@@ -1,0 +1,16 @@
+# local artifacts
+node_modules/
+.env
+.env.*
+dist/
+build/
+tmp/
+output/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+
+# generated documents
+*.docx
+*.pdf
