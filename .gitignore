@@ -6,6 +6,7 @@ dist/
 build/
 tmp/
 output/
+tools/
 
 # OS / editor
 .DS_Store
