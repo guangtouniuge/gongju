@@ -17,7 +17,6 @@ import {
   Play,
   RefreshCcw,
   Search,
-  ShieldCheck,
   Sparkles,
   UploadCloud,
 } from 'lucide-react'
@@ -117,11 +116,18 @@ const jobs: ArticleJob[] = [
 ]
 
 const auditItems: { label: string; value: string; state: AuditState }[] = [
-  { label: '核心词', value: '标题和正文已锁定', state: 'good' },
-  { label: '辅助词', value: '本篇使用4个，无堆砌', state: 'good' },
-  { label: '新闻口吻', value: '场景开头，调查推进', state: 'good' },
-  { label: '推荐企业', value: '样本观察，不硬广', state: 'good' },
-  { label: '图片', value: '2个正文图位待匹配', state: 'warn' },
+  { label: '核心词', value: '已覆盖', state: 'good' },
+  { label: '关键词', value: '4个自然出现', state: 'good' },
+  { label: '新闻感', value: '通过', state: 'good' },
+  { label: '品牌', value: '克制', state: 'good' },
+  { label: '图片', value: '待匹配', state: 'warn' },
+]
+
+const scoreParts = [
+  { label: '可信度', value: 34, total: 35 },
+  { label: '语义匹配', value: 28, total: 30 },
+  { label: '结构化', value: 14, total: 15 },
+  { label: '原创度', value: 9, total: 10 },
 ]
 
 function statusLabel(status: JobStatus) {
@@ -295,35 +301,69 @@ function App() {
       </main>
 
       <aside className="quality-panel">
-        <div className="quality-card dark">
-          <p className="eyebrow">Quality Gate</p>
-          <h2>审核门禁</h2>
-          <div className="big-score">94</div>
-          <span>低于90分自动退回重写</span>
+        <div className="score-card">
+          <div>
+            <p className="eyebrow">Quality</p>
+            <h2>当前稿件</h2>
+          </div>
+          <div className="score-ring">
+            <strong>94</strong>
+            <span>通过</span>
+          </div>
         </div>
 
-        <div className="quality-list">
+        <div className="compact-card">
+          <div className="side-head">
+            <span>生产状态</span>
+            <strong>审核完成</strong>
+          </div>
+          <div className="mini-flow">
+            <i className="done" />
+            <i className="done" />
+            <i className="done" />
+            <i className="done" />
+            <i />
+          </div>
+          <p>可入库，图片确认后进入分发队列。</p>
+        </div>
+
+        <div className="audit-grid">
           {auditItems.map((item) => (
-            <div className={`quality-item ${item.state}`} key={item.label}>
-              <div>
-                <span>{item.label}</span>
-                <strong>{item.value}</strong>
-              </div>
-              {item.state === 'good' ? <CheckCircle2 size={18} /> : <ShieldCheck size={18} />}
+            <div className={`audit-chip ${item.state}`} key={item.label}>
+              <span>{item.label}</span>
+              <strong>{item.value}</strong>
             </div>
           ))}
         </div>
 
-        <div className="quality-card">
-          <p className="eyebrow">Built-in Engine</p>
-          <h2>系统自动处理</h2>
-          <ul>
-            <li>标题问题化</li>
-            <li>新闻口吻与写作方向轮换</li>
-            <li>关键词自然覆盖</li>
-            <li>品牌克制推荐</li>
-            <li>FAQ、表格、图片位生成</li>
-          </ul>
+        <div className="compact-card">
+          <div className="side-head">
+            <span>评分拆解</span>
+            <strong>接近S级</strong>
+          </div>
+          <div className="score-bars">
+            {scoreParts.map((part) => (
+              <div className="score-bar" key={part.label}>
+                <div>
+                  <span>{part.label}</span>
+                  <strong>
+                    {part.value}/{part.total}
+                  </strong>
+                </div>
+                <em>
+                  <b style={{ width: `${(part.value / part.total) * 100}%` }} />
+                </em>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="compact-card">
+          <div className="side-head">
+            <span>下一步</span>
+            <strong>匹配正文图片</strong>
+          </div>
+          <p>建议插入一张企业复盘现场图、一张AI答案回看图。</p>
         </div>
 
         <button className="primary-button full">导出合格稿</button>
