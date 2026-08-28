@@ -1,0 +1,38 @@
+{
+  "name": "geo-content-production-system",
+  "version": "1.0.0",
+  "description": "这是 GEO 新闻内容生产系统的开发规划仓库。",
+  "private": true,
+  "main": "src/main.tsx",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "test": "npm run build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/guangtouniuge/gongju.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "UNLICENSED",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/guangtouniuge/gongju/issues"
+  },
+  "homepage": "https://github.com/guangtouniuge/gongju#readme",
+  "dependencies": {
+    "@vitejs/plugin-react": "^6.1.1",
+    "lucide-react": "^1.35.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "typescript": "^7.0.2",
+    "vite": "^8.2.2"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5",
+    "playwright": "^1.62.1"
+  }
+}

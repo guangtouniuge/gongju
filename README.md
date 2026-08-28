@@ -30,3 +30,33 @@ Agents:
 
 - `.cursor/agents/geo-production-orchestrator.md`
 - `.cursor/agents/geo-article-quality-auditor.md`
+
+## 本地运行
+
+```bash
+npm install
+npm run dev
+```
+
+打开：
+
+```text
+http://127.0.0.1:5173/
+```
+
+## 测试
+
+```bash
+npm test
+```
+
+当前 1.0 基础版包含：
+
+- Codex/GPT 风格三栏工作台
+- 项目资料概览
+- 关键词库展示
+- 文章计划卡
+- 单篇任务队列
+- 文章预览
+- 右侧质量审核面板
+- GitHub Actions 构建测试
