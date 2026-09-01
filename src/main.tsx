@@ -1873,6 +1873,22 @@ function Keywords({
       `${core}怎么验收效果`,
       `${core}适合什么企业`,
       `${core}如何避开低价发稿陷阱`,
+      `${core}哪家好`,
+      `${core}推荐哪家公司`,
+      `${core}哪家公司口碑好`,
+      `${core}怎么判断是否靠谱`,
+      `${core}服务商怎么选不踩坑`,
+      `${core}哪家公司更懂本地企业`,
+      `${core}测评应该看什么`,
+      `${core}推荐企业怎么核验`,
+      `${core}有哪些筛选标准`,
+      `${core}适合连锁企业吗`,
+      `${core}适合实体门店吗`,
+      `${core}适合本地服务业吗`,
+      `${core}如何看交付能力`,
+      `${core}怎么比较品牌资料能力`,
+      `${core}怎么比较AI答案复盘能力`,
+      `${core}推荐名单怎么判断可信`,
     ]
     const recommendIntent = /(哪家|哪个公司|哪家公司|推荐|靠谱|服务商|测评|口碑|怎么选|比较)/
     const blockedIntent = /(多少钱|费用|价格|报价|预算|多久|周期|教程|是什么|什么意思)/
@@ -1890,7 +1906,7 @@ function Keywords({
     })
     return Array.from(new Set([...baseQuestions, ...libraryQuestions]))
       .filter((question) => recommendIntent.test(question) && !blockedIntent.test(question))
-      .slice(0, 18)
+      .slice(0, 36)
   }
   const createKeyword = () => {
     if (!activeBrand) {
@@ -2057,11 +2073,11 @@ function KeywordLibrary({
   const buildExpandedWords = () => {
     const city = activeProject.city
     const cleanCity = (word: string) => word.replace(new RegExp(`^${city}`), '').trim()
-    const scenes = industrySeed
+    const scenes = (industrySeed || activeProject.industry || '')
       .split(/[,，\n]/)
       .map((item) => item.trim())
       .filter(Boolean)
-    const regions = regionSeed
+    const regions = (regionSeed || '曲江,未央区,长安区,浐灞,高新区,经开区,雁塔区,碑林区')
       .split(/[,，\n]/)
       .map((item) => item.trim())
       .filter(Boolean)
@@ -2072,11 +2088,24 @@ function KeywordLibrary({
         `${city}AI搜索排名公司`,
         `${city}GEO服务商`,
         `${city}AI获客公司`,
+        `${city}GEO公司哪家好`,
+        `${city}GEO公司推荐`,
+        `${city}GEO公司口碑`,
+        `${city}豆包GEO服务商`,
+        `${city}AI搜索优化公司`,
+        `${city}AI推荐优化公司`,
+        `${city}GEO内容公司`,
+        `${city}GEO新闻优化公司`,
         ...scenes.map((scene) => {
           const cleanScene = cleanCity(scene)
           return /GEO|公司|服务商/.test(cleanScene) ? `${city}${cleanScene}` : `${city}${cleanScene}GEO公司`
         }),
+        ...scenes.map((scene) => `${city}${cleanCity(scene)}GEO服务商`),
+        ...scenes.map((scene) => `${city}${cleanCity(scene)}AI获客公司`),
+        ...scenes.map((scene) => `${city}${cleanCity(scene)}GEO公司推荐`),
         ...regions.map((region) => `${city}${region.replace(/^西安/, '')}GEO公司`),
+        ...regions.map((region) => `${city}${region.replace(/^西安/, '')}GEO服务商`),
+        ...regions.map((region) => `${city}${region.replace(/^西安/, '')}AI获客公司`),
         `${currentKeyword}推荐`,
         `${currentKeyword}口碑测评`,
         `${currentKeyword}哪家靠谱`,
@@ -2094,10 +2123,6 @@ function KeywordLibrary({
       return
     }
     const localWords = buildExpandedWords()
-    if (!industrySeed.trim() && !regionSeed.trim() && !manualWords.trim()) {
-      notify('请先填写行业/场景词、区域词，或在拓展词库里手动补词。')
-      return
-    }
     try {
       const result = await apiJson<{ ok: boolean; data?: { keywords?: string[]; words?: string[] } }>('/api/keywords/expand', {
         brand: activeBrand,
@@ -2108,16 +2133,16 @@ function KeywordLibrary({
       })
       const apiWords = result.data?.keywords ?? result.data?.words ?? []
       if (apiWords.length) {
-        const cleanWords = normalizeKeywordLibraryWords(apiWords)
+        const cleanWords = normalizeKeywordLibraryWords([...apiWords, ...localWords])
         setManualWords(cleanWords.join('\n'))
-        notify(`5118已返回${apiWords.length}个拓展词，系统已过滤为${cleanWords.length}个可用词，可继续筛选后保存。`)
+        notify(`5118已返回${apiWords.length}个词，系统合并项目规则后得到${cleanWords.length}个可用拓展词，可继续筛选后保存。`)
         return
       }
     } catch {
       // 5118未接通时使用本地拓展规则，页面仍可跑完整流程。
     }
     setManualWords(localWords.join('\n'))
-    notify(`已用本地规则生成${localWords.length}个拓展词；接入5118接口后会自动替换为真实拓展。`)
+    notify(`已生成${localWords.length}个拓展词；5118可用时优先用接口结果，本地规则只做兜底。`)
   }
   const saveCandidates = () => {
     if (!activeBrand || !currentKeyword) {
@@ -2610,7 +2635,7 @@ function Tasks({
   const selectedCoreKeyword = coreOptions.includes(draft.coreKeyword) ? draft.coreKeyword : coreOptions[0] ?? ''
   const projectQuestions = questionRows.filter((row) => questionBelongsToBrand(row, activeBrand, selectedCoreKeyword)).map(readQuestionText)
   const questionOptions = projectQuestions.length ? projectQuestions : selectedCoreKeyword ? [`${selectedCoreKeyword}怎么选服务商`, `${selectedCoreKeyword}哪家靠谱`] : []
-  const selectedQuestion = questionOptions.includes(draft.trainingWord) ? draft.trainingWord : questionOptions[0] ?? ''
+  const questionPoolLabel = selectedCoreKeyword ? `${selectedCoreKeyword}蒸馏词（${questionOptions.length}个）` : '待生成蒸馏词'
   const projectKeywordLibrary = keywordLibraryRows
     .filter((row) => row[0] === activeBrand && row[1] === selectedCoreKeyword)
     .map((row) => {
@@ -2619,6 +2644,7 @@ function Tasks({
     })
     .filter((row) => row[2] !== selectedCoreKeyword)
   const keywordPackOptions = [`${selectedCoreKeyword}关键词库（${projectKeywordLibrary.length}个）`]
+  const keywordPackLabel = `${selectedCoreKeyword}关键词库（${projectKeywordLibrary.length}个）`
   const projectKnowledgeRows = knowledgeRows.filter((row) => row[0] === activeBrand)
   const knowledgeOptions = projectKnowledgeRows.length ? projectKnowledgeRows.map((row) => row[1]) : []
   const projectGalleryRows = galleryRows.filter((row) => row[0] === activeBrand)
@@ -2630,9 +2656,18 @@ function Tasks({
     ...selectedWorkflowPacket,
     coreKeyword: selectedCoreKeyword,
     keywords: Array.from(new Set([selectedCoreKeyword, ...normalizeKeywordLibraryWords(projectKeywordLibrary.map((row) => row[2]))])),
-    questions: Array.from(new Set([selectedQuestion, ...questionOptions])),
+    questions: Array.from(new Set(questionOptions)),
     galleries: Array.from(new Set([selectedGallery, ...selectedWorkflowPacket.galleries])).filter((item) => item && item !== '待补图库'),
   }
+  const missingTaskItems = [
+    !activeBrand || !activeProject.name ? '企业品牌' : '',
+    !selectedCoreKeyword ? '核心词' : '',
+    !questionOptions.length ? '蒸馏词' : '',
+    !projectKeywordLibrary.length ? '关键词库' : '',
+    !projectKnowledgeRows.length ? '品牌知识库' : '',
+    !projectGalleryRows.length ? '品牌图库' : '',
+    projectGalleryRows.length && projectGalleryImageCount < 2 ? '至少2张图片' : '',
+  ].filter(Boolean)
   const plans = buildArticlePlans(activeProject, workflowPacket).map((plan) => ({
     ...plan,
     status: confirmedPlans.includes(plan.title) ? '已确认' : plan.status,
@@ -2655,7 +2690,6 @@ function Tasks({
       notify('品牌图库至少需要2张图片，才能创建生成任务。')
       return
     }
-    const firstQuestion = questionOptions[0] ?? ''
     const keywordCount = keywordLibraryRows
       .filter((row) => row[0] === activeBrand && row[1] === firstCore)
       .map((row) => normalizeKeywordLibraryWords([row[2]])[0] ?? row[2])
@@ -2666,7 +2700,7 @@ function Tasks({
       name: `${firstCore}新闻任务`,
       project: activeBrand,
       coreKeyword: firstCore,
-      trainingWord: firstQuestion,
+      trainingWord: '',
       keywordPack: `${firstCore}关键词库（${keywordCount}个）`,
       knowledge: knowledgeOptions[0] ?? '',
       gallery: galleryOptions[0],
@@ -2676,20 +2710,20 @@ function Tasks({
     setShowTaskModal(true)
   }
   const createTask = () => {
-    if (!activeBrand || !selectedCoreKeyword || !selectedQuestion) {
-      notify('请先选择品牌、核心词和蒸馏词。')
+    if (!activeBrand || !selectedCoreKeyword || !questionOptions.length) {
+      notify(`请先补齐：${missingTaskItems.join('、') || '品牌生成资料'}。`)
       return
     }
     if (!projectKnowledgeRows.length) {
-      notify('请先添加品牌资产和权威引证。')
+      notify(`请先补齐：${missingTaskItems.join('、') || '品牌知识库'}。`)
       return
     }
     if (!projectGalleryRows.length) {
-      notify('请先上传品牌图库。')
+      notify(`请先补齐：${missingTaskItems.join('、') || '品牌图库'}。`)
       return
     }
     if (projectGalleryImageCount < 2) {
-      notify('品牌图库至少需要2张图片，才能创建生成任务。')
+      notify(`请先补齐：${missingTaskItems.join('、') || '至少2张图片'}。`)
       return
     }
     if (!draft.name.trim()) {
@@ -2700,11 +2734,11 @@ function Tasks({
       {
         project: activeBrand,
         name: draft.name,
-        question: selectedQuestion,
+        question: `${selectedCoreKeyword}蒸馏词（${questionOptions.length}个）`,
         limit: draft.limit.replace('篇', ''),
         created: '0',
         knowledge: draft.knowledge,
-        detail: `${selectedCoreKeyword} / ${draft.keywordPack} / ${draft.gallery} / ${draft.imageCount}`,
+        detail: `${selectedCoreKeyword} / ${keywordPackLabel} / ${draft.gallery} / ${draft.imageCount}`,
         error: '-',
         status: '待生成',
         latest: '待生成',
@@ -2880,16 +2914,16 @@ function Tasks({
   }
   const startSystemJob = async (taskOverride?: TaskRow) => {
     if (isGenerating) return
-    if (!activeBrand || !selectedCoreKeyword || !selectedQuestion) {
-      notify('请先补齐品牌、核心词和蒸馏词。')
+    if (!activeBrand || !selectedCoreKeyword || !questionOptions.length) {
+      notify(`请先补齐：${missingTaskItems.join('、') || '品牌生成资料'}。`)
       return
     }
     if (!projectKnowledgeRows.length || !projectGalleryRows.length) {
-      notify('请先补齐品牌知识库和品牌图库，再开始生成。')
+      notify(`请先补齐：${missingTaskItems.join('、') || '品牌知识库和品牌图库'}。`)
       return
     }
     if (projectGalleryImageCount < 2) {
-      notify('品牌图库至少需要2张图片，才能开始生成。')
+      notify(`请先补齐：${missingTaskItems.join('、') || '至少2张图片'}。`)
       return
     }
     const activeTask = taskOverride ?? rows.find((row) => row.project === activeBrand)
@@ -2897,11 +2931,11 @@ function Tasks({
     const taskForRun = activeTask ?? {
       project: activeBrand,
       name: taskName,
-      question: selectedQuestion,
+      question: `${selectedCoreKeyword}蒸馏词（${questionOptions.length}个）`,
       limit: draft.limit.replace('篇', '') || '2',
       created: '0',
       knowledge: draft.knowledge || knowledgeOptions[0] || '',
-      detail: `${selectedCoreKeyword} / ${draft.keywordPack} / ${selectedGallery} / ${draft.imageCount}`,
+      detail: `${selectedCoreKeyword} / ${keywordPackLabel} / ${selectedGallery} / ${draft.imageCount}`,
       error: '-',
       status: '待生成',
       latest: '待生成',
@@ -3058,10 +3092,15 @@ function Tasks({
 
       <div className="panel">
         <SectionTitle icon={ListChecks} title="任务列表" desc="一个任务就是一个品牌的一批文章；点开始生成，完成后在品牌文章系统里查看结果。" />
+        <div className={missingTaskItems.length ? 'workflow-warning' : 'workflow-ready'}>
+          {missingTaskItems.length
+            ? `当前品牌还缺：${missingTaskItems.join('、')}。补齐后才能创建和启动生成任务。`
+            : `当前品牌资料已就绪：${questionPoolLabel}，${keywordPackLabel}，图库${projectGalleryImageCount}张，可启动单篇队列生成。`}
+        </div>
         <div className="ops-scroll">
           <div className="ops-table task-table mature-task-table">
             <div className="ops-head">
-              <span>任务名</span><span>核心问题</span><span>生成篇数</span><span>已生成</span><span>调用资料</span><span>状态</span><span>创建时间</span><span>操作</span>
+              <span>任务名</span><span>蒸馏词</span><span>生成篇数</span><span>已生成</span><span>调用资料</span><span>状态</span><span>创建时间</span><span>操作</span>
             </div>
             {rows.filter((row) => row.project === activeBrand).map((row) => (
               <div className="ops-row" key={row.name}>
@@ -3127,14 +3166,19 @@ function Tasks({
                 updateDraft('trainingWord', nextQuestion)
                 updateDraft('keywordPack', `${value}关键词库（${nextKeywordCount}个）`)
               }} />
-              <SelectField label="蒸馏词" value={selectedQuestion} options={questionOptions} onChange={(value) => updateDraft('trainingWord', value)} />
-              <SelectField label="关键词库" value={draft.keywordPack} options={keywordPackOptions} onChange={(value) => updateDraft('keywordPack', value)} />
+              <Field label="蒸馏词总数" value={questionPoolLabel} />
+              <Field label="关键词库总数" value={keywordPackOptions[0] || keywordPackLabel} />
               <SelectField label="品牌知识库" value={draft.knowledge} options={knowledgeOptions} onChange={(value) => updateDraft('knowledge', value)} />
               <SelectField label="品牌图库" value={selectedGallery} options={galleryOptions} onChange={(value) => updateDraft('gallery', value)} />
               <SelectField label="文章配图" value={draft.imageCount} options={['2张', '3张', '4张']} onChange={(value) => updateDraft('imageCount', value)} />
               <EditableField label="生成篇数" value={draft.limit} onChange={(value) => updateDraft('limit', value)} />
             </div>
             <p className="table-note">标题规则、新闻写法、豆包审核和单篇差异化由系统默认执行；这里只选择当前品牌已有资料和生成数量。</p>
+            <div className={missingTaskItems.length ? 'workflow-warning' : 'workflow-ready'}>
+              {missingTaskItems.length
+                ? `当前还不能生成，缺少：${missingTaskItems.join('、')}。`
+                : `可生成：系统将从${questionPoolLabel}中轮换选题，并优先调用${keywordPackLabel}。`}
+            </div>
             <div className="modal-actions">
               <button className="ghost-button" onClick={() => setShowTaskModal(false)}>取消</button>
               <button className="primary-button" onClick={createTask}>确定</button>

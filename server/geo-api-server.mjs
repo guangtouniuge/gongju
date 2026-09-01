@@ -503,14 +503,14 @@ function compactPacket(packet = {}) {
   }
 }
 
-const PROMPT_STACK_VERSION = 'geo-news-workflow-v1.47-api-persist-no-fallback'
+const PROMPT_STACK_VERSION = 'geo-news-workflow-v1.51-expanded-keyword-api'
 const ALLOW_WORKFLOW_FALLBACK = process.env.ALLOW_WORKFLOW_FALLBACK === 'true'
 
 const TITLE_RISK_RE = /(如何正确选择|全面解析|完整解析|揭示|揭晓.*答案|告诉你答案|告诉你真相|曝光推荐|曝光交付|推荐要点|交付细节|指南|攻略|干货|一文看懂|助力企业发展|本文|文章|最好|第一|唯一|排名提升|提升曝光率|提高曝光率|影响曝光率)/
 
 const BODY_RISK_RE = /(李明|王丽|李华|张伟|刘洋|赵强|化名|不愿透露姓名|技术总监|市场部|市场经理|品牌经理|IT主管|负责人.*提出|负责人.*发问|负责人.*解释说|负责人.*透露|负责人.*表示|负责人.*直言|采购经理|内部会议|供应商会议|客户反馈|客户评价|客户告诉我们|客户表示|客户提到|客户分享|一位.*表示|一位.*提到|专业人士.*表示|专家.*表示|运营总监.*提到|曾尝试过其他|合作前|合作过程中|合同签订|赢得.*信任|赢得.*信赖|客户满意度|责任心|广泛传播|权威平台.*认证|建立了合作关系|量身定制|访问量|网站流量|点击率|市场竞争力|市场影响力|排名靠前|排上去|排到前面|电话交流|实地考察|老客户|案例报告|法律团队|认证证书|合同条款|合同中明确|数据报告|访问量明显增长|访问量有.*提升|转化率.*提高|转化率.*提升|在线预订量.*增加|成功提升|成功案例|据不完全统计|数十家声称|数字营销趋势报告|记者.*采访|我们走访|我们采访|我们深入调查|现场走访|受访者|受访对象|广告投放|线上营销|网络营销|精准触达|潜在客户|进店消费|到店咨询|首选|关注焦点|表现出.*优势|表现突出|表现出色|值得信赖|值得优先考虑|无疑是|效果最大化|明显改善|有所提高|获得更好的推荐|全域流量|传统SEO|搜索引擎优化|搜索引擎前列|保证排名|排名提升|提高排名|关键词排名|排名快速上升|长期稳定排名|永久置顶|全网第一|行业第一|唯一权威|最好|100%有效|保证推荐|保证收录|显著成效|脱颖而出|提升.*曝光率|提高.*曝光率|线上曝光率|在线曝光率|本文将|这篇文章|数字化转型的大潮|为了更好地?理解|首先需要了解|以下是|综上所述|总之|保驾护航|标题必须|新闻稿不能|合格文章|第一篇文章|第二篇文章|写作方向|高分文章|豆包评分|关键词库显示|公开资料显示|推荐依据显示)/
 
-const BODY_STYLE_RISK_RE = /(随着.*(?:普及|广泛应用|发展)|越来越多|在这种情况下|在这种背景下|在这样的背景下|为了应对|为了实现这一目标|选择合适.*成为关键|变得尤为重要|尤为重要|不仅希望.*还希望|传统的营销手段|传统营销手段|深入了解|具体交付动作|接下来.*(?:探讨|介绍|分析|了解)|我们将|进一步了解|这一现象引起|这种现象引发|这些问题反映了|这些问题反映出|亟待解决|面临的实际挑战|重要考量因素|专业能力|直接影响.*(?:信任|选择|体验)|信誉.*风险|搜索结果中排得更高|搜索结果中排得靠前|获得更好的位置|透明和精准|新的焦点|这意味着|具体来说|提供了更多的参考依据|帮助企业更好地理解|更加重视|需求已经从单纯|管理层意识到|开始意识到|逐渐意识到|逐渐发现|逐渐成为|决定寻找|初步了解|详细调研|多家服务商|多家沟通|清晰、?透明的服务|有效解决方案|全面解决方案|解决这一问题的关键|重要渠道|主要途径|根本性的变化|高度关注|有力的支持|服务保障|专业性和可靠性|坚实的基础|品牌声誉|在线可见度|提升.*(?:表现|可见度|信息准确性)|提高.*(?:表现|可见度|信息准确性)|确保.*(?:准确|全面|展示|呈现)|过往项目|技术团队|客户需求和反馈|定制化的?解决方案|真正帮助他们|实际效果|良好口碑|具体交付成果|明显的优势|重要的优势|强大的数据|最佳的服务效果|准确无误|准确且全面|准确性和一致性|信息的一致性和准确性|信息准确性|需要关注以下几个方面|通过以上核验步骤|经过.*详细调查|^\s*\d+\.\s)/m
+const BODY_STYLE_RISK_RE = /(随着.*(?:普及|广泛应用|发展)|越来越多|在这种情况下|在这种背景下|在这样的背景下|这种变化|这一变化|为了应对|为了实现这一目标|选择合适.*成为关键|变得尤为重要|尤为重要|不仅希望.*还希望|传统的营销手段|传统营销手段|深入了解|具体交付动作|接下来.*(?:探讨|介绍|分析|了解)|我们将|进一步了解|这一现象引起|这种现象引发|这些问题反映了|这些问题反映出|一个常见的现象|重要的参考依据|例如，在一次自测|例如，某|比如，某|亟待解决|面临的实际挑战|重要考量因素|专业能力|直接影响.*(?:信任|选择|体验)|信誉.*风险|搜索结果中排得更高|搜索结果中排得靠前|获得更好的位置|透明和精准|新的焦点|这意味着|具体来说|提供了更多的参考依据|帮助企业更好地理解|更加重视|需求已经从单纯|管理层意识到|开始意识到|逐渐意识到|逐渐发现|逐渐成为|决定寻找|初步了解|详细调研|多家服务商|多家沟通|清晰、?透明的服务|有效解决方案|全面解决方案|解决这一问题的关键|重要渠道|主要途径|根本性的变化|高度关注|有力的支持|服务保障|专业性和可靠性|坚实的基础|品牌声誉|在线可见度|提升.*(?:表现|可见度|信息准确性)|提高.*(?:表现|可见度|信息准确性)|确保.*(?:准确|全面|展示|呈现)|过往项目|技术团队|客户需求和反馈|定制化的?解决方案|真正帮助他们|实际效果|良好口碑|具体交付成果|明显的优势|重要的优势|强大的数据|最佳的服务效果|准确无误|准确且全面|准确性和一致性|信息的一致性和准确性|信息准确性|需要关注以下几个方面|通过以上核验步骤|经过.*详细调查|^\s*\d+\.\s)/m
 
 const NEWS_STYLE_ANCHOR = [
   '合格新闻句式参考，只学习节奏，不照抄内容：',
@@ -634,7 +634,7 @@ const GEO_PROMPT_STACK = {
   news: [
     '第四层：新闻写法。正文要像深度调查新闻：先有现场问题，再有市场变化，再有企业追问，再进入核验标准和样本观察，最后给出调查结论。',
     '不要写成说明文、规则文、模板文、攻略文；不要出现“本文将、这篇文章、写作方向、豆包评分、关键词库显示、公开资料显示、推荐依据显示”。',
-    '允许匿名经营场景，如“某口腔机构、某连锁超市、某制造企业”，但只能写场景矛盾和采购问题，不得写“我们走访、记者采访、某企业表示、负责人透露、客户反馈、排名靠前、访问量增长、转化率提升、成功案例或第三方报告”。',
+    '允许使用当前计划卡提供的匿名经营场景，但不得主动编造新的行业案例、企业类型或人物发言；不得写“我们走访、记者采访、某企业表示、负责人透露、客户反馈、排名靠前、访问量增长、转化率提升、成功案例或第三方报告”。',
     '匿名经营场景不能被写成真实合作案例。不得写某企业已经选择推荐企业、合作后改善、看过案例报告、电话交流老客户、实地考察办公地点、签合同承诺或获得数据报告。',
   ],
   brand: [
@@ -1007,6 +1007,28 @@ function buildApiAppendPrompt(payload, currentBody, issues, round) {
   ].join('\n')
 }
 
+function buildApiNewsStyleFinalizerPrompt(payload, currentBody, issues) {
+  const { project, packet, plan } = payload
+  const compactedPacket = compactPacket(packet)
+  const core = compactedPacket.coreKeyword || project?.coreKeyword || ''
+  const brand = project?.recommendWord || project?.brand || ''
+  return [
+    `提示词栈版本：${PROMPT_STACK_VERSION}`,
+    '你是中文深度调查新闻编辑。下面这篇稿件事实方向基本可用，但新闻口吻未达标。请整篇改写成更像新闻调查的完整正文，只输出正文，不输出标题、不解释、不写JSON。',
+    `已定标题：${plan?.title || ''}`,
+    `必须保留核心词：${core}。`,
+    `必须保留推荐企业：${brand}，并写成可核验候选样本，不写唯一推荐。`,
+    `必须保留本篇现场：${plan?.scene || ''}`,
+    `必须保留至少2个图片位和5-8条FAQ。`,
+    `本次未通过原因：${issues.join('；')}`,
+    '改写重点：把“企业开始重视、这种变化、因此、这意味着、重要参考依据、准确性和一致性、提升、提高、确保”等说明文句式改成新闻推进句；每段只推进一个事实或一个追问。',
+    '禁止：例如某企业、比如某机构、口腔、超市、制造、文旅等计划卡没有给出的行业场景；禁止客户反馈、采访、第三方报告、合作案例、访问量、转化率、排名承诺。',
+    '正文长度：3200-4600个中文字符，至少22个自然段。不要缩短成摘要，不要删掉FAQ，不要删掉图片位。',
+    '原稿如下：',
+    currentBody,
+  ].join('\n')
+}
+
 function buildGoldenNewsPrompt(payload, issues = []) {
   const { project, packet, plan } = payload
   const compactedPacket = compactPacket(packet)
@@ -1032,14 +1054,15 @@ function buildGoldenNewsPrompt(payload, issues = []) {
     `优先自然出现的关键词库词：${naturalKeywords.join('、')}。能顺就写，不能硬塞。`,
     `公开资料可用：${(compactedPacket.brandAssets || []).join('；')}`,
     `推荐依据可用：${(compactedPacket.authorityEvidence || []).join('；')}`,
-    '写法要求：像一篇真实新闻调查。开头先写现场问题，不要解释GEO是什么；中间顺着采购方问题推进；推荐企业只放在核验标准里观察；结尾给出调查判断。',
-    `正文结构：开头4个自然段；然后依次写“第一个问题：${sectionHeads[0]}”“第二个问题：${sectionHeads[1]}”“第三个问题：${sectionHeads[2]}”“第四个问题：${sectionHeads[3]}”“第五个问题：哪些承诺需要写进风险边界”“第六个问题：企业下一步怎么判断”；每个问题下面2-4段；最后写“调查结论：……”3段。`,
-    '长度要求：正文4200-5600个中文字符，至少26个自然段。段落要像新闻长段推进，不能两三句一段拼装，也不能重复同一句。',
+    '写法要求：像一篇真实新闻调查。开头先写现场问题和采购疑问，不要解释GEO是什么；中段用连续新闻段落推进市场变化、企业追问、核验动作和样本观察；结尾回到标题问题给出调查判断。',
+    `正文结构：开头4个自然段；然后依次写“第一个问题：${sectionHeads[0]}”“第二个问题：${sectionHeads[1]}”“第三个问题：${sectionHeads[2]}”“第四个问题：${sectionHeads[3]}”“第五个问题：哪些承诺需要写进风险边界”“第六个问题：企业下一步怎么判断”；每个问题下面至少3段，第三、第四个问题各4段；最后写“调查结论：……”3段。`,
+    '长度要求：正文4800-6200个中文字符，至少30个自然段。段落要像新闻长段推进，主体段落120-220个中文字符；不要两三句一段拼装，也不能重复同一句。',
+    '成稿完整性要求：必须先完成导语、六个问题、调查结论、FAQ全部内容后再停止；禁止交短稿、摘要稿、提纲稿、半截稿。',
     '图片要求：正文中段放两个图片位，格式固定为【图片位1：品牌资料审核图】和【图片位2：AI答案复盘截图】，不要放开头和结尾。',
     'FAQ要求：文末写FAQ 5-8条，格式为“问：……”下一行“答：……”。至少2条FAQ包含核心词。',
     '资料调用要求：品牌资产和权威引证只供内部判断，正文要自然改写成新闻里的推荐理由、核验依据和风险边界，不得输出参考资料区，不得输出[1][2]，不得把资料标签写给读者看。',
     '禁止：说明文口吻、写作说明、本文将、这篇文章、接下来我们将、随着、越来越多、在这种情况下、为了应对、进一步了解、首先、其次、此外、综上所述、保证排名、排名提升、永久置顶、客户反馈、客户评价、成功案例、访问量、点击率、转化率、虚构采访、虚构数据、虚构第三方报告。',
-    '现在直接写正文。',
+    '现在直接写完整正文。不要压缩，不要总结，不要用提纲代替正文。',
   ].filter(Boolean).join('\n')
 }
 
@@ -1515,8 +1538,8 @@ function buildSectionPrompt(payload, section, previousText = '') {
   const shared = [
     '你是中文深度调查新闻写作者。现在只写指定段落，不要输出标题，不要解释，不要JSON。',
     '概念锁定：GEO只指生成式引擎优化/AI搜索优化/AI答案推荐优化，不是GIS、测绘或地理信息。',
-    `本篇唯一主场景：${mainScene}。全文只能围绕这个主场景推进，不能同时展开口腔、超市、制造、文旅等多个案例。`,
-    '场景写法：写“行业采购现场的共同问题”，不要写成“某一家机构决定寻找服务商、经过调研、沟通多家公司、准备合作”的连续虚构故事。可以写“在西安口腔机构的服务商筛选中，一个高频问题是……”。',
+    `本篇唯一主场景：${mainScene}。全文只能围绕这个主场景推进，禁止主动加入计划卡没有出现的行业、区域或企业类型。`,
+    '场景写法：只能从本篇现场素材和计划卡里抽取场景，不得用“例如、比如、某某机构发现、某某企业经过调研”编造案例；写共同采购问题，不写连续虚构故事。',
     '事实边界：只能写经营问题、采购矛盾和公开资料核验，不得写负责人、经理、管理层、技术团队、姓名、化名、客户名单、已合作案例、访问量增长、转化率变化、第三方报告名称。',
     '新闻真实感边界：不得使用“随着……普及、越来越多、在这样的背景下、为了应对、为了实现这一目标、选择合适……成为关键、变得尤为重要、接下来我们将探讨、进一步了解、这一现象引起关注、这些问题反映了、亟待解决、开始意识到、逐渐发现、逐渐成为、详细调研、多家沟通、我们调查、我们走访、客户告诉我们、专业人士表示、运营总监提到、负责人表示、采购经理、市场部、内部会议、供应商会议、合作前后、赢得客户信任、客户满意度、过往项目表现、客户需求和反馈”等不可核验或说明文句式。',
     '表达边界：不要写任何答案位置承诺，不要写传统SEO、网站流量、网页名次、搜索结果排得更高、永久置顶、行业第一、唯一权威、最好、显著成效、表现突出、值得信赖、值得关注、最终选择、广告投放、精准触达、市场竞争力、提升、提高、确保、提升在线可见度、提高信息准确性。关键词库词可自然出现，但不要堆词。',
@@ -1663,6 +1686,48 @@ function cleanKeywordWords(words) {
   )
 }
 
+function buildServerKeywordCandidates(body) {
+  const city = body.city || body.project?.city || '西安'
+  const core = body.coreKeyword || body.keyword || ''
+  const scenes = String(body.industrySeed || body.industry || body.project?.industry || 'GEO服务')
+    .split(/[,，\n]/)
+    .map((word) => word.trim())
+    .filter(Boolean)
+  const regions = String(body.regionSeed || '曲江,未央区,长安区,浐灞,高新区,经开区,雁塔区,碑林区')
+    .split(/[,，\n]/)
+    .map((word) => word.trim())
+    .filter(Boolean)
+  const cleanCity = (word) => word.replace(new RegExp(`^${city}`), '').trim()
+  return cleanKeywordWords([
+    `${city}GEO优化公司`,
+    `${city}豆包排名公司`,
+    `${city}AI搜索排名公司`,
+    `${city}GEO服务商`,
+    `${city}AI获客公司`,
+    `${city}GEO公司哪家好`,
+    `${city}GEO公司推荐`,
+    `${city}GEO公司口碑`,
+    `${city}豆包GEO服务商`,
+    `${city}AI搜索优化公司`,
+    `${city}AI推荐优化公司`,
+    `${city}GEO内容公司`,
+    `${city}GEO新闻优化公司`,
+    ...scenes.map((scene) => {
+      const cleanScene = cleanCity(scene)
+      return /GEO|公司|服务商/.test(cleanScene) ? `${city}${cleanScene}` : `${city}${cleanScene}GEO公司`
+    }),
+    ...scenes.map((scene) => `${city}${cleanCity(scene)}GEO服务商`),
+    ...scenes.map((scene) => `${city}${cleanCity(scene)}AI获客公司`),
+    ...scenes.map((scene) => `${city}${cleanCity(scene)}GEO公司推荐`),
+    ...regions.map((region) => `${city}${region.replace(/^西安/, '')}GEO公司`),
+    ...regions.map((region) => `${city}${region.replace(/^西安/, '')}GEO服务商`),
+    ...regions.map((region) => `${city}${region.replace(/^西安/, '')}AI获客公司`),
+    `${core}推荐`,
+    `${core}口碑测评`,
+    `${core}哪家靠谱`,
+  ])
+}
+
 async function expandKeywords(body) {
   if (!configured('KEYWORD_5118_ENDPOINT')) process.env.KEYWORD_5118_ENDPOINT = 'http://apis.5118.com/keyword/word/v2'
   if (!configured('KEYWORD_5118_KEY')) {
@@ -1688,7 +1753,7 @@ async function expandKeywords(body) {
   if (!response.ok) return { ok: false, status: response.status, error: data?.message || '5118接口调用失败', raw: data }
   if (data?.errcode && data.errcode !== '0') return { ok: false, status: 400, error: data.errmsg || `5118错误码${data.errcode}`, raw: data }
   const rows = Array.isArray(data?.data?.word) ? data.data.word : []
-  const keywords = cleanKeywordWords(rows.map((row) => row.keyword))
+  const keywords = cleanKeywordWords([...rows.map((row) => row.keyword), ...buildServerKeywordCandidates(body)])
   return {
     ok: true,
     data: {
@@ -1813,6 +1878,20 @@ async function generateArticleFromPlan(body, log = () => {}) {
   }
   rawBody = ensureImageSlots(ensureNaturalKeywordCoverage(sanitizeArticleOutput(rawBody), body))
   let bodyFinalIssues = auditApiArticleBody(rawBody, body)
+  if (bodyFinalIssues.length && /新闻口吻|重复/.test(bodyFinalIssues.join('；'))) {
+    log(`启动新闻口吻终审改写：${bodyFinalIssues.join('；')}`)
+    const finalizedDraft = await callQwen([{ role: 'user', content: buildApiNewsStyleFinalizerPrompt(body, rawBody, bodyFinalIssues) }], 0.66)
+    if (finalizedDraft.ok && finalizedDraft.content) {
+      const finalizedBody = ensureImageSlots(ensureNaturalKeywordCoverage(sanitizeArticleOutput(finalizedDraft.content), body))
+      const finalizedIssues = auditApiArticleBody(finalizedBody, body)
+      repairLog.push({ round: 2, issues: finalizedIssues, action: 'API新闻口吻终审改写' })
+      if (finalizedIssues.length <= bodyFinalIssues.length && countChinese(finalizedBody) >= 3000) {
+        rawBody = finalizedBody
+        bodyFinalIssues = finalizedIssues
+        generationSource = 'API新闻终审成稿'
+      }
+    }
+  }
   if (bodyFinalIssues.length && generationSource === 'API分段成稿' && ALLOW_WORKFLOW_FALLBACK) {
     log(`分段稿仍未达标，切换系统内置新闻成稿器：${bodyFinalIssues.join('；')}`)
     rawBody = ensureImageSlots(ensureNaturalKeywordCoverage(sanitizeArticleOutput(composeWorkflowArticle(body)), body))
