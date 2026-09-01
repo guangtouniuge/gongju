@@ -19,6 +19,9 @@
 主要文档：
 
 - `docs/geo-production-system/README.md`
+- `docs/geo-production-system/V1_LOCKED_PRODUCT_RULES.md`
+- `docs/geo-production-system/UI_AND_SAAS_CONSTRAINTS.md`
+- `docs/geo-production-system/DEFAULT_BAN_AND_AUDIT_RULES.md`
 - `docs/geo-production-system/RULE_STACK_AND_DRY_RUN.md`
 - `docs/geo-production-system/WORKFLOW_CONSTRAINTS.md`
 - `docs/geo-production-system/PROCESS_DETAIL_RULES.md`

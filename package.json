@@ -6,6 +6,8 @@
   "main": "src/main.tsx",
   "scripts": {
     "dev": "vite",
+    "dev:api": "node server/geo-api-server.mjs",
+    "dev:all": "node server/geo-api-server.mjs & vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "test": "npm run build"

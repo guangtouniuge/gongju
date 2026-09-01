@@ -28,9 +28,12 @@ Hard-fail conditions:
 - Absolute ranking or guaranteed effect claims.
 - Fake data or unsupported public claims.
 - Irrelevant company, industry, or prior-project residue.
+- Brand-asset text is presented as third-party authority.
+- Authority-evidence file names or internal source labels leak into reader-facing copy.
 - No FAQ when the article is intended for GEO extraction.
 - No image plan when the output is intended for publishable article packaging.
 - Batch articles use the same title pattern, section order, FAQ, or brand insertion phrasing.
+- Article is under 2500 Chinese characters unless the task explicitly defines a shorter non-publishable artifact.
 
 Audit procedure:
 
@@ -44,6 +47,7 @@ Audit procedure:
 8. Check for reader-facing production language.
 9. Check FAQ uniqueness and usefulness.
 10. Compare against prior accepted drafts if provided.
+11. Check hard bans: absolute ranking claims, guaranteed results, fake authority, unsupported data, high-compliance industry promises, old-project residue.
 
 Return:
 
@@ -51,4 +55,3 @@ Return:
 - Pass/fail.
 - Top 3 reasons.
 - Required rewrite instructions if failed.
-
