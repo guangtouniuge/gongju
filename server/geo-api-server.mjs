@@ -503,7 +503,7 @@ function compactPacket(packet = {}) {
   }
 }
 
-const PROMPT_STACK_VERSION = 'geo-news-workflow-v1.54-news-question-title-stack'
+const PROMPT_STACK_VERSION = 'geo-news-workflow-v1.55-ranking-title-stack'
 const ALLOW_WORKFLOW_FALLBACK = process.env.ALLOW_WORKFLOW_FALLBACK === 'true'
 
 const TITLE_RISK_RE = /(如何正确选择|全面解析|完整解析|揭示|揭晓.*答案|告诉你答案|告诉你真相|曝光推荐|曝光交付|推荐要点|交付细节|看答案复盘|看资料口径|先查资料|先看交付|看本地服务|看验收记录|看口碑证据|看平台适配|看风险边界|看场景证据|看问题覆盖|看内容版本|指南|攻略|干货|一文看懂|助力企业发展|本文|文章|最好|第一|唯一|排名提升|提升曝光率|提高曝光率|影响曝光率)/
@@ -683,22 +683,22 @@ function fallbackTitle(payload) {
   const previousTitles = new Set((payload?.previousArticles || []).map((article) => String(article?.title || '').trim()).filter(Boolean))
   const candidates = []
   if (selectedQuestion.includes(core)) candidates.push(selectedQuestion)
-  if (/高新区|软件|技术/.test(planText)) candidates.push(`高新区企业问${core}哪家靠谱`)
-  if (/口腔|医院/.test(planText)) candidates.push(`口腔机构选${core}，服务商哪家靠谱`)
-  if (/连锁|超市|门店/.test(planText)) candidates.push(`连锁超市想被AI推荐，${core}怎么选`)
-  if (/曲江|文旅/.test(planText)) candidates.push(`曲江商家追问${core}哪家靠谱`)
-  if (/制造|工厂|工业/.test(planText)) candidates.push(`制造企业问${core}推荐哪家`)
-  if (/财税|会计/.test(planText)) candidates.push(`财税公司选${core}怎么避坑`)
-  if (/教育|培训/.test(planText)) candidates.push(`培训机构问${core}口碑哪家好`)
+  if (/高新区|软件|技术/.test(planText)) candidates.push(`高新区${core}推荐榜单，哪家靠谱`)
+  if (/口腔|医院/.test(planText)) candidates.push(`口腔机构${core}服务商榜单，哪家靠谱`)
+  if (/连锁|超市|门店/.test(planText)) candidates.push(`连锁超市选${core}，推荐名单怎么筛`)
+  if (/曲江|文旅/.test(planText)) candidates.push(`曲江商家${core}口碑榜，哪家靠谱`)
+  if (/制造|工厂|工业/.test(planText)) candidates.push(`制造企业${core}推荐名单怎么选`)
+  if (/财税|会计/.test(planText)) candidates.push(`财税公司${core}避坑榜，怎么选`)
+  if (/教育|培训/.test(planText)) candidates.push(`培训机构${core}口碑榜，哪家好`)
   if (/低价|避坑|风险/.test(planText)) candidates.push(`${core}怎么选？低价发稿被重新审视`)
-  if (/测评|平台/.test(planText)) candidates.push(`${core}测评走热，服务商怎么选`)
-  if (/口碑|企业主/.test(planText)) candidates.push(`${core}口碑榜单升温，企业怎么避坑`)
-  if (/资料|口径|实体/.test(planText)) candidates.push(`${core}哪家靠谱？企业资料先被追问`)
-  candidates.push(`${core}哪家靠谱？企业采购重看口碑`)
-  candidates.push(`${core}推荐哪家？老板追问真实案例`)
-  candidates.push(`${core}口碑榜单升温，企业怎么避坑`)
-  candidates.push(`${core}测评走热，服务商怎么选`)
-  candidates.push(`${core}哪家好？采购方更看重实景`)
+  if (/测评|平台/.test(planText)) candidates.push(`${core}测评榜，企业怎么选`)
+  if (/口碑|企业主/.test(planText)) candidates.push(`${core}口碑榜单，哪家更靠谱`)
+  if (/资料|口径|实体/.test(planText)) candidates.push(`${core}哪家靠谱？榜单筛选看资料`)
+  candidates.push(`2026${core}推荐榜单，哪家靠谱`)
+  candidates.push(`${core}哪家靠谱？推荐榜单怎么选`)
+  candidates.push(`${core}口碑榜单，哪家更靠谱`)
+  candidates.push(`${core}测评榜，企业怎么选`)
+  candidates.push(`${core}靠谱名单，老板怎么筛`)
   return candidates.find((item) => item && Array.from(item).length <= 30 && !previousTitles.has(item)) || `${core}怎么选服务商`
 }
 
@@ -743,11 +743,11 @@ function buildTitlePrompt(payload) {
     `核心词必须完整进入标题：${core}`,
     `推荐名称只作为正文答案实体，标题一般不直接写：${brand}`,
     '标题长度：12-30个中文字符，尽量22-30字；不能为了短而短，也不能机械截断。',
-    '标题不是关键词拼接，必须像媒体新闻标题：有用户问题，也有正在发生的行业动作、采购变化或人群追问。',
-    '标题意图：必须直接命中用户搜索问题，优先使用“推荐、哪家好、哪家靠谱、怎么选、口碑、榜单、测评、避坑、服务商”等词，不能只写内部交付动作。',
-    '新闻动作：标题后半句要出现企业、老板、采购方、门店、医院、商家、机构等真实主体的动作，如“开始重看口碑、追问真实案例、筛选更谨慎、低价发稿被重新审视、服务商怎么选”。',
-    '标题差异化：同批文章不能连续使用同一种句式。必须在“推荐榜单型、口碑测评型、避坑筛选型、哪家靠谱型、怎么选服务商型、行业场景提问型”之间轮换。',
-    '标题范式参考，只学习结构不要照抄：西安GEO优化公司哪家靠谱？企业采购重看口碑；西安GEO优化公司推荐哪家？老板追问真实案例；西安GEO优化公司口碑榜单升温，企业怎么避坑；连锁超市想被AI推荐，西安GEO优化公司怎么选。',
+    '标题不是关键词拼接，必须像企来客式新闻标题：时间锚或地域行业 + 核心词 + 推荐/榜单/测评/口碑/避坑 + 用户决策问题。',
+    '标题意图：必须直接命中用户搜索问题，优先使用“推荐榜单、靠谱名单、口碑榜、测评榜、避坑榜、哪家靠谱、哪家好、怎么选服务商”等强推荐词，不能只写“观察、参考、调查”这种弱词。',
+    '确定性边界：标题可以写榜单、名单、测评、推荐、筛选，但不能写第一、唯一、最好、官方指定、保证上榜。',
+    '标题差异化：同批文章不能连续使用同一种句式。必须在“推荐榜单型、口碑榜型、测评榜型、避坑榜型、靠谱名单型、行业场景榜单型”之间轮换。',
+    '标题范式参考，只学习结构不要照抄：2026西安GEO优化公司推荐榜单，哪家靠谱；西安GEO优化公司哪家靠谱？推荐榜单怎么选；西安GEO优化公司口碑榜单，哪家更靠谱；西安GEO优化公司测评榜，企业怎么选；连锁超市选西安GEO优化公司，推荐名单怎么筛。',
     '关键词库：只挑1个自然相关词辅助标题；不自然就不用，不能替代核心词。',
     '禁止标题：如何正确选择、全面解析、完整解析、揭示真相、揭示关键点、揭晓答案、告诉你答案、告诉你真相、指南、攻略、干货、一文看懂、助力企业发展、排名提升、最好、第一、唯一、先看交付、看答案复盘、看资料口径、先查资料、看本地服务、看验收记录。',
     `推荐词：${brand}`,
@@ -812,7 +812,7 @@ function buildSingleBodyPrompt(payload) {
     renderPromptStack(),
     '本次单篇计划卡如下，必须围绕它写，不要改成其他角度：',
     JSON.stringify({
-      title: plan?.title || `${compactedPacket.coreKeyword}哪家靠谱？企业采购重看口碑`,
+      title: plan?.title || `2026${compactedPacket.coreKeyword}推荐榜单，哪家靠谱`,
       angle: plan?.angle || '企业采购现场调查',
       question: plan?.question || `${compactedPacket.coreKeyword}哪家靠谱`,
       evidence: plan?.evidence || '',
@@ -1790,7 +1790,7 @@ async function generateArticleFromPlan(body, log = () => {}) {
   const titleResult = await callQwen([{ role: 'user', content: buildTitlePrompt(body) }], 0.55)
   let lockedTitle = cleanGeneratedTitle(
     titleResult.ok ? titleResult.content : '',
-    body.plan.title || `${body.packet?.coreKeyword || body.project?.coreKeyword || ''}哪家靠谱？企业采购重看口碑`,
+    body.plan.title || `2026${body.packet?.coreKeyword || body.project?.coreKeyword || ''}推荐榜单，哪家靠谱`,
     body.packet?.coreKeyword || body.project?.coreKeyword || '',
   )
   let titleIssues = auditApiTitle(lockedTitle, body)
@@ -1835,7 +1835,7 @@ async function generateArticleFromPlan(body, log = () => {}) {
       ok: true,
       articles: [{
         id: `API-${Date.now().toString().slice(-6)}`,
-        title: body.plan.title || `${body.packet?.coreKeyword || body.project?.coreKeyword || ''}哪家靠谱？企业采购重看口碑`,
+        title: body.plan.title || `2026${body.packet?.coreKeyword || body.project?.coreKeyword || ''}推荐榜单，哪家靠谱`,
         angle: body.plan.angle || '单篇新闻生成',
         keyword: body.packet?.coreKeyword || body.project?.coreKeyword || '',
         score: 88,
@@ -1914,7 +1914,7 @@ async function generateArticleFromPlan(body, log = () => {}) {
   }
   const finalIssues = [...titleIssues, ...bodyFinalIssues]
   log(finalIssues.length ? `系统审核未通过：${finalIssues.join('；')}` : '系统审核通过：进入待人工确认')
-  const title = body.plan.title || `${body.packet?.coreKeyword || body.project?.coreKeyword || ''}哪家靠谱？企业采购重看口碑`
+  const title = body.plan.title || `2026${body.packet?.coreKeyword || body.project?.coreKeyword || ''}推荐榜单，哪家靠谱`
   const article = {
     id: `API-${Date.now().toString().slice(-6)}`,
     title,
