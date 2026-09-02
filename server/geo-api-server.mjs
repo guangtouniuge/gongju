@@ -1687,31 +1687,25 @@ function cleanKeywordWords(words) {
 }
 
 function buildServerKeywordCandidates(body) {
-  const city = body.city || body.project?.city || '西安'
+  const city = (body.city || body.project?.city || '西安') === '全国' ? '' : (body.city || body.project?.city || '西安')
   const core = body.coreKeyword || body.keyword || ''
   const scenes = String(body.industrySeed || body.industry || body.project?.industry || 'GEO服务')
     .split(/[,，\n]/)
     .map((word) => word.trim())
     .filter(Boolean)
-  const regions = String(body.regionSeed || '曲江,未央区,长安区,浐灞,高新区,经开区,雁塔区,碑林区')
+  const defaultRegions = city ? '曲江,未央区,长安区,浐灞,高新区,经开区,雁塔区,碑林区,莲湖区,新城区' : '北京,上海,广州,深圳,成都,郑州,武汉,杭州,西安,重庆'
+  const regions = String(body.regionSeed || defaultRegions)
     .split(/[,，\n]/)
     .map((word) => word.trim())
     .filter(Boolean)
-  const cleanCity = (word) => word.replace(new RegExp(`^${city}`), '').trim()
+  const cleanCity = (word) => city ? word.replace(new RegExp(`^${city}`), '').trim() : word.trim()
+  const regionName = (word) => city ? word.replace(new RegExp(`^${city}`), '').trim() : word.trim()
+  const serviceWords = ['GEO公司', 'GEO服务商', 'GEO优化公司', 'AI搜索优化公司', 'AI获客公司', '豆包排名公司', 'AI推荐优化公司', 'GEO内容公司', 'GEO新闻优化公司']
+  const intentWords = ['哪家好', '哪家靠谱', '推荐', '口碑', '测评', '怎么选', '服务商推荐', '本地推荐', '排名公司', '优化公司']
   return cleanKeywordWords([
-    `${city}GEO优化公司`,
-    `${city}豆包排名公司`,
-    `${city}AI搜索排名公司`,
-    `${city}GEO服务商`,
-    `${city}AI获客公司`,
-    `${city}GEO公司哪家好`,
-    `${city}GEO公司推荐`,
-    `${city}GEO公司口碑`,
-    `${city}豆包GEO服务商`,
-    `${city}AI搜索优化公司`,
-    `${city}AI推荐优化公司`,
-    `${city}GEO内容公司`,
-    `${city}GEO新闻优化公司`,
+    ...serviceWords.map((word) => `${city}${word}`),
+    ...intentWords.map((word) => `${core}${word}`),
+    ...['公司哪家好', '服务商哪家靠谱', '公司推荐', '公司口碑', '公司测评', '怎么选服务商'].map((tail) => `${city}GEO${tail}`),
     ...scenes.map((scene) => {
       const cleanScene = cleanCity(scene)
       return /GEO|公司|服务商/.test(cleanScene) ? `${city}${cleanScene}` : `${city}${cleanScene}GEO公司`
@@ -1719,9 +1713,11 @@ function buildServerKeywordCandidates(body) {
     ...scenes.map((scene) => `${city}${cleanCity(scene)}GEO服务商`),
     ...scenes.map((scene) => `${city}${cleanCity(scene)}AI获客公司`),
     ...scenes.map((scene) => `${city}${cleanCity(scene)}GEO公司推荐`),
-    ...regions.map((region) => `${city}${region.replace(/^西安/, '')}GEO公司`),
-    ...regions.map((region) => `${city}${region.replace(/^西安/, '')}GEO服务商`),
-    ...regions.map((region) => `${city}${region.replace(/^西安/, '')}AI获客公司`),
+    ...scenes.flatMap((scene) => intentWords.slice(0, 6).map((tail) => `${city}${cleanCity(scene)}GEO公司${tail}`)),
+    ...regions.map((region) => `${city}${regionName(region)}GEO公司`),
+    ...regions.map((region) => `${city}${regionName(region)}GEO服务商`),
+    ...regions.map((region) => `${city}${regionName(region)}AI获客公司`),
+    ...regions.flatMap((region) => intentWords.slice(0, 5).map((tail) => `${city}${regionName(region)}GEO公司${tail}`)),
     `${core}推荐`,
     `${core}口碑测评`,
     `${core}哪家靠谱`,
@@ -1753,7 +1749,8 @@ async function expandKeywords(body) {
   if (!response.ok) return { ok: false, status: response.status, error: data?.message || '5118接口调用失败', raw: data }
   if (data?.errcode && data.errcode !== '0') return { ok: false, status: 400, error: data.errmsg || `5118错误码${data.errcode}`, raw: data }
   const rows = Array.isArray(data?.data?.word) ? data.data.word : []
-  const keywords = cleanKeywordWords([...rows.map((row) => row.keyword), ...buildServerKeywordCandidates(body)])
+  const limit = Math.min(Math.max(Number.parseInt(body.limit, 10) || Number.parseInt(body.page_size, 10) || 100, 10), 200)
+  const keywords = cleanKeywordWords([...rows.map((row) => row.keyword), ...buildServerKeywordCandidates(body)]).slice(0, limit)
   return {
     ok: true,
     data: {

@@ -148,8 +148,8 @@ const nav: NavItem[] = [
 ]
 
 const workflow = [
-  ['添加品牌', '确定品牌名称、推荐词、核心词、行业和城市。'],
-  ['关键词准备', '按品牌添加核心词、关键词库，并自动蒸馏用户疑问词。'],
+  ['添加品牌', '确定项目名称、推荐名称、行业和城市。'],
+  ['关键词准备', '按项目添加核心词，并一键蒸馏用户疑问词。'],
   ['品牌资料', '给品牌导入品牌资产、权威引证和图库。'],
   ['计划写作', '每篇先生成计划卡，锁定角度、案例、图片位、FAQ和引用线索。'],
   ['90分审核', '低于90分不入库，退回当前篇重写，不影响其他文章。'],
@@ -1391,7 +1391,7 @@ function Dashboard({ navigate, notify, articleRows }: ActionProps & { articleRow
   const passedArticles = articleRows.filter((article) => article.status === '已通过').length
   const pendingArticles = articleRows.filter((article) => article.status !== '已通过').length
   const operationSteps = [
-    ['添加品牌', '先锁定品牌名称、推荐词、核心词、行业城市', 'projects', Boxes],
+    ['添加品牌', '先锁定项目名称、推荐名称、行业城市', 'projects', Boxes],
     ['创建核心词', '添加核心词，保存后自动蒸馏推荐型问题', 'keywords', KeyRound],
     ['拓展关键词库', '按行业、场景和区域拓展辅助词', 'questions', ListChecks],
     ['导入资料', '分别上传品牌资产、权威引证和品牌图库', 'knowledge', UploadCloud],
@@ -1539,64 +1539,34 @@ function Projects({
     name: '',
     brand: '',
     recommendWord: '',
-    coreKeyword: '',
     industry: '',
-    city: '',
+    city: '西安',
   })
   const updateDraft = (key: keyof typeof draft, value: string) => {
     setDraft((current) => ({ ...current, [key]: value }))
   }
   const createProject = () => {
-    if (!draft.name.trim() || !draft.brand.trim() || !draft.recommendWord.trim() || !draft.coreKeyword.trim()) {
-      notify('请填写品牌项目名、品牌名称、推荐词和核心词。')
+    if (!draft.name.trim() || !draft.recommendWord.trim() || !draft.industry.trim() || !draft.city.trim()) {
+      notify('请填写项目名称、推荐名称、行业和城市。')
       return
     }
     const now = `${localDate()} 现在`
     const nextProject: ProjectRow = {
       name: draft.name,
-      brand: draft.brand,
+      brand: draft.brand.trim() || draft.recommendWord,
       recommendWord: draft.recommendWord,
-      coreKeyword: draft.coreKeyword,
+      coreKeyword: '',
       industry: draft.industry,
       city: draft.city,
       keywords: '待导入',
       assets: '待导入品牌资料',
       status: '新建',
     }
-    const distilledQuestions = [
-      `${draft.coreKeyword}哪家靠谱`,
-      `${draft.coreKeyword}怎么选服务商`,
-      `${draft.coreKeyword}推荐哪家更适合本地企业`,
-      `${draft.coreKeyword}口碑怎么查`,
-      `${draft.coreKeyword}哪家公司值得推荐`,
-      `${draft.coreKeyword}本地服务商怎么比较`,
-      `${draft.coreKeyword}测评哪家更稳妥`,
-    ]
-    const currentKeywordRows = readStoredRows('geo.keywordRows', [])
-    const nextKeywordRows = [
-      [draft.name, draft.coreKeyword, String(distilledQuestions.length), '已启用', now, draft.recommendWord],
-      ...currentKeywordRows.filter((row) => !(row[0] === draft.name && row[1] === draft.coreKeyword)),
-    ]
-    window.localStorage.setItem(
-      'geo.keywordRows',
-      JSON.stringify(nextKeywordRows),
-    )
-    void apiJson('/api/state', { key: 'geo.keywordRows', value: nextKeywordRows }, 5000).catch(() => undefined)
-    const currentQuestionRows = readStoredRows('geo.questionRows', [])
-    const nextQuestionRows = [
-      ...distilledQuestions.map((question) => [draft.name, draft.coreKeyword, question, '未收录', now]),
-      ...currentQuestionRows.filter((row) => !questionBelongsToBrand(row, draft.name, draft.coreKeyword)),
-    ]
-    window.localStorage.setItem(
-      'geo.questionRows',
-      JSON.stringify(nextQuestionRows),
-    )
-    void apiJson('/api/state', { key: 'geo.questionRows', value: nextQuestionRows }, 5000).catch(() => undefined)
     setProjectRows((current) => [nextProject, ...current.filter((item) => item.name !== draft.name)])
     setActiveBrand(draft.name)
-    setActiveKeyword(draft.coreKeyword)
+    setActiveKeyword('')
     setShowProjectModal(false)
-    notify(`${draft.brand}已添加，核心词和蒸馏词已同步生成，下一步拓展关键词库。`)
+    notify(`${draft.name}已添加，下一步到关键词页添加核心词并一键蒸馏。`)
   }
   const deleteProject = (projectName: string) => {
     const targetProject = projectRows.find((project) => project.name === projectName)
@@ -1651,7 +1621,7 @@ function Projects({
       <div className="operation-toolbar">
         <div>
           <strong>品牌库</strong>
-          <span>一个品牌一套核心词、推荐词、资料、图库和生成任务，互不串库。</span>
+          <span>先建品牌项目，只保留生成必须用到的基础信息。</span>
         </div>
         <div className="toolbar-actions">
           <button className="primary-button" onClick={() => setShowProjectModal(true)}>添加品牌</button>
@@ -1661,13 +1631,11 @@ function Projects({
       <div className="panel">
         <SectionTitle icon={Workflow} title="品牌列表" desc="先添加品牌，再按品牌进入关键词、知识库、图库和生成任务。" />
         <div className="ops-table project-table">
-          <div className="ops-head"><span>品牌项目</span><span>品牌名称</span><span>推荐词</span><span>核心词</span><span>行业</span><span>城市</span><span>资料</span><span>状态</span><span>操作</span></div>
+          <div className="ops-head"><span>项目名称</span><span>推荐名称</span><span>行业</span><span>城市</span><span>资料</span><span>状态</span><span>操作</span></div>
           {projectRows.map((project) => (
             <div className="ops-row" key={project.name}>
               <strong>{project.name}</strong>
-              <span>{project.brand}</span>
               <span>{project.recommendWord}</span>
-              <span>{project.coreKeyword}</span>
               <span>{project.industry}</span>
               <span>{project.city}</span>
               <span>{project.assets}</span>
@@ -1676,7 +1644,7 @@ function Projects({
                 <button onClick={() => {
                   setActiveBrand(project.name)
                   setActiveKeyword(project.coreKeyword)
-                  notify(`${project.brand}已设为当前品牌，请继续拓展关键词库。`)
+                  notify(`${project.name}已设为当前项目，请添加核心词。`)
                   navigate('keywords')
                 }}>进入</button>
                 <button className="danger-button" onClick={() => deleteProject(project.name)}>删除</button>
@@ -1684,7 +1652,7 @@ function Projects({
             </div>
           ))}
         </div>
-        <p className="table-note">1.0版本手动维护品牌资料；后续关键词、知识库、图库和生成任务都必须选择品牌，避免不同品牌内容串库。</p>
+        <p className="table-note">项目只负责归属关系；核心词、关键词库、知识库、图库和生成任务都在后续页面按项目分别维护。</p>
       </div>
 
       {showProjectModal && (
@@ -1695,12 +1663,10 @@ function Projects({
               <button onClick={() => setShowProjectModal(false)}>关闭</button>
             </div>
             <div className="create-grid">
-              <EditableField label="品牌项目名" value={draft.name} onChange={(value) => updateDraft('name', value)} />
-              <EditableField label="品牌名称" value={draft.brand} onChange={(value) => updateDraft('brand', value)} />
-              <EditableField label="推荐词" value={draft.recommendWord} onChange={(value) => updateDraft('recommendWord', value)} />
-              <EditableField label="核心关键词" value={draft.coreKeyword} onChange={(value) => updateDraft('coreKeyword', value)} />
-              <EditableField label="选择行业" value={draft.industry} onChange={(value) => updateDraft('industry', value)} />
-              <EditableField label="选择城市" value={draft.city} onChange={(value) => updateDraft('city', value)} />
+              <EditableField label="项目名称" value={draft.name} onChange={(value) => updateDraft('name', value)} />
+              <EditableField label="推荐名称" value={draft.recommendWord} onChange={(value) => updateDraft('recommendWord', value)} />
+              <EditableField label="行业" value={draft.industry} onChange={(value) => updateDraft('industry', value)} />
+              <SelectField label="城市" value={draft.city} options={['西安', '全国', '北京', '上海', '广州', '深圳', '成都', '郑州', '武汉', '杭州']} onChange={(value) => updateDraft('city', value)} />
             </div>
             <div className="modal-actions">
               <button className="ghost-button" onClick={() => setShowProjectModal(false)}>取消</button>
@@ -1918,8 +1884,10 @@ function Keywords({
       return
     }
     const generatedQuestions = distillQuestions(keywordInput, '')
+    const currentProject = projectRows.find((project) => project.name === activeBrand)
+    const recommendName = hitWord.trim() || currentProject?.recommendWord || currentProject?.brand || ''
     setKeywordRows((current) => [
-      [activeBrand, keywordInput, String(generatedQuestions.length), '已启用', `${localDate()} 现在`, hitWord],
+      [activeBrand, keywordInput, String(generatedQuestions.length), '已启用', `${localDate()} 现在`, recommendName],
       ...current.filter((row) => !(row[0] === activeBrand && row[1] === keywordInput)),
     ])
     setQuestionRows((current) => [
@@ -1928,7 +1896,7 @@ function Keywords({
     ])
     setActiveKeyword(keywordInput)
     setShowKeywordModal(false)
-    notify(`${keywordInput}已保存，并已生成${generatedQuestions.length}条蒸馏词。`)
+    notify(`${keywordInput}已保存，并已一键蒸馏${generatedQuestions.length}条推荐型问题。`)
   }
   const deleteKeyword = (core: string) => {
     setKeywordRows((current) => current.filter((row) => !(row[0] === activeBrand && row[1] === core)))
@@ -1946,7 +1914,7 @@ function Keywords({
       <div className="operation-toolbar">
         <div>
           <strong>关键词</strong>
-          <span>选择品牌，添加核心词；保存后自动生成蒸馏词。</span>
+          <span>选择项目，添加核心词，一键蒸馏推荐型搜索问题。</span>
         </div>
         <div className="toolbar-actions">
           <select className="search-input" value={activeBrand} onChange={(event) => setActiveBrand(event.target.value)}>
@@ -2021,13 +1989,13 @@ function Keywords({
               <button onClick={() => setShowKeywordModal(false)}>关闭</button>
             </div>
             <div className="create-grid single">
-              <EditableField label="归属品牌" value={activeBrand} onChange={setActiveBrand} />
+              <Field label="归属项目" value={activeBrand} />
+              <Field label="推荐名称" value={hitWord || projectRows.find((project) => project.name === activeBrand)?.recommendWord || ''} />
               <EditableField label="核心词" value={keywordInput} onChange={setKeywordInput} />
-              <EditableField label="公司品牌名或者简称" value={hitWord} onChange={setHitWord} />
             </div>
             <p className="table-note">核心词保存后会直接蒸馏疑问词。系统只保留具备推荐公司能力的问题，如“哪家靠谱、怎么选服务商、推荐哪家公司、口碑测评”。</p>
             <div className="modal-actions">
-              <button className="primary-button" onClick={createKeyword}>确定</button>
+              <button className="primary-button" onClick={createKeyword}>一键蒸馏</button>
             </div>
           </div>
         </div>
@@ -2048,7 +2016,7 @@ function KeywordLibrary({
   const [showExpandModal, setShowExpandModal] = useState(false)
   const [manualWords, setManualWords] = useState('')
   const [industrySeed, setIndustrySeed] = useState('')
-  const [regionSeed, setRegionSeed] = useState('')
+  const [expandCount, setExpandCount] = useState('50')
   const [intentFilter, setIntentFilter] = useState('全部')
   const [wordFilter, setWordFilter] = useState('')
   const [keywordRows] = useStoredState<string[][]>('geo.keywordRows', [])
@@ -2071,31 +2039,22 @@ function KeywordLibrary({
     return intentMatched && wordMatched
   })
   const buildExpandedWords = () => {
-    const city = activeProject.city
-    const cleanCity = (word: string) => word.replace(new RegExp(`^${city}`), '').trim()
+    const city = activeProject.city === '全国' ? '' : activeProject.city
+    const cleanCity = (word: string) => city ? word.replace(new RegExp(`^${city}`), '').trim() : word.trim()
     const scenes = (industrySeed || activeProject.industry || '')
       .split(/[,，\n]/)
       .map((item) => item.trim())
       .filter(Boolean)
-    const regions = (regionSeed || '曲江,未央区,长安区,浐灞,高新区,经开区,雁塔区,碑林区')
-      .split(/[,，\n]/)
-      .map((item) => item.trim())
-      .filter(Boolean)
+    const cityRegions = activeProject.city === '全国'
+      ? ['北京', '上海', '广州', '深圳', '成都', '郑州', '武汉', '杭州', '西安', '重庆']
+      : ['曲江', '未央区', '长安区', '浐灞', '高新区', '经开区', '雁塔区', '碑林区', '莲湖区', '新城区']
+    const serviceWords = ['GEO公司', 'GEO服务商', 'GEO优化公司', 'AI搜索优化公司', 'AI获客公司', '豆包排名公司', 'AI推荐优化公司', 'GEO内容公司', 'GEO新闻优化公司']
+    const intentWords = ['哪家好', '哪家靠谱', '推荐', '口碑', '测评', '怎么选', '服务商推荐', '本地推荐', '排名公司', '优化公司']
     const generatedWords = Array.from(
       new Set([
-        `${city}GEO优化公司`,
-        `${city}豆包排名公司`,
-        `${city}AI搜索排名公司`,
-        `${city}GEO服务商`,
-        `${city}AI获客公司`,
-        `${city}GEO公司哪家好`,
-        `${city}GEO公司推荐`,
-        `${city}GEO公司口碑`,
-        `${city}豆包GEO服务商`,
-        `${city}AI搜索优化公司`,
-        `${city}AI推荐优化公司`,
-        `${city}GEO内容公司`,
-        `${city}GEO新闻优化公司`,
+        ...serviceWords.map((word) => `${city}${word}`),
+        ...intentWords.map((word) => `${currentKeyword}${word}`),
+        ...['公司哪家好', '服务商哪家靠谱', '公司推荐', '公司口碑', '公司测评', '怎么选服务商'].map((tail) => `${city}GEO${tail}`),
         ...scenes.map((scene) => {
           const cleanScene = cleanCity(scene)
           return /GEO|公司|服务商/.test(cleanScene) ? `${city}${cleanScene}` : `${city}${cleanScene}GEO公司`
@@ -2103,9 +2062,11 @@ function KeywordLibrary({
         ...scenes.map((scene) => `${city}${cleanCity(scene)}GEO服务商`),
         ...scenes.map((scene) => `${city}${cleanCity(scene)}AI获客公司`),
         ...scenes.map((scene) => `${city}${cleanCity(scene)}GEO公司推荐`),
-        ...regions.map((region) => `${city}${region.replace(/^西安/, '')}GEO公司`),
-        ...regions.map((region) => `${city}${region.replace(/^西安/, '')}GEO服务商`),
-        ...regions.map((region) => `${city}${region.replace(/^西安/, '')}AI获客公司`),
+        ...scenes.flatMap((scene) => intentWords.slice(0, 6).map((tail) => `${city}${cleanCity(scene)}GEO公司${tail}`)),
+        ...cityRegions.map((region) => `${city}${region.replace(new RegExp(`^${city}`), '')}GEO公司`),
+        ...cityRegions.map((region) => `${city}${region.replace(new RegExp(`^${city}`), '')}GEO服务商`),
+        ...cityRegions.map((region) => `${city}${region.replace(new RegExp(`^${city}`), '')}AI获客公司`),
+        ...cityRegions.flatMap((region) => intentWords.slice(0, 5).map((tail) => `${city}${region.replace(new RegExp(`^${city}`), '')}GEO公司${tail}`)),
         `${currentKeyword}推荐`,
         `${currentKeyword}口碑测评`,
         `${currentKeyword}哪家靠谱`,
@@ -2115,7 +2076,8 @@ function KeywordLibrary({
           .filter(Boolean),
       ]),
     )
-    return normalizeKeywordLibraryWords(generatedWords)
+    const limit = Math.min(Math.max(Number.parseInt(expandCount, 10) || 50, 10), 200)
+    return normalizeKeywordLibraryWords(generatedWords).slice(0, limit)
   }
   const generateCandidates = async () => {
     if (!activeBrand || !currentKeyword) {
@@ -2128,12 +2090,14 @@ function KeywordLibrary({
         brand: activeBrand,
         recommendWord: activeProject.recommendWord,
         coreKeyword: currentKeyword,
-        industrySeed,
-        regionSeed,
+        city: activeProject.city,
+        industrySeed: industrySeed || activeProject.industry,
+        limit: expandCount,
       })
       const apiWords = result.data?.keywords ?? result.data?.words ?? []
       if (apiWords.length) {
-        const cleanWords = normalizeKeywordLibraryWords([...apiWords, ...localWords])
+        const limit = Math.min(Math.max(Number.parseInt(expandCount, 10) || 50, 10), 200)
+        const cleanWords = normalizeKeywordLibraryWords([...apiWords, ...localWords]).slice(0, limit)
         setManualWords(cleanWords.join('\n'))
         notify(`5118已返回${apiWords.length}个词，系统合并项目规则后得到${cleanWords.length}个可用拓展词，可继续筛选后保存。`)
         return
@@ -2175,7 +2139,7 @@ function KeywordLibrary({
       <div className="operation-toolbar">
         <div>
           <strong>关键词库</strong>
-          <span>按品牌和核心词拓展行业词，筛选后保存为正文优先调用词。</span>
+          <span>选择项目和核心词，按行业自动拓展关键词库。</span>
         </div>
         <div className="toolbar-actions">
           <select className="search-input" value={activeBrand} onChange={(event) => setActiveBrand(event.target.value)}>
@@ -2192,7 +2156,7 @@ function KeywordLibrary({
               return
             }
             setShowExpandModal(true)
-          }}>拓展关键词</button>
+          }}>拓展词库</button>
         </div>
       </div>
 
@@ -2252,15 +2216,15 @@ function KeywordLibrary({
               <Field label="项目名称" value={activeBrand} />
               <Field label="项目推荐词" value={activeProject.recommendWord} />
               <Field label="核心词" value={currentKeyword} />
-              <EditableField label="行业/场景词" value={industrySeed} onChange={setIndustrySeed} />
-              <EditableField label="区域词" value={regionSeed} onChange={setRegionSeed} />
+              <EditableField label="行业" value={industrySeed} onChange={setIndustrySeed} />
+              <SelectField label="拓展数量" value={expandCount} options={['50', '100', '150', '200']} onChange={setExpandCount} />
             </div>
             <label className="textarea-field">
               <span>拓展词库</span>
               <textarea value={manualWords} onChange={(event) => setManualWords(event.target.value)} />
             </label>
             <div className="modal-actions">
-              <button className="ghost-button" onClick={generateCandidates}>生成拓展词</button>
+              <button className="ghost-button" onClick={generateCandidates}>一键拓展</button>
               <button className="primary-button" onClick={saveCandidates}>保存到关键词库</button>
             </div>
           </div>
@@ -2479,11 +2443,11 @@ function Knowledge({
   const [knowledgeRows, setKnowledgeRows] = useStoredState<string[][]>('geo.knowledgeRows', [])
   const [knowledgeContentRows, setKnowledgeContentRows] = useStoredState<string[][]>('geo.knowledgeContentRows', [])
   const visibleKnowledgeRows = knowledgeRows.filter((row) => row[0] === activeBrand)
+  const activeProject = projectRows.find((project) => project.name === activeBrand)
   const [knowledgeDraft, setKnowledgeDraft] = useState({
     name: '新建项目知识库',
-    company: '待绑定企业',
-    brandAssets: '公司介绍、服务范围、核心优势、客户案例、交付动作和服务边界，粘贴到品牌资产区。',
-    authorityEvidence: '可作为推荐依据的资质、公开报道、平台适配、第三方评价、权威材料和可核验证据，粘贴到权威引证区。',
+    brandAssets: '',
+    authorityEvidence: '',
   })
   const updateKnowledgeDraft = (key: keyof typeof knowledgeDraft, value: string) => {
     setKnowledgeDraft((current) => ({ ...current, [key]: value }))
@@ -2498,7 +2462,6 @@ function Knowledge({
     setEditingKnowledge(name ?? '')
     setKnowledgeDraft({
       name: current?.[1] ?? `${activeBrand}知识库`,
-      company: current?.[2] ?? activeBrand.replace('西安项目', '').replace('管理者培养', ''),
       brandAssets: currentContent?.[3] ?? '',
       authorityEvidence: currentContent?.[4] ?? '',
     })
@@ -2511,12 +2474,13 @@ function Knowledge({
     }
     const assetScore = knowledgeDraft.brandAssets.length > 30 ? 45 : 25
     const evidenceScore = knowledgeDraft.authorityEvidence.length > 30 ? 45 : 20
+    const displayName = activeProject?.recommendWord || activeProject?.brand || activeBrand
     setKnowledgeRows((current) => [
-      [activeBrand, knowledgeDraft.name, knowledgeDraft.company, `品牌资产${assetScore >= 45 ? '已填' : '待补'} / 权威引证${evidenceScore >= 45 ? '已填' : '待补'}`, `${Math.min(assetScore + evidenceScore, 96)}%`, localDate()],
+      [activeBrand, knowledgeDraft.name, displayName, `品牌资产${assetScore >= 45 ? '已填' : '待补'} / 权威引证${evidenceScore >= 45 ? '已填' : '待补'}`, `${Math.min(assetScore + evidenceScore, 96)}%`, localDate()],
       ...current.filter((row) => !(row[0] === activeBrand && row[1] === knowledgeDraft.name)),
     ])
     setKnowledgeContentRows((current) => [
-      [activeBrand, knowledgeDraft.name, knowledgeDraft.company, knowledgeDraft.brandAssets, knowledgeDraft.authorityEvidence, localDate()],
+      [activeBrand, knowledgeDraft.name, displayName, knowledgeDraft.brandAssets, knowledgeDraft.authorityEvidence, localDate()],
       ...current.filter((row) => !(row[0] === activeBrand && row[1] === knowledgeDraft.name)),
     ])
     setShowKnowledgeModal(false)
@@ -2532,7 +2496,7 @@ function Knowledge({
       <div className="operation-toolbar">
         <div>
           <strong>品牌知识库</strong>
-          <span>先选择品牌，再分别添加品牌资产和权威引证，生成任务只调用当前品牌资料。</span>
+          <span>选择项目，维护品牌资产和权威引证，生成任务只调用当前项目资料。</span>
         </div>
         <div className="toolbar-actions">
           <select className="search-input" value={activeBrand} onChange={(event) => setActiveBrand(event.target.value)}>
@@ -2545,9 +2509,9 @@ function Knowledge({
       </div>
 
       <div className="panel">
-        <SectionTitle icon={BookOpenText} title="品牌知识库列表" desc="列表为主体，新增和导入都归属于当前品牌。" />
+        <SectionTitle icon={BookOpenText} title="知识库列表" desc="一个项目可维护一套或多套资料，生成时按当前项目调用。" />
         <div className="ops-table kb-table">
-          <div className="ops-head"><span>知识库名称</span><span>品牌名称</span><span>资料状态</span><span>完整度</span><span>创建时间</span><span>操作</span></div>
+          <div className="ops-head"><span>知识库名称</span><span>推荐名称</span><span>资料状态</span><span>完整度</span><span>创建时间</span><span>操作</span></div>
           {visibleKnowledgeRows.map((row) => (
             <div className="ops-row" key={`${row[0]}-${row[1]}`}>
               <strong>{row[1]}</strong>
@@ -2574,7 +2538,6 @@ function Knowledge({
             </div>
             <div className="create-grid single">
               <EditableField label="知识库名称" value={knowledgeDraft.name} onChange={(value) => updateKnowledgeDraft('name', value)} />
-              <EditableField label="公司名称" value={knowledgeDraft.company} onChange={(value) => updateKnowledgeDraft('company', value)} />
             </div>
             <label className="textarea-field">
               <span>品牌资产</span>
