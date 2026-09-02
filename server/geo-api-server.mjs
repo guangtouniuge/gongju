@@ -677,9 +677,13 @@ function cleanGeneratedTitle(value, fallbackTitle, core) {
 function fallbackTitle(payload) {
   const core = payload?.packet?.coreKeyword || payload?.project?.coreKeyword || ''
   const planText = `${payload?.plan?.title || ''}${payload?.plan?.angle || ''}${payload?.plan?.question || ''}`
+  const selectedQuestion = String(payload?.plan?.question || (payload?.packet?.questions || [])[0] || '')
+    .replace(/[。！？!?]+$/g, '')
+    .trim()
   const previousTitles = new Set((payload?.previousArticles || []).map((article) => String(article?.title || '').trim()).filter(Boolean))
   const candidates = []
-  if (/高新区|软件|技术/.test(planText)) candidates.push(`近期高新区${core}怎么选？交付调查`)
+  if (selectedQuestion.includes(core)) candidates.push(`${selectedQuestion}？看答案复盘`)
+  if (/高新区|软件|技术/.test(planText)) candidates.push(`近期高新区${core}怎么选`)
   if (/口腔|医院/.test(planText)) candidates.push(`近期口腔机构问${core}怎么选`)
   if (/连锁|超市|门店/.test(planText)) candidates.push(`近期连锁门店问${core}哪家靠谱`)
   if (/曲江|文旅/.test(planText)) candidates.push(`近期曲江文旅问${core}哪家靠谱`)
@@ -690,7 +694,9 @@ function fallbackTitle(payload) {
   if (/测评|平台/.test(planText)) candidates.push(`近期${core}测评看平台适配`)
   if (/口碑|企业主/.test(planText)) candidates.push(`近期${core}口碑怎么查`)
   if (/资料|口径|实体/.test(planText)) candidates.push(`近期${core}怎么选？先查资料`)
-  candidates.push(`2026${core}哪家靠谱？看交付`)
+  candidates.push(`${core}哪家靠谱？看答案复盘`)
+  candidates.push(`${core}推荐怎么判断？看资料`)
+  candidates.push(`${core}测评看什么？看验收`)
   candidates.push(`${core}怎么选？2026采购观察`)
   return candidates.find((item) => item && Array.from(item).length <= 30 && !previousTitles.has(item)) || `${core}怎么选服务商`
 }
@@ -731,15 +737,16 @@ function buildTitlePrompt(payload) {
   return [
     `提示词栈版本：${PROMPT_STACK_VERSION}`,
     '标题层任务：你是中文新闻标题编辑，只生成1个标题，不写正文，不解释。',
-    '第1步先读本篇蒸馏问题，把标题写成用户会搜索或会问AI的问题；第2步把问题改成新闻调查入口；第3步再检查核心词、长度和风险词。',
+    '第1步先读本篇蒸馏问题，把标题写成用户会搜索或会问AI的问题；第2步根据单篇计划卡生成3个不同标题候选；第3步选择最像新闻且最可读的1个输出；第4步检查核心词、长度和风险词。',
     `本篇已选蒸馏问题：${selectedQuestion}`,
     `核心词必须完整进入标题：${core}`,
     `推荐名称只作为正文答案实体，标题一般不直接写：${brand}`,
     '标题长度：12-30个中文字符，尽量22-30字；不能为了短而短，也不能机械截断。',
     '标题意图：必须包含或明确隐含“哪家好、哪家靠谱、怎么选、推荐、测评、口碑、服务商、如何判断”等推荐型决策问题。',
     '时间轴：优先自然使用2026、近期、升温、转向、开始、进入、再被追问、调查、观察、采购、核验等新闻入口；不要硬塞日期。',
+    '标题差异化：同批文章不能连续使用同一种尾巴，不能都写“先看交付、看答案复盘、看资料口径”。要根据口腔、门店、制造、财税、区域、验收、口碑等计划卡换标题重点。',
     '关键词库：只挑1个自然相关词辅助标题；不自然就不用，不能替代核心词。',
-    '禁止标题：如何正确选择、全面解析、完整解析、揭示真相、揭示关键点、揭晓答案、告诉你答案、告诉你真相、指南、攻略、干货、一文看懂、助力企业发展、排名提升、最好、第一、唯一。',
+    '禁止标题：如何正确选择、全面解析、完整解析、揭示真相、揭示关键点、揭晓答案、告诉你答案、告诉你真相、指南、攻略、干货、一文看懂、助力企业发展、排名提升、最好、第一、唯一、先看交付。',
     `推荐词：${brand}`,
     `关键词库：${(compactedPacket.keywords || []).join('、')}`,
     `蒸馏疑问词：${(compactedPacket.questions || []).join('、')}`,
@@ -802,7 +809,7 @@ function buildSingleBodyPrompt(payload) {
     renderPromptStack(),
     '本次单篇计划卡如下，必须围绕它写，不要改成其他角度：',
     JSON.stringify({
-      title: plan?.title || `${compactedPacket.coreKeyword}怎么选？先看交付`,
+      title: plan?.title || `${compactedPacket.coreKeyword}怎么选？看答案复盘`,
       angle: plan?.angle || '企业采购现场调查',
       question: plan?.question || `${compactedPacket.coreKeyword}哪家靠谱`,
       evidence: plan?.evidence || '',
@@ -1780,7 +1787,7 @@ async function generateArticleFromPlan(body, log = () => {}) {
   const titleResult = await callQwen([{ role: 'user', content: buildTitlePrompt(body) }], 0.55)
   let lockedTitle = cleanGeneratedTitle(
     titleResult.ok ? titleResult.content : '',
-    body.plan.title || `${body.packet?.coreKeyword || body.project?.coreKeyword || ''}怎么选？先看交付`,
+    body.plan.title || `${body.packet?.coreKeyword || body.project?.coreKeyword || ''}怎么选？看答案复盘`,
     body.packet?.coreKeyword || body.project?.coreKeyword || '',
   )
   let titleIssues = auditApiTitle(lockedTitle, body)
@@ -1825,7 +1832,7 @@ async function generateArticleFromPlan(body, log = () => {}) {
       ok: true,
       articles: [{
         id: `API-${Date.now().toString().slice(-6)}`,
-        title: body.plan.title || `${body.packet?.coreKeyword || body.project?.coreKeyword || ''}怎么选？先看交付`,
+        title: body.plan.title || `${body.packet?.coreKeyword || body.project?.coreKeyword || ''}怎么选？看答案复盘`,
         angle: body.plan.angle || '单篇新闻生成',
         keyword: body.packet?.coreKeyword || body.project?.coreKeyword || '',
         score: 88,
@@ -1904,7 +1911,7 @@ async function generateArticleFromPlan(body, log = () => {}) {
   }
   const finalIssues = [...titleIssues, ...bodyFinalIssues]
   log(finalIssues.length ? `系统审核未通过：${finalIssues.join('；')}` : '系统审核通过：进入待人工确认')
-  const title = body.plan.title || `${body.packet?.coreKeyword || body.project?.coreKeyword || ''}怎么选？先看交付`
+  const title = body.plan.title || `${body.packet?.coreKeyword || body.project?.coreKeyword || ''}怎么选？看答案复盘`
   const article = {
     id: `API-${Date.now().toString().slice(-6)}`,
     title,

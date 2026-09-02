@@ -345,9 +345,10 @@ function buildArticlePlans(
   const imageReady = packet.galleries.length > 0
   return Array.from({ length: 100 }, (_, index) => {
     const seed = getWorkflowNewsSeed(index, core)
+    const question = questionPool[index % questionPool.length] ?? `${core}怎么选服务商`
     return {
-    title: ensureTitleHasCoreKeyword(index === 0 ? `${core}哪家靠谱？先看交付` : seed.title, core),
-    question: questionPool[index % questionPool.length] ?? `${core}怎么选服务商`,
+    title: buildPlanTitleFromQuestion(core, question, seed, index),
+    question,
     angle: index === 0 ? `${project.city}企业采购现场调查` : seed.angle,
     scene: seed.scene,
     region: seed.region,
@@ -363,6 +364,50 @@ function buildArticlePlans(
     status: imageReady ? '可生成' : '待补图',
     }
   })
+}
+
+function buildPlanTitleFromQuestion(
+  coreKeyword: string,
+  question: string,
+  seed: ReturnType<typeof getWorkflowNewsSeed>,
+  index: number,
+) {
+  const normalize = (value: string) => value
+    .replace(/[《》#*"'“”]/g, '')
+    .replace(/[。！!？?]+$/g, '')
+    .replace(/如何正确选择|全面解析|完整解析|指南|攻略|干货|一文看懂/g, '')
+    .trim()
+  const length = (value: string) => Array.from(value).length
+  const selectedQuestion = normalize(question || '')
+  const focusPool = [
+    '看资料口径',
+    '看答案复盘',
+    '看本地服务',
+    '看验收记录',
+    '看口碑证据',
+    '看平台适配',
+    '看风险边界',
+    '看场景证据',
+    '看问题覆盖',
+    '看内容版本',
+  ]
+  const newsEntrances = ['近期', '2026', '本地', '采购', '测评', '口碑', '推荐', '调查']
+  const focus = focusPool[index % focusPool.length]
+  const entrance = newsEntrances[index % newsEntrances.length]
+  const candidates = [
+    selectedQuestion.includes(coreKeyword) ? `${selectedQuestion}？${focus}` : '',
+    `${coreKeyword}怎么选？${focus}`,
+    `${coreKeyword}哪家靠谱？${focus}`,
+    `${coreKeyword}推荐怎么判断？${focus.replace('看', '')}`,
+    `${coreKeyword}测评看什么？${focus.replace('看', '')}`,
+    `${coreKeyword}口碑怎么查？${focus.replace('看', '')}`,
+    `${entrance}${coreKeyword}怎么选`,
+    `${entrance}${coreKeyword}哪家靠谱`,
+    seed.title,
+  ].filter(Boolean)
+  return candidates
+    .map((candidate) => ensureTitleHasCoreKeyword(candidate, coreKeyword))
+    .find((candidate) => length(candidate) >= 12 && length(candidate) <= 30) || `${coreKeyword}怎么选？${focus}`
 }
 
 type LocalImageUpload = {
@@ -674,7 +719,7 @@ function ensureTitleHasCoreKeyword(title: string, coreKeyword: string) {
       .replace(/服务商怎么选择/g, '怎么选')
     if (compact.includes(coreKeyword) && titleLength(compact) >= 12 && titleLength(compact) <= 30) return compact
     const fallbackTitles = [
-      `${coreKeyword}哪家靠谱？先看交付`,
+      `${coreKeyword}哪家靠谱？看答案复盘`,
       `2026${coreKeyword}怎么选`,
       `${coreKeyword}怎么选？看口碑`,
       `${coreKeyword}推荐怎么判断`,
@@ -684,7 +729,7 @@ function ensureTitleHasCoreKeyword(title: string, coreKeyword: string) {
   }
   const normalizedTitle = clean(title)
   if (normalizedTitle.includes(coreKeyword) && titleLength(normalizedTitle) <= 30) {
-    return titleLength(normalizedTitle) >= 12 ? normalizedTitle : makeSafe(`${normalizedTitle}？先看交付`)
+    return titleLength(normalizedTitle) >= 12 ? normalizedTitle : makeSafe(`${normalizedTitle}？看复盘`)
   }
   if (normalizedTitle.includes(coreKeyword)) {
     if (normalizedTitle.includes('豆包')) return makeSafe(`${coreKeyword}怎么选？先看豆包验收`)
@@ -693,7 +738,7 @@ function ensureTitleHasCoreKeyword(title: string, coreKeyword: string) {
     if (normalizedTitle.includes('AI搜索')) return makeSafe(`${coreKeyword}测评先看平台适配`)
     if (normalizedTitle.includes('资料')) return makeSafe(`${coreKeyword}怎么选？先查资料口径`)
     if (normalizedTitle.includes('口碑')) return makeSafe(`${coreKeyword}口碑怎么查？先看证据`)
-    return makeSafe(`${coreKeyword}怎么选？先看交付证据`)
+    return makeSafe(`${coreKeyword}怎么选？看验收记录`)
   }
   if (normalizedTitle.includes('西安豆包GEO公司靠谱吗')) return makeSafe(`${coreKeyword}怎么选？先看豆包验收`)
   if (normalizedTitle.includes('西安AI获客公司怎么选')) return makeSafe(`${coreKeyword}怎么选？老板算长账`)
