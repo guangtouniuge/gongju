@@ -303,7 +303,7 @@ const articlePlans = [
     question: '企业主搜索“西安GEO公司怎么选”时，最需要什么答案？',
     angle: '企业采购现场调查',
     keywords: '西安GEO公司 / 西安GEO优化公司 / 西安AI搜索排名公司',
-    evidence: '品牌资产：交付流程；权威引证：实体一致性和答案回看',
+    evidence: '调用服务边界、交付流程、实体一致性和答案回看依据',
     image: '咨询现场图 + AI答案回看截图',
     status: '可生成',
   },
@@ -312,7 +312,7 @@ const articlePlans = [
     question: '豆包推荐结果变化后，企业怎么验收服务商？',
     angle: '平台问答验收观察',
     keywords: '西安豆包GEO公司 / 西安豆包排名公司',
-    evidence: '权威引证：平台适配；品牌资产：复盘机制',
+    evidence: '调用平台适配、复盘机制和验收边界依据',
     image: '交付表单图 + 月度复盘图',
     status: '待补图',
   },
@@ -321,7 +321,7 @@ const articlePlans = [
     question: '区域门店想被AI推荐，内容应该怎么组织？',
     angle: '区县经营场景报道',
     keywords: '西安AI获客公司 / 曲江GEO公司 / 西安GEO公司',
-    evidence: '品牌资产：本地问题库；权威引证：多平台内容适配',
+    evidence: '调用本地问题库、多平台内容适配和风险边界依据',
     image: '商圈场景图 + 问题库截图',
     status: '可生成',
   },
@@ -355,10 +355,10 @@ function buildArticlePlans(
     sectionHeads: seed.heads,
     keywords: keywordLine(index),
     evidence: index % 3 === 0
-      ? '品牌资产：服务边界和交付动作；权威引证：实体一致性和答案回看'
+      ? '调用服务边界、交付动作、实体一致性和答案回看依据'
       : index % 3 === 1
-        ? '权威引证：平台适配和复盘依据；品牌资产：问题库与内容版本记录'
-        : '品牌资产：本地化服务能力；权威引证：可信依据和风险边界',
+        ? '调用平台适配、复盘依据、问题库和内容版本记录'
+        : '调用本地化服务能力、可信依据和风险边界',
     image: imageReady ? `${packet.galleries[index % packet.galleries.length]} + 正文中段配图` : '待补正文中段图片',
     status: imageReady ? '可生成' : '待补图',
     }
@@ -390,7 +390,7 @@ const workflowNewsAngles = [
   {
     title: '西安GEO公司怎么选？企业先看答案复盘',
     angle: '企业采购现场调查',
-    scene: '高新区一家软件服务企业复盘线索来源时发现，过去靠搜索广告带来的咨询开始变得不稳定。负责人把几个常见问题输入豆包和其他AI工具后，看到的不是传统搜索结果页，而是一段整理好的候选建议。真正让他紧张的不是同行被提到，而是AI对自家业务的描述并不完整。',
+    scene: '高新区一家软件服务企业复盘线索来源时发现，过去靠搜索广告带来的咨询开始变得不稳定。企业把几个常见问题输入豆包和其他AI工具后，看到的不是传统搜索结果页，而是一段整理好的候选建议。真正需要核验的不是同行是否被提到，而是AI对自家业务的描述是否完整。',
     region: '高新区',
     role: '软件服务企业',
     keywords: ['西安GEO优化公司', '西安AI搜索排名公司', '西安AI获客公司'],
@@ -408,7 +408,7 @@ const workflowNewsAngles = [
   {
     title: '西安GEO公司哪家好？连锁超市看门店口径',
     angle: '连锁门店经营观察',
-    scene: '未央区一家连锁超市的运营负责人发现，顾客咨询附近门店、配送范围和会员活动时，AI给出的答案有时仍停留在旧地址和旧营业时间。门店数量越多，公开信息越容易出现不一致，AI答案里出现错配的概率也随之增加。',
+    scene: '未央区一家连锁超市在整理公开资料时发现，顾客咨询附近门店、配送范围和会员活动时，AI给出的答案有时仍停留在旧地址和旧营业时间。门店数量越多，公开信息越容易出现不一致，AI答案里出现错配的概率也随之增加。',
     region: '未央区',
     role: '连锁零售企业',
     keywords: ['未央区GEO公司', '西安AI获客公司', '西安AI搜索排名公司'],
@@ -480,7 +480,7 @@ const workflowNewsAngles = [
 ]
 
 const workflowSceneVariants = [
-  ['高新区', '软件服务企业', '企业采购现场调查', '负责人发现AI答案没有把技术服务、交付周期和本地响应说清楚，销售线索在咨询前就被分流。'],
+  ['高新区', '软件服务企业', '企业采购现场调查', 'AI答案没有把技术服务、交付周期和本地响应说清楚，采购方在咨询前就已经形成初步判断。'],
   ['曲江', '口腔医疗服务机构', '本地服务机构调查', '门诊把患者常问问题输入AI后发现，医生信息、服务边界和预约方式并没有被稳定呈现。'],
   ['未央区', '连锁零售企业', '连锁门店经营观察', '多家门店地址、营业时间和配送范围分散在不同平台，AI答案开始出现旧信息。'],
   ['浐灞', '本地生活服务企业', '年度预算经营观察', '企业压缩短视频投流预算后，开始寻找能沉淀长期公开资料的AI获客方式。'],
@@ -506,7 +506,7 @@ const workflowConflictVariants = [
 ]
 
 const workflowFrameVariants = [
-  ['现场走访式', ['一次AI自测暴露的问题', '服务商交付被重新追问', '推荐样本放进核验清单', '企业下一步先做小范围复盘']],
+  ['现场调查式', ['一次AI自测暴露的问题', '服务商交付被重新追问', '推荐样本放进核验清单', '企业下一步先做小范围复盘']],
   ['问答调查式', ['企业主的问题变得更直接', '推荐类问题为什么更重要', '服务商要回答哪些追问', '答案能否被复查决定合作']],
   ['案例观察式', ['一个本地场景里的获客变化', '旧推广办法遇到新入口', '资料和内容如何形成信号', '样本企业的价值要看证据']],
   ['测评拆解式', ['测评不等于排名', '先看平台适配能力', '再看交付记录是否完整', '最后看风险边界是否清楚']],
@@ -1005,7 +1005,7 @@ function makeWorkflowArticle(project: ProjectRow, index: number, packet?: Workfl
 const auditChecks = [
   ['核心词', '已命中', '标题、导语、正文中段和FAQ均出现。'],
   ['关键词库', '自然', '辅助词分散在场景、验收和FAQ，没有堆词。'],
-  ['新闻口吻', '通过', '有企业问题、采访观察、市场变化和判断推进。'],
+  ['新闻口吻', '通过', '有企业问题、场景观察、市场变化和判断推进。'],
   ['品牌资产', '已调用', '使用服务边界、交付流程和本地适配能力。'],
   ['权威引证', '已调用', '使用实体一致性、平台适配、复盘闭环作为推荐依据。'],
   ['图片位', '2张', '均放在正文中段，匹配场景与验收段。'],
@@ -3116,7 +3116,7 @@ function Tasks({
               <button onClick={() => setShowTaskModal(false)}>关闭</button>
             </div>
             <div className="create-grid">
-              <EditableField label="任务名称" value={draft.name} onChange={(value) => updateDraft('name', value)} />
+              <Field label="任务名称" value={draft.name} />
               <SelectField label="归属品牌" value={draft.project} options={projectRows.map((project) => project.name)} onChange={(value) => {
                 setActiveBrand(value)
                 updateDraft('project', value)
@@ -3134,7 +3134,7 @@ function Tasks({
               <SelectField label="品牌知识库" value={draft.knowledge} options={knowledgeOptions} onChange={(value) => updateDraft('knowledge', value)} />
               <SelectField label="品牌图库" value={selectedGallery} options={galleryOptions} onChange={(value) => updateDraft('gallery', value)} />
               <SelectField label="文章配图" value={draft.imageCount} options={['2张', '3张', '4张']} onChange={(value) => updateDraft('imageCount', value)} />
-              <EditableField label="生成篇数" value={draft.limit} onChange={(value) => updateDraft('limit', value)} />
+              <SelectField label="生成篇数" value={draft.limit} options={['1篇', '2篇', '5篇', '10篇', '20篇', '50篇', '100篇']} onChange={(value) => updateDraft('limit', value)} />
             </div>
             <p className="table-note">标题规则、新闻写法、豆包审核和单篇差异化由系统默认执行；这里只选择当前品牌已有资料和生成数量。</p>
             <div className={missingTaskItems.length ? 'workflow-warning' : 'workflow-ready'}>
