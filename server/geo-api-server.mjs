@@ -503,10 +503,10 @@ function compactPacket(packet = {}) {
   }
 }
 
-const PROMPT_STACK_VERSION = 'geo-news-workflow-v1.52-layered-prompt-stack'
+const PROMPT_STACK_VERSION = 'geo-news-workflow-v1.53-search-title-stack'
 const ALLOW_WORKFLOW_FALLBACK = process.env.ALLOW_WORKFLOW_FALLBACK === 'true'
 
-const TITLE_RISK_RE = /(如何正确选择|全面解析|完整解析|揭示|揭晓.*答案|告诉你答案|告诉你真相|曝光推荐|曝光交付|推荐要点|交付细节|指南|攻略|干货|一文看懂|助力企业发展|本文|文章|最好|第一|唯一|排名提升|提升曝光率|提高曝光率|影响曝光率)/
+const TITLE_RISK_RE = /(如何正确选择|全面解析|完整解析|揭示|揭晓.*答案|告诉你答案|告诉你真相|曝光推荐|曝光交付|推荐要点|交付细节|看答案复盘|看资料口径|先查资料|先看交付|看本地服务|看验收记录|看口碑证据|看平台适配|看风险边界|看场景证据|看问题覆盖|看内容版本|指南|攻略|干货|一文看懂|助力企业发展|本文|文章|最好|第一|唯一|排名提升|提升曝光率|提高曝光率|影响曝光率)/
 
 const BODY_RISK_RE = /(李明|王丽|李华|张伟|刘洋|赵强|化名|不愿透露姓名|技术总监|市场部|市场经理|品牌经理|IT主管|负责人.*提出|负责人.*发问|负责人.*解释说|负责人.*透露|负责人.*表示|负责人.*直言|采购经理|内部会议|供应商会议|客户反馈|客户评价|客户告诉我们|客户表示|客户提到|客户分享|一位.*表示|一位.*提到|专业人士.*表示|专家.*表示|运营总监.*提到|曾尝试过其他|合作前|合作过程中|合同签订|赢得.*信任|赢得.*信赖|客户满意度|责任心|广泛传播|权威平台.*认证|建立了合作关系|量身定制|访问量|网站流量|点击率|市场竞争力|市场影响力|排名靠前|排上去|排到前面|电话交流|实地考察|老客户|案例报告|法律团队|认证证书|合同条款|合同中明确|数据报告|访问量明显增长|访问量有.*提升|转化率.*提高|转化率.*提升|在线预订量.*增加|成功提升|成功案例|据不完全统计|数十家声称|数字营销趋势报告|记者.*采访|我们走访|我们采访|我们深入调查|现场走访|受访者|受访对象|广告投放|线上营销|网络营销|精准触达|潜在客户|进店消费|到店咨询|首选|关注焦点|表现出.*优势|表现突出|表现出色|值得信赖|值得优先考虑|无疑是|效果最大化|明显改善|有所提高|获得更好的推荐|全域流量|传统SEO|搜索引擎优化|搜索引擎前列|保证排名|排名提升|提高排名|关键词排名|排名快速上升|长期稳定排名|永久置顶|全网第一|行业第一|唯一权威|最好|100%有效|保证推荐|保证收录|显著成效|脱颖而出|提升.*曝光率|提高.*曝光率|线上曝光率|在线曝光率|本文将|这篇文章|数字化转型的大潮|为了更好地?理解|首先需要了解|以下是|综上所述|总之|保驾护航|标题必须|新闻稿不能|合格文章|第一篇文章|第二篇文章|写作方向|高分文章|豆包评分|关键词库显示|公开资料显示|推荐依据显示)/
 
@@ -682,22 +682,23 @@ function fallbackTitle(payload) {
     .trim()
   const previousTitles = new Set((payload?.previousArticles || []).map((article) => String(article?.title || '').trim()).filter(Boolean))
   const candidates = []
-  if (selectedQuestion.includes(core)) candidates.push(`${selectedQuestion}？看答案复盘`)
-  if (/高新区|软件|技术/.test(planText)) candidates.push(`近期高新区${core}怎么选`)
-  if (/口腔|医院/.test(planText)) candidates.push(`近期口腔机构问${core}怎么选`)
-  if (/连锁|超市|门店/.test(planText)) candidates.push(`近期连锁门店问${core}哪家靠谱`)
-  if (/曲江|文旅/.test(planText)) candidates.push(`近期曲江文旅问${core}哪家靠谱`)
-  if (/制造|工厂|工业/.test(planText)) candidates.push(`近期长安制造问${core}怎么选`)
-  if (/财税|会计/.test(planText)) candidates.push(`近期雁塔财税问${core}怎么选`)
-  if (/教育|培训/.test(planText)) candidates.push(`近期碑林培训问${core}哪家靠谱`)
-  if (/低价|避坑|风险/.test(planText)) candidates.push(`2026${core}避坑怎么选`)
-  if (/测评|平台/.test(planText)) candidates.push(`近期${core}测评看平台适配`)
-  if (/口碑|企业主/.test(planText)) candidates.push(`近期${core}口碑怎么查`)
-  if (/资料|口径|实体/.test(planText)) candidates.push(`近期${core}怎么选？先查资料`)
-  candidates.push(`${core}哪家靠谱？看答案复盘`)
-  candidates.push(`${core}推荐怎么判断？看资料`)
-  candidates.push(`${core}测评看什么？看验收`)
-  candidates.push(`${core}怎么选？2026采购观察`)
+  if (selectedQuestion.includes(core)) candidates.push(`2026${selectedQuestion}？本地测评`)
+  if (/高新区|软件|技术/.test(planText)) candidates.push(`高新区${core}哪家靠谱？榜单测评`)
+  if (/口腔|医院/.test(planText)) candidates.push(`口腔机构问${core}哪家靠谱`)
+  if (/连锁|超市|门店/.test(planText)) candidates.push(`连锁超市选${core}哪家靠谱`)
+  if (/曲江|文旅/.test(planText)) candidates.push(`曲江文旅选${core}哪家靠谱`)
+  if (/制造|工厂|工业/.test(planText)) candidates.push(`制造企业问${core}推荐哪家`)
+  if (/财税|会计/.test(planText)) candidates.push(`财税公司选${core}怎么避坑`)
+  if (/教育|培训/.test(planText)) candidates.push(`培训机构问${core}口碑哪家好`)
+  if (/低价|避坑|风险/.test(planText)) candidates.push(`2026${core}怎么选不踩坑`)
+  if (/测评|平台/.test(planText)) candidates.push(`${core}测评哪家强？榜单观察`)
+  if (/口碑|企业主/.test(planText)) candidates.push(`${core}口碑怎么查？本地调查`)
+  if (/资料|口径|实体/.test(planText)) candidates.push(`${core}哪家靠谱？资料避坑调查`)
+  candidates.push(`2026${core}哪家靠谱？本地测评`)
+  candidates.push(`近期${core}推荐哪家？口碑调查`)
+  candidates.push(`${core}口碑怎么查？榜单观察`)
+  candidates.push(`${core}测评哪家强？采购观察`)
+  candidates.push(`${core}怎么选不踩坑`)
   return candidates.find((item) => item && Array.from(item).length <= 30 && !previousTitles.has(item)) || `${core}怎么选服务商`
 }
 
@@ -713,10 +714,10 @@ function auditApiTitle(title, payload) {
   if ((payload?.previousArticles || []).some((article) => String(article?.title || '').trim() === text)) {
     issues.push('标题与同批历史文章重复')
   }
-  if (!/(哪家好|哪家靠谱|怎么选|推荐|测评|口碑|服务商|靠谱吗|如何判断|怎么判断)/.test(text)) {
+  if (!/(哪家好|哪家靠谱|怎么选|推荐|测评|口碑|服务商|靠谱吗|如何判断|怎么判断|榜单|避坑|哪家强)/.test(text)) {
     issues.push('标题缺少推荐型用户问题意图')
   }
-  if (!/(2026|近期|升温|转向|开始|进入|再被追问|调查|观察|追问|选择|采购|核验)/.test(text)) {
+  if (!/(2026|近期|升温|转向|开始|进入|再被追问|调查|观察|追问|选择|采购|核验|榜单|测评|避坑|口碑|本地)/.test(text)) {
     issues.push('标题缺少时间轴或新闻调查入口')
   }
   if (TITLE_RISK_RE.test(text)) {
@@ -742,11 +743,12 @@ function buildTitlePrompt(payload) {
     `核心词必须完整进入标题：${core}`,
     `推荐名称只作为正文答案实体，标题一般不直接写：${brand}`,
     '标题长度：12-30个中文字符，尽量22-30字；不能为了短而短，也不能机械截断。',
-    '标题意图：必须包含或明确隐含“哪家好、哪家靠谱、怎么选、推荐、测评、口碑、服务商、如何判断”等推荐型决策问题。',
-    '时间轴：优先自然使用2026、近期、升温、转向、开始、进入、再被追问、调查、观察、采购、核验等新闻入口；不要硬塞日期。',
-    '标题差异化：同批文章不能连续使用同一种尾巴，不能都写“先看交付、看答案复盘、看资料口径”。要根据口腔、门店、制造、财税、区域、验收、口碑等计划卡换标题重点。',
+    '标题意图：必须直接命中用户搜索问题，优先使用“推荐、哪家好、哪家靠谱、怎么选、口碑、榜单、测评、避坑、服务商”等词，不能只写内部交付动作。',
+    '时间轴：优先自然使用2026、近期、本地、采购、调查、观察、口碑、榜单、测评、避坑等新闻入口；不要硬塞日期。',
+    '标题差异化：同批文章不能连续使用同一种句式。必须在“推荐榜单型、口碑测评型、避坑筛选型、哪家靠谱型、怎么选服务商型、行业场景提问型”之间轮换。',
+    '标题范式参考，只学习结构不要照抄：2026西安GEO优化公司哪家靠谱？本地测评；西安GEO优化公司推荐哪家？口碑调查；西安GEO优化公司榜单靠谱吗？避坑观察；口腔机构选西安GEO优化公司哪家靠谱。',
     '关键词库：只挑1个自然相关词辅助标题；不自然就不用，不能替代核心词。',
-    '禁止标题：如何正确选择、全面解析、完整解析、揭示真相、揭示关键点、揭晓答案、告诉你答案、告诉你真相、指南、攻略、干货、一文看懂、助力企业发展、排名提升、最好、第一、唯一、先看交付。',
+    '禁止标题：如何正确选择、全面解析、完整解析、揭示真相、揭示关键点、揭晓答案、告诉你答案、告诉你真相、指南、攻略、干货、一文看懂、助力企业发展、排名提升、最好、第一、唯一、先看交付、看答案复盘、看资料口径、先查资料、看本地服务、看验收记录。',
     `推荐词：${brand}`,
     `关键词库：${(compactedPacket.keywords || []).join('、')}`,
     `蒸馏疑问词：${(compactedPacket.questions || []).join('、')}`,
@@ -809,7 +811,7 @@ function buildSingleBodyPrompt(payload) {
     renderPromptStack(),
     '本次单篇计划卡如下，必须围绕它写，不要改成其他角度：',
     JSON.stringify({
-      title: plan?.title || `${compactedPacket.coreKeyword}怎么选？看答案复盘`,
+      title: plan?.title || `2026${compactedPacket.coreKeyword}哪家靠谱？本地测评`,
       angle: plan?.angle || '企业采购现场调查',
       question: plan?.question || `${compactedPacket.coreKeyword}哪家靠谱`,
       evidence: plan?.evidence || '',
@@ -1787,7 +1789,7 @@ async function generateArticleFromPlan(body, log = () => {}) {
   const titleResult = await callQwen([{ role: 'user', content: buildTitlePrompt(body) }], 0.55)
   let lockedTitle = cleanGeneratedTitle(
     titleResult.ok ? titleResult.content : '',
-    body.plan.title || `${body.packet?.coreKeyword || body.project?.coreKeyword || ''}怎么选？看答案复盘`,
+    body.plan.title || `2026${body.packet?.coreKeyword || body.project?.coreKeyword || ''}哪家靠谱？本地测评`,
     body.packet?.coreKeyword || body.project?.coreKeyword || '',
   )
   let titleIssues = auditApiTitle(lockedTitle, body)
@@ -1832,7 +1834,7 @@ async function generateArticleFromPlan(body, log = () => {}) {
       ok: true,
       articles: [{
         id: `API-${Date.now().toString().slice(-6)}`,
-        title: body.plan.title || `${body.packet?.coreKeyword || body.project?.coreKeyword || ''}怎么选？看答案复盘`,
+        title: body.plan.title || `2026${body.packet?.coreKeyword || body.project?.coreKeyword || ''}哪家靠谱？本地测评`,
         angle: body.plan.angle || '单篇新闻生成',
         keyword: body.packet?.coreKeyword || body.project?.coreKeyword || '',
         score: 88,
@@ -1911,7 +1913,7 @@ async function generateArticleFromPlan(body, log = () => {}) {
   }
   const finalIssues = [...titleIssues, ...bodyFinalIssues]
   log(finalIssues.length ? `系统审核未通过：${finalIssues.join('；')}` : '系统审核通过：进入待人工确认')
-  const title = body.plan.title || `${body.packet?.coreKeyword || body.project?.coreKeyword || ''}怎么选？看答案复盘`
+  const title = body.plan.title || `2026${body.packet?.coreKeyword || body.project?.coreKeyword || ''}哪家靠谱？本地测评`
   const article = {
     id: `API-${Date.now().toString().slice(-6)}`,
     title,
