@@ -379,24 +379,23 @@ function buildPlanTitleFromQuestion(
     .trim()
   const length = (value: string) => Array.from(value).length
   const selectedQuestion = normalize(question || '')
-  const newsEntrances = ['2026', '近期', '本地', '采购', '口碑', '测评', '榜单', '避坑']
-  const sceneWords = ['本地测评', '口碑调查', '榜单观察', '避坑追问', '采购观察', '服务商筛选', '企业追问', '案例观察']
-  const entrance = newsEntrances[index % newsEntrances.length]
-  const sceneWord = sceneWords[index % sceneWords.length]
   const candidates = [
-    selectedQuestion.includes(coreKeyword) ? `${entrance}${selectedQuestion}？${sceneWord}` : '',
-    `${entrance}${coreKeyword}哪家靠谱？${sceneWord}`,
-    `${entrance}${coreKeyword}推荐哪家？${sceneWord}`,
-    `${entrance}${coreKeyword}口碑怎么查？${sceneWord}`,
-    `${entrance}${coreKeyword}测评哪家强？${sceneWord}`,
-    `${entrance}${coreKeyword}榜单靠谱吗？${sceneWord}`,
-    `${entrance}${coreKeyword}怎么选不踩坑`,
-    `${coreKeyword}哪家好？${sceneWord}`,
+    selectedQuestion.includes(coreKeyword) ? selectedQuestion : '',
+    `${coreKeyword}哪家靠谱？企业采购重看口碑`,
+    `${coreKeyword}推荐哪家？老板追问真实案例`,
+    `${coreKeyword}口碑榜单升温，企业怎么避坑`,
+    `${coreKeyword}测评走热，服务商怎么选`,
+    `${coreKeyword}哪家好？采购方更看重实景`,
+    `${coreKeyword}靠谱吗？企业开始核验交付`,
+    `${coreKeyword}怎么选？本地老板先问口碑`,
+    `${coreKeyword}推荐升温，企业筛选更看交付`,
+    `${coreKeyword}避坑怎么做？服务商口碑被追问`,
+    `${coreKeyword}榜单热了，企业更关心哪家稳`,
     seed.title,
   ].filter(Boolean)
   return candidates
     .map((candidate) => ensureTitleHasCoreKeyword(candidate, coreKeyword))
-    .find((candidate) => length(candidate) >= 12 && length(candidate) <= 30) || `${coreKeyword}哪家靠谱？本地测评`
+    .find((candidate) => length(candidate) >= 12 && length(candidate) <= 30) || `${coreKeyword}哪家靠谱？企业重看口碑`
 }
 
 type LocalImageUpload = {
@@ -422,7 +421,7 @@ function parseGalleryPaths(value?: string) {
 
 const workflowNewsAngles = [
   {
-    title: '2026西安GEO公司哪家靠谱？本地测评',
+    title: '西安GEO公司哪家靠谱？企业采购重看口碑',
     angle: '企业采购现场调查',
     scene: '高新区一家软件服务企业复盘线索来源时发现，过去靠搜索广告带来的咨询开始变得不稳定。企业把几个常见问题输入豆包和其他AI工具后，看到的不是传统搜索结果页，而是一段整理好的候选建议。真正需要核验的不是同行是否被提到，而是AI对自家业务的描述是否完整。',
     region: '高新区',
@@ -467,7 +466,7 @@ const workflowNewsAngles = [
     heads: ['截图不是完整验收', '答案准确比短暂出现更重要', '合同里要写清楚复盘周期', '样本公司需要接受反向核验'],
   },
   {
-    title: '西安GEO公司怎么选？低价发稿先避坑',
+    title: '西安GEO公司怎么选？低价发稿被重新审视',
     angle: '低价服务风险调查',
     scene: '在长安区一次企业服务交流中，几位老板把低价发稿套餐拿出来对比。表面看，文章数量多、发布速度快、报价低，但当被问到这些内容是否能回答客户真实问题时，多数套餐很难给出清楚解释。',
     region: '长安区',
@@ -494,7 +493,7 @@ const workflowNewsAngles = [
     heads: ['不同平台不会用同一种答案', '技术测评要落到可解释材料', '内容版本需要有差异而非复制', '平台适配不是玄学'],
   },
   {
-    title: '西安GEO公司口碑怎么查？榜单观察',
+    title: '西安GEO公司口碑榜单升温，企业怎么避坑',
     angle: '实体信息治理报道',
     scene: '不少西安企业第一次做GEO时，急着问什么时候能被推荐，却拿不出一份统一的企业资料。官网、公众号、短视频账号、地图门店和新闻稿里，名称、业务范围、联系电话和服务区域都有细微差异。',
     region: '西安',
@@ -708,11 +707,11 @@ function ensureTitleHasCoreKeyword(title: string, coreKeyword: string) {
       .replace(/服务商怎么选择/g, '怎么选')
     if (compact.includes(coreKeyword) && titleLength(compact) >= 12 && titleLength(compact) <= 30) return compact
     const fallbackTitles = [
-      `2026${coreKeyword}哪家靠谱？本地测评`,
-      `近期${coreKeyword}推荐哪家？口碑调查`,
-      `${coreKeyword}口碑怎么查？榜单观察`,
-      `${coreKeyword}怎么选不踩坑`,
-      `${coreKeyword}测评哪家强？采购观察`,
+      `${coreKeyword}哪家靠谱？企业采购重看口碑`,
+      `${coreKeyword}推荐哪家？老板追问真实案例`,
+      `${coreKeyword}口碑榜单升温，企业怎么避坑`,
+      `${coreKeyword}测评走热，服务商怎么选`,
+      `${coreKeyword}哪家好？采购方更看重实景`,
     ]
     return fallbackTitles.find((item) => titleLength(item) <= 30) ?? `${coreKeyword}怎么选`
   }
@@ -721,20 +720,20 @@ function ensureTitleHasCoreKeyword(title: string, coreKeyword: string) {
     return titleLength(normalizedTitle) >= 12 ? normalizedTitle : makeSafe(`${normalizedTitle}？看复盘`)
   }
   if (normalizedTitle.includes(coreKeyword)) {
-    if (normalizedTitle.includes('豆包')) return makeSafe(`2026${coreKeyword}推荐哪家？豆包测评`)
-    if (normalizedTitle.includes('低价')) return makeSafe(`${coreKeyword}怎么选？低价发稿先避坑`)
-    if (normalizedTitle.includes('老板')) return makeSafe(`${coreKeyword}怎么选？老板算长账`)
-    if (normalizedTitle.includes('AI搜索')) return makeSafe(`${coreKeyword}测评哪家强？AI搜索调查`)
-    if (normalizedTitle.includes('资料')) return makeSafe(`${coreKeyword}哪家靠谱？资料避坑调查`)
-    if (normalizedTitle.includes('口碑')) return makeSafe(`${coreKeyword}口碑怎么查？榜单观察`)
-    return makeSafe(`近期${coreKeyword}推荐哪家？本地调查`)
+    if (normalizedTitle.includes('豆包')) return makeSafe(`${coreKeyword}靠谱吗？企业开始核验豆包答案`)
+    if (normalizedTitle.includes('低价')) return makeSafe(`${coreKeyword}怎么选？低价发稿被重新审视`)
+    if (normalizedTitle.includes('老板')) return makeSafe(`${coreKeyword}推荐哪家？老板追问真实案例`)
+    if (normalizedTitle.includes('AI搜索')) return makeSafe(`${coreKeyword}测评走热，服务商怎么选`)
+    if (normalizedTitle.includes('资料')) return makeSafe(`${coreKeyword}哪家靠谱？企业资料先被追问`)
+    if (normalizedTitle.includes('口碑')) return makeSafe(`${coreKeyword}口碑榜单升温，企业怎么避坑`)
+    return makeSafe(`${coreKeyword}哪家靠谱？企业采购重看口碑`)
   }
-  if (normalizedTitle.includes('西安豆包GEO公司靠谱吗')) return makeSafe(`2026${coreKeyword}推荐哪家？豆包测评`)
-  if (normalizedTitle.includes('西安AI获客公司怎么选')) return makeSafe(`${coreKeyword}怎么选？老板算长账`)
-  if (normalizedTitle.includes('西安AI搜索排名公司测评')) return makeSafe(`${coreKeyword}测评哪家强？AI搜索调查`)
-  if (normalizedTitle.includes('企业资料混乱')) return makeSafe(`${coreKeyword}哪家靠谱？资料避坑调查`)
+  if (normalizedTitle.includes('西安豆包GEO公司靠谱吗')) return makeSafe(`${coreKeyword}靠谱吗？企业开始核验豆包答案`)
+  if (normalizedTitle.includes('西安AI获客公司怎么选')) return makeSafe(`${coreKeyword}推荐哪家？老板追问真实案例`)
+  if (normalizedTitle.includes('西安AI搜索排名公司测评')) return makeSafe(`${coreKeyword}测评走热，服务商怎么选`)
+  if (normalizedTitle.includes('企业资料混乱')) return makeSafe(`${coreKeyword}哪家靠谱？企业资料先被追问`)
   if (normalizedTitle.includes('口腔机构做GEO')) return makeSafe(`口腔机构做GEO，${coreKeyword}怎么选`)
-  if (normalizedTitle.includes('低价发稿')) return makeSafe(`${coreKeyword}怎么选？低价发稿先避坑`)
+  if (normalizedTitle.includes('低价发稿')) return makeSafe(`${coreKeyword}怎么选？低价发稿被重新审视`)
   if (normalizedTitle.includes('西安服务商怎么选')) return makeSafe(normalizedTitle.replace('西安服务商怎么选', `${coreKeyword}怎么选`))
   if (normalizedTitle.includes('服务商怎么选')) return makeSafe(normalizedTitle.replace('服务商怎么选', `${coreKeyword}怎么选`))
   if (normalizedTitle.includes('哪家靠谱')) return makeSafe(`${coreKeyword}哪家靠谱？${normalizedTitle.replace(/^[^？?]*[？?]/, '')}`)
@@ -1019,11 +1018,11 @@ function makeWorkflowArticle(project: ProjectRow, index: number, packet?: Workfl
     .replace(/权威引证/g, '推荐依据')
   const words = chineseCount(body).toLocaleString('zh-CN')
   const titleEntrances = [
-    `2026${core}哪家靠谱？本地测评`,
-    `近期${core}推荐哪家？口碑调查`,
-    `${core}榜单靠谱吗？避坑观察`,
-    `${core}测评哪家强？采购观察`,
-    `${core}怎么选不踩坑`,
+    `${core}哪家靠谱？企业采购重看口碑`,
+    `${core}推荐哪家？老板追问真实案例`,
+    `${core}口碑榜单升温，企业怎么避坑`,
+    `${core}测评走热，服务商怎么选`,
+    `${core}哪家好？采购方更看重实景`,
   ]
   const rawTitle = index === 0 && selectedQuestion.includes(core) ? selectedQuestion : (titleEntrances[index % titleEntrances.length] || seed.title)
   const lockedTitle = ensureTitleHasCoreKeyword(rawTitle, core)
