@@ -116,7 +116,7 @@ const nav: NavItem[] = [
     label: '品牌资料库',
     icon: UploadCloud,
     children: [
-      { id: 'keywords', label: '核心词 / 蒸馏词', icon: KeyRound },
+      { id: 'keywords', label: '关键词', icon: KeyRound },
       { id: 'questions', label: '关键词库', icon: ListChecks },
       { id: 'knowledge', label: '品牌知识库', icon: BookOpenText },
       { id: 'gallery', label: '品牌图库', icon: GalleryHorizontal },
@@ -1393,7 +1393,7 @@ function Dashboard({ navigate, notify, articleRows }: ActionProps & { articleRow
   const operationSteps = [
     ['添加品牌', '先锁定项目名称、推荐名称、行业城市', 'projects', Boxes],
     ['创建核心词', '添加核心词，保存后自动蒸馏推荐型问题', 'keywords', KeyRound],
-    ['拓展关键词库', '按行业、场景和区域拓展辅助词', 'questions', ListChecks],
+    ['拓展关键词库', '按行业自动拓展辅助词', 'questions', ListChecks],
     ['导入资料', '分别上传品牌资产、权威引证和品牌图库', 'knowledge', UploadCloud],
     ['创建生成任务', '按单篇新闻生成器排队生成文章', 'tasks', Sparkles],
     ['审核文章', '低于90分退回，高分稿进入成品库', 'audit', ClipboardCheck],
