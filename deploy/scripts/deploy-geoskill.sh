@@ -40,6 +40,10 @@ npm ci
 npm run build
 npm prune --omit=dev
 
+if [ -f deploy/nginx/geoskill.7chacha.com.conf ] && [ -d /etc/nginx/conf.d ]; then
+  cp deploy/nginx/geoskill.7chacha.com.conf /etc/nginx/conf.d/geoskill.7chacha.com.conf
+fi
+
 if command -v pm2 >/dev/null 2>&1; then
   pm2 describe "${PM2_NAME}" >/dev/null 2>&1 \
     && pm2 restart "${PM2_NAME}" --update-env \
