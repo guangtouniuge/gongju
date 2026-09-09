@@ -1430,6 +1430,7 @@ select.search-input {
   color: #245ed0;
   background: #fff;
   font-weight: 700;
+  white-space: nowrap;
 }
 
 .ops-row button.danger-button,
@@ -1444,7 +1445,7 @@ select.search-input {
   align-items: center;
   justify-content: flex-start;
   gap: 7px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 
 .empty-state {
@@ -1589,12 +1590,12 @@ select.search-input {
 }
 
 .task-batch-table {
-  min-width: 980px;
+  min-width: 1080px;
 }
 
 .task-batch-table .ops-head,
 .task-batch-table .ops-row {
-  grid-template-columns: minmax(210px, 1fr) 130px 64px 76px 92px 80px 90px 176px;
+  grid-template-columns: minmax(260px, 1fr) minmax(150px, .72fr) 56px 66px 84px 74px 84px 182px;
   gap: 8px;
 }
 
@@ -1614,19 +1615,34 @@ select.search-input {
 }
 
 .mature-task-table {
-  min-width: 980px;
+  min-width: 1120px;
 }
 
 .mature-task-table .ops-head,
 .mature-task-table .ops-row {
-  grid-template-columns: minmax(170px, 1fr) 108px 72px 72px 130px 78px 118px 168px;
+  grid-template-columns: minmax(220px, 1fr) 120px 70px 70px minmax(120px, .65fr) 78px 118px 218px;
   gap: 8px;
+}
+
+.library-table {
+  min-width: 1160px;
 }
 
 .library-table .ops-head,
 .library-table .ops-row {
-  grid-template-columns: 46px minmax(260px, 1fr) 140px 86px 78px 70px 84px 174px;
+  grid-template-columns: 46px minmax(360px, 1fr) 150px 86px 92px 74px 84px 220px;
   gap: 8px;
+}
+
+.library-table .row-actions {
+  gap: 6px;
+}
+
+.library-table .ops-row button,
+.task-batch-table .ops-row button,
+.mature-task-table .ops-row button {
+  min-height: 30px;
+  padding: 0 10px;
 }
 
 .row-check {

@@ -3536,6 +3536,7 @@ function LibraryPage({ notify, navigate, articleRows, setArticleRows, activeBran
   }
   const allBrandPassedArticles = scopedArticles.filter((item) => item.status === '已生成')
   const passedArticles = allBrandPassedArticles.filter(articleInSelectedBatch)
+  const selectedPassedArticles = passedArticles.filter((article) => selectedArticles.includes(article.id))
   const taskForBatch = storedTaskRows.find((row) => row.batchId === latestBatchId)
   const allCurrentBatchArticles = scopedArticles.filter(articleInSelectedBatch)
   const imageCountForArticle = (article: Article) => galleryRows.filter((row) => row[0] === (article.project || activeBrand)).length
@@ -3543,7 +3544,10 @@ function LibraryPage({ notify, navigate, articleRows, setArticleRows, activeBran
     setSelectedArticles((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]))
   }
   const toggleAllPassedArticles = () => {
-    setSelectedArticles((current) => (current.length === passedArticles.length ? [] : passedArticles.map((article) => article.id)))
+    setSelectedArticles((current) => {
+      const currentVisible = current.filter((id) => passedArticles.some((article) => article.id === id))
+      return currentVisible.length === passedArticles.length ? [] : passedArticles.map((article) => article.id)
+    })
   }
   const buildDownloadContent = (targets: Article[]) => targets
     .map((article, index) => [
@@ -3596,9 +3600,7 @@ function LibraryPage({ notify, navigate, articleRows, setArticleRows, activeBran
     notify(`${target?.title ?? '文章'}已从成品文章库删除。`)
   }
   const downloadSelectedArticles = () => {
-    const targets = selectedArticles.length
-      ? passedArticles.filter((article) => selectedArticles.includes(article.id))
-      : passedArticles
+    const targets = selectedPassedArticles.length ? selectedPassedArticles : passedArticles
     downloadArticles(targets, `${activeBrand}_${taskForBatch?.name ?? '当前任务'}_成品文章`)
   }
   const downloadAllArticles = () => {
@@ -3629,12 +3631,12 @@ function LibraryPage({ notify, navigate, articleRows, setArticleRows, activeBran
               {showAllArticles ? '最新任务' : '全部成品'}
             </button>
             <button className="ghost-button" disabled={!passedArticles.length} onClick={toggleAllPassedArticles}>
-              {selectedArticles.length === passedArticles.length && passedArticles.length > 0 ? '取消全选' : '全选'}
+              {selectedPassedArticles.length === passedArticles.length && passedArticles.length > 0 ? '取消全选' : '全选'}
             </button>
           </div>
           <div className="toolbar-group primary-group">
             <button className="ghost-button" disabled={!passedArticles.length} onClick={() => notify('图文版会读取图片素材库的封面和正文配图，当前先保持正文不改写。')}>图文编排</button>
-            <button className="ghost-button" disabled={!passedArticles.length} onClick={downloadSelectedArticles}>{selectedArticles.length ? '下载选中Word' : '下载当前Word'}</button>
+            <button className="ghost-button" disabled={!passedArticles.length} onClick={downloadSelectedArticles}>{selectedPassedArticles.length ? `下载选中${selectedPassedArticles.length}篇` : '下载当前批次'}</button>
             <button className="ghost-button" disabled={!allBrandPassedArticles.length} onClick={downloadAllArticles}>下载全部Word</button>
             <button
               className="primary-button"
