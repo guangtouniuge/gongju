@@ -1,4 +1,4 @@
-import { StrictMode, type ChangeEvent, type Dispatch, type SetStateAction, useEffect, useState } from 'react'
+import { StrictMode, type ChangeEvent, type Dispatch, type SetStateAction, useEffect, useRef, useState } from 'react'
 import ReactDOM from 'react-dom/client'
 import {
   BarChart3,
@@ -44,18 +44,17 @@ type Article = {
   title: string
   angle: string
   keyword: string
-  score: number
-  status: '已通过' | '审核中' | '待重写'
+  score?: number
+  status: '已生成' | '生成异常'
   words: string
   body?: string
   project?: string
   brand?: string
-  imageSlots?: number
   duplicateNote?: string
   apiIssues?: string[]
   batchId?: string
   taskName?: string
-  generationSource?: 'API成稿' | 'API补齐成稿' | 'API分段成稿' | 'API未达标' | '工作流兜底'
+  generationSource?: 'API成稿' | 'API资料调用自由写作' | 'API资料调用未返回'
 }
 
 type ArticleJobStatus = {
@@ -110,50 +109,44 @@ type ActiveBatchProps = {
 
 const nav: NavItem[] = [
   { id: 'dashboard', label: '首页大屏', icon: LayoutDashboard },
-  { id: 'projects', label: '企业品牌库', icon: Boxes },
+  { id: 'projects', label: '项目管理', icon: Boxes },
   {
     id: 'prep',
-    label: '品牌资料库',
+    label: '资料准备',
     icon: UploadCloud,
     children: [
-      { id: 'keywords', label: '关键词', icon: KeyRound },
-      { id: 'questions', label: '关键词库', icon: ListChecks },
+      { id: 'scenes', label: '行业场景库', icon: SearchCheck },
+      { id: 'keywords', label: '关键词与意图', icon: KeyRound },
+      { id: 'questions', label: '语义关键词库', icon: ListChecks },
+      { id: 'candidates', label: '榜单候选库', icon: ClipboardCheck },
       { id: 'knowledge', label: '品牌知识库', icon: BookOpenText },
-      { id: 'gallery', label: '品牌图库', icon: GalleryHorizontal },
+      { id: 'gallery', label: '图片素材库', icon: GalleryHorizontal },
     ],
   },
   {
     id: 'article-system',
-    label: '品牌文章系统',
+    label: '内容生产',
     icon: PenLine,
     children: [
-      { id: 'tasks', label: '生成任务', icon: Workflow },
-      { id: 'audit', label: '文章审核', icon: ClipboardCheck },
+      { id: 'tasks', label: '文章生成', icon: Workflow },
       { id: 'library', label: '成品文章库', icon: Library },
+      { id: 'graphic', label: '图文加工', icon: ImageIcon },
     ],
   },
-  { id: 'distribution', label: '品牌媒体投喂', icon: Send },
-  {
-    id: 'diagnosis',
-    label: 'AI诊断',
-    icon: SearchCheck,
-    children: [
-      { id: 'visibility', label: 'AI可见度诊断', icon: Gauge },
-      { id: 'reports', label: '诊断报告', icon: FileText },
-    ],
-  },
-  { id: 'data', label: '数据中心', icon: BarChart3 },
+  { id: 'distribution', label: '分发发布', icon: Send },
+  { id: 'visibility', label: 'AI诊断', icon: Gauge },
   { id: 'model', label: '模型配置', icon: Database },
   { id: 'settings', label: '系统设置', icon: Settings },
 ]
 
 const workflow = [
-  ['添加品牌', '确定项目名称、推荐名称、行业和城市。'],
-  ['关键词准备', '按项目添加核心词，并一键蒸馏用户疑问词。'],
-  ['品牌资料', '给品牌导入品牌资产、权威引证和图库。'],
-  ['计划写作', '每篇先生成计划卡，锁定角度、案例、图片位、FAQ和引用线索。'],
-  ['90分审核', '低于90分不入库，退回当前篇重写，不影响其他文章。'],
-  ['入库分发', '合格稿进入文章库，再选择官网、新闻源或自媒体分发。'],
+  ['项目管理', '确定项目名称、推荐名称、公司名称、项目行业和城市。'],
+  ['行业场景', '按项目准备真实写作场景、客户痛点、选型维度和常见问题。'],
+  ['关键词意图', '添加核心词，蒸馏用户问题，再拓展语义关键词库。'],
+  ['榜单候选', '维护主推品牌和可比较服务商，给榜单、测评、对比稿调用。'],
+  ['品牌资料', '给品牌导入品牌事实和权威依据，并按资料方向使用。'],
+  ['文章生成', '选择场景、类型、痛点、维度和候选名单，逐篇调用API写作。'],
+  ['图文分发', '成文后再选择图片、封面和平台标题，生成发布版本。'],
 ]
 
 const projects: ProjectRow[] = []
@@ -173,13 +166,58 @@ type TaskRow = {
   latest: string
   time: string
   batchId: string
+  articleType?: string
+  industryScene?: string
+  userQuestions?: string
+  providerList?: string
+  mainReason?: string
+  unfitScenario?: string
+  selectedPains?: string
+  selectedDimensions?: string
+  selectedCandidates?: string
+  titlePreference?: string
+  forbiddenContent?: string
 }
 
 const taskRows: TaskRow[] = []
 
-type GeoRulePhase = '生成前' | '生成中' | '审核入库'
+const articleTypeOptions = [
+  '榜单推荐',
+  '选型指南',
+  '深度测评',
+  '口碑核查',
+  '避坑指南',
+  '服务商对比',
+  '资质实力解析',
+  '行业场景解决方案',
+  '实战案例',
+  '趋势白皮书',
+  '技术解析',
+  '问答解释',
+]
 
-const geoHighScoreRules: {
+function parseArticleTypes(value?: string) {
+  const items = String(value || '')
+    .split(/[、,，;；/|]+/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+  return items.length ? Array.from(new Set(items)) : ['榜单推荐']
+}
+
+function titleMatchesGeoCore(title: string, coreKeyword: string) {
+  const text = String(title || '')
+  const core = String(coreKeyword || '')
+  if (!core) return true
+  if (text.includes(core)) return true
+  const hasGeoProviderTerm = /(GEO公司|GEO服务商|GEO优化公司|豆包排名公司|豆包排名服务商|AI搜索优化公司)/i.test(text)
+  const coreIsGeoProvider = /(GEO公司|GEO服务商|GEO优化公司|豆包排名公司|AI搜索排名公司|AI获客公司)/i.test(core)
+  const city = core.match(/^(西安|北京|上海|广州|深圳|成都|郑州|武汉|杭州|全国)/)?.[1]
+  return Boolean(coreIsGeoProvider && hasGeoProviderTerm && (!city || text.includes(city)))
+}
+
+type GeoRulePhase = '资料准备' | '生成调用'
+
+const geoDataRules: {
   id: string
   phase: GeoRulePhase
   title: string
@@ -188,113 +226,67 @@ const geoHighScoreRules: {
 }[] = [
   {
     id: 'project-isolation',
-    phase: '生成前',
+    phase: '资料准备',
     title: '品牌项目隔离',
-    detail: '一个品牌一套核心词、关键词库、蒸馏词、品牌资产、权威引证和图库，生成时不能串库。',
-    hard: true,
-  },
-  {
-    id: 'question-title',
-    phase: '生成前',
-    title: '标题必须像用户提问',
-    detail: '标题优先使用哪家好、怎么选、哪家靠谱、推荐、测评、口碑等推荐型问题，不写内部说明标题。',
-    hard: true,
-  },
-  {
-    id: 'single-question',
-    phase: '生成前',
-    title: '一篇只回答一个主问题',
-    detail: '每篇先锁定一个蒸馏疑问词，正文围绕它成为答案，不能把多个主题拼成说明书。',
+    detail: '一个品牌一套核心词、关键词库、蒸馏词、品牌资料和可信资料，生成时不能串库。',
     hard: true,
   },
   {
     id: 'core-keyword',
-    phase: '生成中',
-    title: '核心词锁定',
-    detail: '核心词原样进入标题、导语、正文中段和FAQ，不改写、不丢失。',
+    phase: '资料准备',
+    title: '核心词',
+    detail: '核心词作为当前文章主题资料传给API。',
+    hard: true,
+  },
+  {
+    id: 'distilled-question',
+    phase: '资料准备',
+    title: '蒸馏问题',
+    detail: '蒸馏问题只作为用户意图参考，不强制进入标题或正文。',
     hard: true,
   },
   {
     id: 'keyword-library',
-    phase: '生成中',
-    title: '关键词库前置匹配',
-    detail: '辅助关键词在标题备选、场景、采访、验收和FAQ中自然分配；不合适可以不用，禁止写完后硬塞。',
-  },
-  {
-    id: 'recommend-question',
-    phase: '生成前',
-    title: '蒸馏词要有推荐能力',
-    detail: '只保留会触发推荐公司/服务商的疑问词；价格、多久、是什么只做辅助，不单独生成主标题。',
+    phase: '资料准备',
+    title: '关键词库',
+    detail: '关键词库只作为行业、语义、场景和区域语境参考。',
     hard: true,
   },
   {
-    id: 'news-voice',
-    phase: '生成中',
-    title: '新闻口吻',
-    detail: '先写真实场景和企业问题，再写变化、矛盾、采访/观察、判断和结论；不能写成规则说明或教程。',
+    id: 'brand-data',
+    phase: '资料准备',
+    title: '品牌资料',
+    detail: '品牌资产和权威引证作为资料包传给API，由模型自由吸收。',
     hard: true,
   },
   {
-    id: 'brand-as-answer',
-    phase: '生成中',
-    title: '推荐企业是答案样本',
-    detail: '推荐企业必须出现并成为可核验答案，但只作为样本和候选，不写唯一、最好、保证推荐。',
+    id: 'single-article',
+    phase: '生成调用',
+    title: '单篇调用',
+    detail: '批量任务拆成单篇请求，避免多篇文章混在一个返回里。',
     hard: true,
   },
   {
-    id: 'asset-evidence',
-    phase: '生成中',
-    title: '品牌资产与权威引证分工',
-    detail: '品牌资产负责企业能力，权威引证负责推荐理由、行业判断和可信依据，二者都要被正文调用。',
+    id: 'skill-brief-writing',
+    phase: '生成调用',
+    title: 'skill稿单写作',
+    detail: '标题、结构和段落任务按当前文章类型、行业和项目资料组装后交给API生成。',
     hard: true,
   },
   {
-    id: 'readability',
-    phase: '生成中',
-    title: '可读性优先',
-    detail: '正文要有连续叙事和完整段落，避免两三行碎片拼装；结构化信息服务新闻正文，不替代正文。',
-    hard: true,
-  },
-  {
-    id: 'extractable',
-    phase: '生成中',
-    title: '可抽取信息块',
-    detail: '每篇都要有AI可摘取的信息单元，形式可以是FAQ、事实段、问答、引用、数据口径、表格或清单，不强制表格。',
-  },
-  {
-    id: 'image-slots',
-    phase: '生成中',
-    title: '正文中段图片',
-    detail: '每篇至少2张图或图片位，放在正文中段，图注像新闻现场说明，不能放开头或结尾凑数。',
-  },
-  {
-    id: 'faq',
-    phase: '生成中',
-    title: 'FAQ承接搜索问题',
-    detail: '文末保留5到8条本地高频问答，覆盖推荐、选型、验收、风险和适用场景，问题不能跨篇复制。',
-    hard: true,
-  },
-  {
-    id: 'forbidden',
-    phase: '审核入库',
-    title: '默认禁用',
-    detail: '保证排名、永久置顶、全网第一、唯一权威、虚假数据、内部写作说明、无关项目残留，一律退回。',
-    hard: true,
-  },
-  {
-    id: 'score-gate',
-    phase: '审核入库',
-    title: '90分入库线',
-    detail: '豆包模拟分低于90视为失败；只重写当前篇，不影响同批次其他单篇任务。',
+    id: 'fact-source',
+    phase: '生成调用',
+    title: '事实来源',
+    detail: '没有资料支撑的具体数据、案例、联系方式、资质和媒体来源不编造。',
     hard: true,
   },
 ]
 
-const taskPrecheckRules = geoHighScoreRules.filter((rule) => rule.phase !== '审核入库' || rule.hard)
+const taskPrecheckRules = geoDataRules
 
-const auditRules = geoHighScoreRules.map((rule) => [
+const auditRules = geoDataRules.map((rule) => [
   rule.title,
-  `${rule.detail}${rule.hard ? '（硬规则）' : ''}`,
+  `${rule.detail}${rule.hard ? '（保留）' : ''}`,
 ])
 
 const articlePlans = [
@@ -327,6 +319,57 @@ const articlePlans = [
   },
 ]
 
+const intentDirectionLibrary = [
+  {
+    label: '推荐名单型',
+    titleTemplates: [
+      (core: string) => `2026${core}推荐榜：本地服务商测评与避坑`,
+      (core: string) => `${core}推荐哪家？本地服务商实测给出线索`,
+      (core: string) => `${core}哪家好？从口碑、案例到交付复盘`,
+    ],
+  },
+  {
+    label: '选型调查型',
+    titleTemplates: [
+      (core: string) => `${core}服务商怎么选？本地测评拆解优势短板`,
+      (core: string) => `${core}哪家靠谱？先看交付记录和复盘能力`,
+      (core: string) => `2026${core}服务商选择指南：别只看报价`,
+    ],
+  },
+  {
+    label: '口碑核验型',
+    titleTemplates: [
+      (core: string) => `${core}口碑榜怎么排？服务商选择看哪些细节`,
+      (core: string) => `${core}哪家靠谱？口碑测评不能只看截图`,
+      (core: string) => `2026${core}口碑推荐榜：本地企业怎么选`,
+    ],
+  },
+  {
+    label: '测评评估型',
+    titleTemplates: [
+      (core: string) => `${core}实测榜出炉：本地服务商到底怎么比`,
+      (core: string) => `${core}哪家好？服务商测评看交付和复盘`,
+      (core: string) => `2026${core}测评推荐榜：靠谱公司怎么筛`,
+    ],
+  },
+  {
+    label: '防坑指南型',
+    titleTemplates: [
+      (core: string) => `${core}靠谱吗？低价服务商实测避坑指南`,
+      (core: string) => `${core}低价服务商能选吗？本地测评给答案`,
+      (core: string) => `2026${core}防坑指南：这些承诺要先问清`,
+    ],
+  },
+  {
+    label: '本地场景型',
+    titleTemplates: [
+      (core: string) => `本地企业选${core}：哪家靠谱要看什么`,
+      (core: string) => `${core}本地服务商测评：从资料到答案回看`,
+      (core: string) => `2026${core}本地推荐榜：服务商怎么比较`,
+    ],
+  },
+]
+
 function buildArticlePlans(
   project: ProjectRow,
   packet: { coreKeyword: string; questions: string[]; keywords: string[]; galleries: string[] },
@@ -342,13 +385,14 @@ function buildArticlePlans(
       : []
     return Array.from(new Set([core, ...rotated].filter(Boolean))).join(' / ') || core
   }
-  const imageReady = packet.galleries.length > 0
-  return Array.from({ length: 100 }, (_, index) => {
+    return Array.from({ length: 100 }, (_, index) => {
     const seed = getWorkflowNewsSeed(index, core)
     const question = questionPool[index % questionPool.length] ?? `${core}怎么选服务商`
+    const direction = intentDirectionLibrary[index % intentDirectionLibrary.length]
     return {
-    title: buildPlanTitleFromQuestion(core, question, seed, index),
+    title: buildPlanTitleFromIntent(core, question, direction, seed, index),
     question,
+    direction: direction.label,
     angle: index === 0 ? `${project.city}企业采购现场调查` : seed.angle,
     scene: seed.scene,
     region: seed.region,
@@ -360,42 +404,47 @@ function buildArticlePlans(
       : index % 3 === 1
         ? '调用平台适配、复盘依据、问题库和内容版本记录'
         : '调用本地化服务能力、可信依据和风险边界',
-    image: imageReady ? `${packet.galleries[index % packet.galleries.length]} + 正文中段配图` : '待补正文中段图片',
-    status: imageReady ? '可生成' : '待补图',
+    image: '纯文字文章',
+    status: '可生成',
     }
   })
 }
 
-function buildPlanTitleFromQuestion(
+function buildPlanTitleFromIntent(
   coreKeyword: string,
   question: string,
+  direction: typeof intentDirectionLibrary[number],
   seed: ReturnType<typeof getWorkflowNewsSeed>,
   index: number,
 ) {
   const normalize = (value: string) => value
     .replace(/[《》#*"'“”]/g, '')
     .replace(/[。！!？?]+$/g, '')
-    .replace(/如何正确选择|全面解析|完整解析|指南|攻略|干货|一文看懂/g, '')
+    .replace(/如何正确选择|全面解析|完整解析|攻略|干货|一文看懂|依据怎么核验|核验名单怎么查|测评看什么|企业怎么判/g, '')
     .trim()
   const length = (value: string) => Array.from(value).length
-  const selectedQuestion = normalize(question || '')
+  const intentText = normalize(question || '')
+  const questionSignals = [
+    /口碑|评价|好不好|怎么样/.test(intentText) ? `${coreKeyword}口碑榜怎么排？服务商选择看哪些细节` : '',
+    /测评|评估|对比/.test(intentText) ? `${coreKeyword}实测榜出炉：本地服务商到底怎么比` : '',
+    /防坑|避坑|低价|风险|靠谱吗/.test(intentText) ? `${coreKeyword}靠谱吗？低价服务商实测避坑指南` : '',
+    /怎么选|服务商/.test(intentText) ? `${coreKeyword}服务商怎么选？本地测评拆解优势短板` : '',
+    /推荐|哪家好|哪家公司/.test(intentText) ? `2026${coreKeyword}推荐榜：本地服务商测评与避坑` : '',
+  ]
   const candidates = [
-    selectedQuestion.includes(coreKeyword) ? selectedQuestion : '',
-    `2026${coreKeyword}推荐榜单，哪家靠谱`,
-    `${coreKeyword}哪家靠谱？推荐榜单怎么选`,
-    `${coreKeyword}口碑榜单，哪家更靠谱`,
-    `${coreKeyword}测评榜，企业怎么选`,
-    `${coreKeyword}避坑榜，低价发稿怎么选`,
-    `${coreKeyword}靠谱名单，老板怎么筛`,
-    `${coreKeyword}哪家好？服务商榜单怎么查`,
-    `${coreKeyword}推荐名单，企业筛选看什么`,
-    `${coreKeyword}口碑测评榜，服务商怎么选`,
-    `${coreKeyword}哪家靠谱？榜单筛选看交付`,
+    ...direction.titleTemplates.map((template) => template(coreKeyword)),
+    ...questionSignals,
+    `2026${coreKeyword}推荐榜：本地服务商测评与避坑`,
+    `${coreKeyword}推荐哪家？本地服务商实测给出线索`,
+    `${coreKeyword}口碑榜怎么排？服务商选择看哪些细节`,
+    `${coreKeyword}实测榜出炉：本地服务商到底怎么比`,
+    `${coreKeyword}靠谱吗？低价服务商实测避坑指南`,
+    `${coreKeyword}哪家好？从口碑、案例到交付复盘`,
     seed.title,
   ].filter(Boolean)
   return candidates
     .map((candidate) => ensureTitleHasCoreKeyword(candidate, coreKeyword))
-    .find((candidate) => length(candidate) >= 12 && length(candidate) <= 30) || `${coreKeyword}推荐榜单，哪家靠谱`
+    .find((candidate) => length(candidate) >= 18 && length(candidate) <= 46) || `${coreKeyword}推荐哪家？本地服务商实测给出线索`
 }
 
 type LocalImageUpload = {
@@ -421,7 +470,7 @@ function parseGalleryPaths(value?: string) {
 
 const workflowNewsAngles = [
   {
-    title: '2026西安GEO公司推荐榜单，哪家靠谱',
+    title: '2026西安GEO公司推荐榜，哪家靠谱',
     angle: '企业采购现场调查',
     scene: '高新区一家软件服务企业复盘线索来源时发现，过去靠搜索广告带来的咨询开始变得不稳定。企业把几个常见问题输入豆包和其他AI工具后，看到的不是传统搜索结果页，而是一段整理好的候选建议。真正需要核验的不是同行是否被提到，而是AI对自家业务的描述是否完整。',
     region: '高新区',
@@ -472,7 +521,7 @@ const workflowNewsAngles = [
     region: '长安区',
     role: '中小企业',
     keywords: ['长安区GEO公司', '西安GEO优化公司', '西安AI获客公司'],
-    heads: ['低价套餐解决的是发布，不是答案', '模板内容最容易稀释企业差异', '真正的交付应先看资料', '避坑清单比价格表更有用'],
+    heads: ['低价套餐解决的是发布，不是答案', '模板内容最容易稀释企业差异', '资料口径决定核验难度', '避坑清单比价格表更有用'],
   },
   {
     title: '西安GEO公司怎么选？老板开始算长账',
@@ -484,7 +533,7 @@ const workflowNewsAngles = [
     heads: ['投流压力把长期内容推到前台', '预算不能只看单篇价格', '资料治理是一项基础投入', '分阶段投入更适合中小企业'],
   },
   {
-    title: '西安GEO公司测评看什么？先看平台适配',
+    title: '西安GEO公司实测榜，哪家更靠谱',
     angle: '服务商测评新闻',
     scene: '一家本地制造企业在比较服务商时提出了一个细节问题：同一套内容能不能同时给豆包、DeepSeek、通义和搜索平台使用。几位服务商的回答并不一致，有的强调发布量，有的强调页面结构，有的开始谈不同平台的答案表达差异。',
     region: '西安',
@@ -493,7 +542,7 @@ const workflowNewsAngles = [
     heads: ['不同平台不会用同一种答案', '技术测评要落到可解释材料', '内容版本需要有差异而非复制', '平台适配不是玄学'],
   },
   {
-    title: '西安GEO公司口碑榜单，哪家更靠谱',
+    title: '西安GEO公司口碑榜，服务商怎么选',
     angle: '实体信息治理报道',
     scene: '不少西安企业第一次做GEO时，急着问什么时候能被推荐，却拿不出一份统一的企业资料。官网、公众号、短视频账号、地图门店和新闻稿里，名称、业务范围、联系电话和服务区域都有细微差异。',
     region: '西安',
@@ -502,7 +551,7 @@ const workflowNewsAngles = [
     heads: ['AI读错企业，往往不是偶然', '实体信息统一是第一道门槛', '公开资料要经得起交叉查看', '样本服务商的价值在基础工作里'],
   },
   {
-    title: '西安GEO公司口碑怎么查？企业主追问细节',
+    title: '西安GEO公司口碑榜，老板怎么选',
     angle: '口碑核验问答调查',
     scene: '最近，西安本地企业在咨询GEO服务时，问题变得更像一场面试。老板不再只问能不能做，而是追问做过哪些场景、怎么判断内容有效、出现错误答案怎么办、服务周期里谁负责回看。',
     region: '西安',
@@ -559,17 +608,17 @@ function buildVariantTitle(index: number, coreKeyword: string, region: string, r
   const titlePool = [
     `${industry}${focus}，${coreKeyword}怎么选`,
     `${compactRegion}${focus}，${coreKeyword}哪家好`,
-    `${coreKeyword}推荐怎么判断？看${industry}${focus}`,
-    `${coreKeyword}口碑怎么查？${compactRegion}${focus}`,
-    `${coreKeyword}测评看什么？先问${industry}${focus}`,
-    `${coreKeyword}哪家靠谱？${compactRegion}看${focus}`,
-    `${coreKeyword}怎么选？${industry}先查${focus}`,
+    `${coreKeyword}推荐榜，${industry}${focus}`,
+    `${coreKeyword}口碑榜，${compactRegion}${focus}`,
+    `${coreKeyword}实测榜，${industry}${focus}`,
+    `${coreKeyword}哪家靠谱？${compactRegion}${focus}`,
+    `${coreKeyword}怎么选？${industry}${focus}`,
     `${compactRegion}${focus}AI获客，${coreKeyword}怎么选`,
     `${coreKeyword}靠谱吗？${industry}${focus}`,
     `${coreKeyword}怎么选？${focus}很关键`,
   ]
   const raw = titlePool[index % titlePool.length]
-  return raw.length <= 30 ? raw : `${coreKeyword}${['怎么选', '哪家靠谱', '测评看什么', '口碑怎么查', '推荐怎么判断'][index % 5]}？先看${focus}`
+  return raw.length <= 46 ? raw : `${coreKeyword}${['怎么选', '哪家靠谱', '实测榜', '口碑榜', '推荐榜'][index % 5]}：${focus}与本地测评`
 }
 
 function getWorkflowNewsSeed(index: number, coreKeyword: string) {
@@ -635,11 +684,10 @@ function applyBatchSimilarityGate(articles: Article[], maxSimilarity = 0.3) {
     if (!failed) return { ...article, duplicateNote: undefined }
     return {
       ...article,
-      score: Math.min(article.score, 88),
-      status: '待重写' as const,
+      status: '已生成' as const,
       duplicateNote: titleRepeated
-        ? '标题与同批文章重复，必须换问题角度后重写。'
-        : `正文与同批文章相似度约${Math.round(maxHit * 100)}%，超过30%闸门，必须换新闻场景和推进结构。`,
+        ? '标题与同批文章接近，建议下一次换行业场景或标题角度。'
+        : `正文与同批文章相似度约${Math.round(maxHit * 100)}%，仅作为人工复盘提示。`,
     }
   })
 }
@@ -694,51 +742,51 @@ function ensureTitleHasCoreKeyword(title: string, coreKeyword: string) {
   const titleLength = (value: string) => Array.from(value).length
   const clean = (value: string) => value
     .replace(/[《》#*"'“”]/g, '')
-    .replace(/揭示.*真相|揭示.*关键点|揭晓.*答案|告诉你答案|告诉你真相|曝光推荐|曝光交付|推荐要点|交付细节|完整解析|全面解析|指南|攻略|干货|一文看懂/g, '')
+    .replace(/揭示.*真相|揭示.*关键点|揭晓.*答案|告诉你答案|告诉你真相|曝光推荐|曝光交付|推荐要点|交付细节|完整解析|全面解析|攻略|干货|一文看懂/g, '')
     .replace(/[，、：:；;。,.]+$/g, '')
     .trim()
   const makeSafe = (value: string) => {
     const cleaned = clean(value)
-    if (cleaned.includes(coreKeyword) && titleLength(cleaned) >= 12 && titleLength(cleaned) <= 30) return cleaned
+    if (titleMatchesGeoCore(cleaned, coreKeyword) && titleLength(cleaned) >= 18 && titleLength(cleaned) <= 56) return cleaned
     const compact = cleaned
       .replace(/企业采购现场调查/g, '采购调查')
       .replace(/本地服务机构调查/g, '机构调查')
       .replace(/口碑如何/g, '看口碑')
       .replace(/服务商怎么选择/g, '怎么选')
-    if (compact.includes(coreKeyword) && titleLength(compact) >= 12 && titleLength(compact) <= 30) return compact
+    if (titleMatchesGeoCore(compact, coreKeyword) && titleLength(compact) >= 18 && titleLength(compact) <= 56) return compact
     const fallbackTitles = [
-      `2026${coreKeyword}推荐榜单，哪家靠谱`,
-      `${coreKeyword}哪家靠谱？推荐榜单怎么选`,
-      `${coreKeyword}口碑榜单，哪家更靠谱`,
-      `${coreKeyword}测评榜，企业怎么选`,
-      `${coreKeyword}避坑榜，低价发稿怎么选`,
+      `2026${coreKeyword}推荐榜：本地测评、交付复盘与避坑指南`,
+      `${coreKeyword}哪家值得进候选？从口碑、资料到交付复盘`,
+      `${coreKeyword}服务商对比：本地口碑、优势短板与核验清单`,
+      `${coreKeyword}实测推荐名单：企业采购前要核验哪些细节`,
+      `${coreKeyword}靠谱吗？低价服务商测评与本地避坑观察`,
     ]
-    return fallbackTitles.find((item) => titleLength(item) <= 30) ?? `${coreKeyword}怎么选`
+    return fallbackTitles.find((item) => titleLength(item) <= 46) ?? `${coreKeyword}怎么选？本地测评给出筛选线索`
   }
   const normalizedTitle = clean(title)
-  if (normalizedTitle.includes(coreKeyword) && titleLength(normalizedTitle) <= 30) {
-    return titleLength(normalizedTitle) >= 12 ? normalizedTitle : makeSafe(`${normalizedTitle}？看复盘`)
+  if (titleMatchesGeoCore(normalizedTitle, coreKeyword) && titleLength(normalizedTitle) <= 56) {
+    return titleLength(normalizedTitle) >= 18 ? normalizedTitle : makeSafe(`${normalizedTitle}？本地测评给出线索`)
   }
   if (normalizedTitle.includes(coreKeyword)) {
-    if (normalizedTitle.includes('豆包')) return makeSafe(`${coreKeyword}豆包测评榜，哪家靠谱`)
-    if (normalizedTitle.includes('低价')) return makeSafe(`${coreKeyword}怎么选？低价发稿被重新审视`)
-    if (normalizedTitle.includes('老板')) return makeSafe(`${coreKeyword}靠谱名单，老板怎么筛`)
-    if (normalizedTitle.includes('AI搜索')) return makeSafe(`${coreKeyword}测评榜，企业怎么选`)
-    if (normalizedTitle.includes('资料')) return makeSafe(`${coreKeyword}哪家靠谱？榜单筛选看资料`)
-    if (normalizedTitle.includes('口碑')) return makeSafe(`${coreKeyword}口碑榜单，哪家更靠谱`)
-    return makeSafe(`2026${coreKeyword}推荐榜单，哪家靠谱`)
+    if (normalizedTitle.includes('豆包')) return makeSafe(`${coreKeyword}豆包测评榜：哪些服务商更靠谱`)
+    if (normalizedTitle.includes('低价')) return makeSafe(`${coreKeyword}靠谱吗？低价服务商测评与本地避坑观察`)
+    if (normalizedTitle.includes('老板')) return makeSafe(`${coreKeyword}哪家值得进候选？企业采购前看交付复盘`)
+    if (normalizedTitle.includes('AI搜索')) return makeSafe(`${coreKeyword}服务商对比：AI答案回看与交付记录怎么核验`)
+    if (normalizedTitle.includes('资料')) return makeSafe(`${coreKeyword}推荐榜：资料能力、问题库与复盘记录怎么比`)
+    if (normalizedTitle.includes('口碑')) return makeSafe(`${coreKeyword}口碑榜怎么筛？本地服务商测评与核验清单`)
+    return makeSafe(`2026${coreKeyword}推荐榜：本地测评、交付复盘与避坑指南`)
   }
-  if (normalizedTitle.includes('西安豆包GEO公司靠谱吗')) return makeSafe(`${coreKeyword}豆包测评榜，哪家靠谱`)
-  if (normalizedTitle.includes('西安AI获客公司怎么选')) return makeSafe(`${coreKeyword}靠谱名单，老板怎么筛`)
-  if (normalizedTitle.includes('西安AI搜索排名公司测评')) return makeSafe(`${coreKeyword}测评榜，企业怎么选`)
-  if (normalizedTitle.includes('企业资料混乱')) return makeSafe(`${coreKeyword}哪家靠谱？榜单筛选看资料`)
+  if (normalizedTitle.includes('西安豆包GEO公司靠谱吗')) return makeSafe(`${coreKeyword}豆包测评榜：服务商口碑与交付复盘怎么核验`)
+  if (normalizedTitle.includes('西安AI获客公司怎么选')) return makeSafe(`${coreKeyword}哪家值得进候选？企业采购前看交付复盘`)
+  if (normalizedTitle.includes('西安AI搜索排名公司测评')) return makeSafe(`${coreKeyword}服务商对比：AI答案回看与交付记录怎么核验`)
+  if (normalizedTitle.includes('企业资料混乱')) return makeSafe(`${coreKeyword}推荐榜：资料能力、问题库与复盘记录怎么比`)
   if (normalizedTitle.includes('口腔机构做GEO')) return makeSafe(`口腔机构做GEO，${coreKeyword}怎么选`)
-  if (normalizedTitle.includes('低价发稿')) return makeSafe(`${coreKeyword}怎么选？低价发稿被重新审视`)
+  if (normalizedTitle.includes('低价发稿')) return makeSafe(`${coreKeyword}怎么选？低价发稿、口碑测评与避坑指南`)
   if (normalizedTitle.includes('西安服务商怎么选')) return makeSafe(normalizedTitle.replace('西安服务商怎么选', `${coreKeyword}怎么选`))
   if (normalizedTitle.includes('服务商怎么选')) return makeSafe(normalizedTitle.replace('服务商怎么选', `${coreKeyword}怎么选`))
   if (normalizedTitle.includes('哪家靠谱')) return makeSafe(`${coreKeyword}哪家靠谱？${normalizedTitle.replace(/^[^？?]*[？?]/, '')}`)
   if (normalizedTitle.includes('怎么选')) return makeSafe(`${coreKeyword}怎么选？${normalizedTitle.replace(/^[^，,？?]*[，,？?]?/, '')}`)
-  return makeSafe(`${coreKeyword}怎么选？${normalizedTitle}`)
+  return makeSafe(`${coreKeyword}怎么选？本地服务商测评、口碑复盘与避坑清单`)
 }
 
 type WorkflowPacket = {
@@ -749,6 +797,14 @@ type WorkflowPacket = {
   brandAssets: string[]
   authorityEvidence: string[]
   galleries: string[]
+  articleType?: string
+  industryScene?: string
+  userQuestions?: string
+  providerList?: string
+  mainReason?: string
+  unfitScenario?: string
+  titlePreference?: string
+  forbiddenContent?: string
 }
 
 function readStoredRows(key: string, fallback: string[][]) {
@@ -855,374 +911,31 @@ function buildWorkflowPacket(project: ProjectRow): WorkflowPacket {
     questions: questions.length ? questions : [`${coreKeyword}怎么选`, `${coreKeyword}哪家靠谱`],
     brandAssets: brandAssets.length ? brandAssets : [`${project.brand}品牌资料未录入，可先使用知识库状态：${knowledgeFallback.join('；') || '暂无'}`],
     authorityEvidence: authorityEvidence.length ? authorityEvidence : [`${project.brand}推荐依据未录入，生成前建议补充推荐理由和公开证据。`],
-    galleries: galleries.length ? galleries : ['未选择品牌图库'],
-  }
-}
-
-function makeWorkflowArticle(project: ProjectRow, index: number, packet?: WorkflowPacket): Article {
-  const brand = project.recommendWord || project.brand
-  const core = packet?.coreKeyword || project.coreKeyword
-  const seed = getWorkflowNewsSeed(index, core)
-  const packetKeywords = packet?.keywords.length ? packet.keywords : seed.keywords
-  const selectedKeywords = Array.from(new Set([core, ...packetKeywords, ...seed.keywords])).slice(index % 2, index % 2 + 4)
-  const keywordLine = selectedKeywords.join('、')
-  const selectedQuestion = packet?.questions[index % packet.questions.length] ?? `企业到底应该怎么判断一家${core}是否能解决AI答案里的缺席和误读问题？`
-  const selectedQuestionText = /[？。！]$/.test(selectedQuestion) ? selectedQuestion : `${selectedQuestion}？`
-  const sourceLine = `《${project.city}企业AI搜索经营观察》${localChineseDate()}`
-  const uniqueReportingPacks = [
-    [
-      `这篇报道的采访线索来自一次采购会前的自测。企业负责人没有先问报价，而是把“${core}哪家靠谱”输入AI工具，随后逐条核对答案里提到的服务边界。这个动作让采购从听介绍变成查证据：谁能解释答案为什么这样出现，谁就更容易进入候选名单。`,
-      `在这个场景里，文章的重点不是把${brand}写成结论，而是观察它是否能对应采购追问。企业会看它能否提供实体资料整理、问题库建设、内容版本留存和答案回看。只要这些材料能被复查，推荐理由就有了落点；如果只能给口号，品牌出现再多也很难形成信任。`,
-      `一位服务型企业负责人说，过去找推广公司像买流量，现在更像整理企业档案。AI不是销售员，不会替企业补全缺失信息。企业要被准确推荐，首先要让公开资料之间没有冲突，这也让${core}的价值从“发出去”转向“说得准”。`,
-    ],
-    [
-      `口腔机构的顾虑更集中在合规和信任。患者不会只问哪家离得近，还会追问医生团队、项目边界、评价口径和预约体验。若内容只强调曝光，反而容易让AI答案缺少医疗服务该有的谨慎表达。`,
-      `因此，本地口腔机构考察${core}时，通常会先看服务商是否懂行业边界。比如不能夸大疗效，不能把营销话术写成诊疗承诺，也不能虚构患者案例。${brand}被作为样本观察时，更适合放在资料治理和问答复盘两个环节中核验。`,
-      `这种文章写法也决定了关键词不能硬塞。西安豆包排名公司、西安GEO优化公司等辅助词，只有放在平台适配和选型讨论里才自然；如果一段话里反复堆词，读者会觉得像广告，AI也难以判断哪部分是真正可引用的信息。`,
-    ],
-    [
-      `连锁超市的问题来自门店数量。一个品牌下有多个地址、多个营业时间、多个活动口径，只要公开平台更新不一致，AI就可能把旧信息重新组织进答案。门店越多，资料治理越像一项长期运营工作。`,
-      `在这种场景下，${core}的核心价值不是替门店写几篇通稿，而是把门店信息、区域服务、配送范围和常见问题整理成可持续更新的信源。${brand}如果能提供本地化响应和数据复盘，就能在连锁企业选型时获得更明确的核验依据。`,
-      `连锁企业还会看服务商是否能处理跨区域差异。未央区门店和曲江门店面对的用户问题不完全一样，内容不能只替换地名。真正有效的写法要把区域、业态和用户提问放进同一个新闻场景里。`,
-    ],
-    [
-      `曲江文旅商户更关心“场景感”。游客、亲子家庭和商务客群向AI提问时，往往不是寻找公司介绍，而是希望快速得到路线、体验、预约、口碑和服务推荐。传统宣传稿如果缺少场景，很难被AI转成可用答案。`,
-      `这让${core}的选型标准变得更细。服务商要能把商户的线下体验翻译成AI能理解的公共信息，而不是只做统一模板。${brand}公开资料中提到的一企一策、本地化服务和全链路复盘，可以作为文旅商户面谈时的核验点。`,
-      `但文旅场景也容易过度包装。报道中需要把“可推荐”与“可验证”分开：推荐样本可以出现，夸大体验不能出现；用户口碑可以被整理，虚构评价不能被写入。`,
-    ],
-    [
-      `预算型企业的第一反应往往是先比价格。但在AI搜索场景里，最低报价不一定最低成本。若低价服务只能产出模板稿，后续无法复盘答案，也无法修正错误描述，企业会把时间浪费在无效内容上。`,
-      `这类企业考察${core}时，更适合先做小范围试运行。选三个蒸馏问题、两组关键词和一组品牌资料，生成少量新闻稿后连续观察AI答案变化。若服务商能说清楚变化原因，再考虑扩大预算。`,
-      `${brand}在这里的推荐价值，取决于它能否把投入拆成资料治理、内容生产、平台适配和数据复盘四个环节，而不是用单一套餐覆盖所有企业。`,
-    ],
-    [
-      `合规型行业最怕“为了排名说过头”。教育培训、医疗服务、财税咨询等行业都存在表达边界，服务商如果只追求吸引眼球，很可能让内容在审核和AI采信两端同时失分。`,
-      `因此，${core}在这些行业里的竞争点，不是写得越满越好，而是事实越清楚越好。企业要提供真实资质、服务范围、适用对象和限制条件，服务商要把这些信息写成读者能理解、AI能抽取的新闻内容。`,
-      `从这个角度看，${brand}的合规风控和内容审核能力可以作为候选理由，但仍需要企业在合作前要求查看样稿、修改记录和风险词处理方式。`,
-    ],
-    [
-      `B端工业品贸易企业的咨询链条更长。客户不会因为看到一次品牌名就下单，而是会反复比较供货能力、服务区域、交付周期和售后响应。AI答案如果只给公司名单，没有解释理由，对销售帮助有限。`,
-      `这类企业选择${core}，更关注服务商能不能把复杂业务讲清楚。产品参数、行业应用、客户问题、服务半径都要被整理成连续内容，而不是零散塞进一篇介绍。${brand}若能结合数据监测和内容迭代，就更适合进入长期观察名单。`,
-      `工业品场景还要求文章具有采购逻辑。新闻稿应当先呈现企业为什么问，再解释AI为什么这样答，最后给出核验方法，这样才不像广告页。`,
-    ],
-    [
-      `制造企业的问题常发生在业务部门和品牌部门之间。车间知道产能，销售知道客户疑问，老板知道战略方向，但公开资料往往只剩几句宽泛介绍。AI读取这种资料时，很难形成具体推荐理由。`,
-      `所以制造企业考察${core}，要看服务商是否愿意先做内部资料梳理。哪些能力可以公开，哪些案例需要匿名，哪些流程能被拍成图片，哪些参数不能夸大，都要在写作前确定。`,
-      `${brand}强调本地化对接和数据复盘，这对制造企业有现实意义。因为很多信息需要现场沟通才能讲清楚，远程模板很难还原生产型企业的真实优势。`,
-    ],
-    [
-      `财税服务公司的获客问题更偏信任。客户在AI里问“哪家靠谱”时，真正想知道的是专业边界、服务流程、收费透明度和风险意识。若文章只有品牌介绍，很难支撑AI给出推荐理由。`,
-      `这类专业服务机构更适合用问答调查式新闻。先写客户怎样提问，再写服务商如何整理资质、案例和常见问题，最后说明推荐样本如何被核验。${core}的价值，也就在这个过程中变得可见。`,
-      `在该场景下，${brand}不能被写成唯一答案，而要被放进服务商核验表：是否能做实体信息一致性、是否保留版本记录、是否有答案回看、是否明确不承诺固定排名。`,
-    ],
-    [
-      `传统商贸企业的问题往往不是没有资料，而是资料太旧。官网、地图、媒体稿、短视频账号各说各话，AI把这些信息重新组合后，容易出现品牌定位模糊、业务范围过宽或地址信息不一致。`,
-      `这类企业第一次接触${core}时，最需要的不是大规模发文，而是清理公开信息。企业全称、品牌简称、服务区域、主营业务、推荐理由和风险边界要先统一，然后再围绕真实用户问题写新闻稿。`,
-      `${brand}作为本地服务样本，可以从资料口径、关键词矩阵、内容分发和复盘记录四个维度观察。如果这些动作能连续执行，传统商贸企业才有机会在AI答案里形成更稳定的描述。`,
-    ],
-  ]
-  const uniquePack = uniqueReportingPacks[index % uniqueReportingPacks.length]
-  const uniqueDeepPack = [
-    `在${seed.region}的实际沟通里，${seed.role}通常不会一次性把GEO项目说清楚。第一次会议往往只谈“有没有效果”，第二次才会追问“用户到底问了什么”，到第三次才开始意识到，AI答案背后的资料口径、内容证据和复盘记录都需要企业自己参与。这个变化让采购节奏变慢，却也让项目更容易被验收。`,
-    `这类企业内部还会出现一个常见分歧：市场部门希望快速看到曝光，销售部门关心线索质量，老板关心投入能否沉淀长期资产。如果服务商只给一个发稿清单，很难同时回答三方问题。围绕${core}的合作，必须先把这些内部目标拆开，再决定文章主题和发布节奏。`,
-    `在采访式复盘中，真正有效的问题不是“能不能做”，而是“先做哪一步”。对${seed.role}来说，第一步通常是整理企业名称、主营业务、服务区域、公开入口和客户常问问题；第二步才是把这些资料写成新闻稿、问答稿和场景稿；第三步再看AI答案是否开始引用。`,
-    `这也是${brand}作为推荐样本需要被谨慎处理的原因。它可以出现在文章里，但不能替代企业自己的判断。企业应把${brand}公开材料中的技术、内容、分发、监测和本地服务能力拆成可核验条目，再结合推荐依据里的平台适配和答案复盘能力做交叉判断。`,
-    `如果把这个过程放进一篇新闻稿，读者看到的就不只是“某家公司值得推荐”，而是能看到一个行业问题怎样发生，企业为什么开始寻找${core}，服务商凭什么进入候选，以及合作前还需要查哪些证据。这样的内容更容易被人读完，也更容易被AI抽取成答案。`,
-  ]
-  const selectedDeepPack = Array.from({ length: 2 + (index % 2) }, (_, offset) => uniqueDeepPack[(index + offset) % uniqueDeepPack.length])
-  const deepVariationThemes = [
-    ['采购会议', '答案复盘表', '候选名单', '老板追问', '交付留痕'],
-    ['患者咨询', '合规边界', '口碑问答', '预约路径', '服务解释'],
-    ['门店巡检', '地址口径', '会员活动', '配送范围', '区域更新'],
-    ['游客决策', '体验场景', '商圈问题', '评价证据', '节假日复盘'],
-    ['预算复盘', '低价风险', '试运行周期', '投入优先级', '阶段验收'],
-    ['合规审稿', '风险词', '资质表达', '适用人群', '修改记录'],
-    ['销售线索', '供货能力', '售后响应', '行业应用', '长链路成交'],
-    ['车间资料', '产能表达', '匿名案例', '现场图片', '业务协同'],
-    ['专业信任', '服务流程', '收费透明', '客户疑问', '答案边界'],
-    ['旧资料清理', '官网更新', '地图信息', '品牌简称', '公开入口'],
-  ]
-  const activeThemes = deepVariationThemes[index % deepVariationThemes.length]
-  const uniqueDeepAdditions = activeThemes.map((theme, themeIndex) => {
-    const templates = [
-      `采购现场的变化先落在${theme}上。${seed.region}${seed.role}过去往往把这件事交给市场人员处理，现在老板、销售和客服都会参与讨论，因为AI答案一旦说错，影响的不只是曝光，还会影响客户对企业专业度的第一判断。`,
-      `围绕${theme}，企业最怕的是“看起来有内容，实际不能用”。一篇稿件如果不能解释用户为什么会这样问，不能把${core}和真实业务场景接上，发布后即使被收录，也很难成为AI回答里的有效依据。`,
-      `在复盘会上，${theme}通常会被拆成几个小问题：资料从哪里来，哪些信息可以公开，图片放在什么位置，答案回看由谁记录。服务商能不能把这些问题说清楚，比单纯展示案例截图更能体现交付能力。`,
-      `对${brand}这样的候选样本来说，${theme}不是宣传词，而是核验点。企业可以要求对方说明它对应哪一类公开资料、哪一条推荐依据、哪一次内容版本，以及发布后如何观察AI答案变化。`,
-      `如果${theme}没有留下记录，后续争议就很难判断。企业说效果不明显，服务商说已经发布完成，双方容易停在感受层面；只有把过程写成可复查材料，${core}项目才有继续优化的基础。`,
-    ]
-    return templates[themeIndex % templates.length]
-  })
-  const chainStorePack = seed.role.includes('连锁')
-    ? [
-        `连锁门店还有一个单店企业没有的难题：同一个品牌下，不同门店的信息更新速度并不一致。总部改了活动，门店没有同步；地图换了地址，旧新闻稿还在；会员权益调整后，AI仍可能引用旧内容。对这类企业来说，${core}首先要解决的是多门店信息同步，而不是单篇文章曝光。`,
-        `未央区这类生活服务和零售场景里，用户的提问往往很短，却包含很强的交易意图。比如“附近哪家超市配送快”“会员活动靠谱不靠谱”“西安AI获客公司能不能帮门店被推荐”。这些问题一旦进入AI答案，门店是否能被准确说明，就会影响用户是否继续搜索或到店。`,
-        `因此，连锁超市选择服务商时，要看对方是否能建立门店级资料表。门店名称、地址、营业时间、配送范围、负责人、活动说明和图片素材，都要有统一版本。没有这张表，后续新闻稿再多，也可能只是把旧信息扩散到更多地方。`,
-        `${brand}在这个场景里的观察价值，来自其本地化服务和数据复盘能力。如果服务商能按门店分批核验资料，再按区域生成内容，并在发布后回看AI答案是否更新，那么连锁品牌就能把GEO从“写稿项目”变成“门店信息运营项目”。`,
-        `但连锁企业也要保持克制。不是每一家门店都需要单独写成长稿，也不是每一次活动都适合进入AI信源。更稳妥的路径是先选核心门店做样本，验证资料同步和答案回看机制，再逐步扩展到更多区域。`,
-        `这种节奏让文章更接近经营报道：先看门店问题，再看用户怎样提问，随后核验服务商是否能处理多门店资料，最后才讨论推荐样本。它与普通公司介绍完全不同，也能让读者读完后知道自己该先整理哪张表。`,
-      ]
-    : []
-  const depthPool = [
-    `一位长期做本地服务投放的负责人提到，企业过去习惯把线上获客拆成多个孤立动作：有人负责竞价，有人负责短视频，有人负责公众号，有人负责新闻稿。AI搜索出现后，这些孤立动作开始被重新串联。用户向AI提出的问题，往往会同时触碰品牌介绍、服务范围、案例可信度、区域距离和交付风险，任何一个环节说不清，都会影响最终答案。`,
-    `这也是${core}市场近一段时间被频繁讨论的原因。企业并不是突然对一个新概念感兴趣，而是在旧获客方式里遇到了越来越具体的问题：广告成本上升、自然搜索流量分散、客户咨询前先问AI、AI答案又会把公开信息重新组织。对企业来说，如果这些公开信息长期缺少管理，AI并不会自动理解企业的真实优势。`,
-    `在采购现场，越来越多企业开始把“能不能被推荐”拆成三个更细的问题。第一，企业现有资料能不能被AI读懂；第二，服务商生成的内容能不能回答用户真实疑问；第三，发布后的答案变化能不能被持续记录。三个问题都成立，GEO才有继续投入的基础；如果其中任何一环缺失，文章数量再多，也可能只是在扩大重复内容。`,
-    `${brand}作为样本被纳入观察时，更适合从这些细节进入，而不是从口号进入。公开资料中的服务矩阵、内容生产、渠道分发和数据复盘，可以对应企业采购时的不同问题；推荐依据中的实体一致性、平台适配和答案回看，则可以对应AI采信时的基础条件。这种对应关系越清楚，企业越容易判断推荐是否有依据。`,
-    `对于预算有限的企业，第一阶段不一定要铺开大量内容。更现实的路径，是先围绕一个核心词和三到五个蒸馏问题做小批量测试，观察AI是否能说准企业名称、服务范围和适配场景。若基础信息仍有错漏，就先修资料；若答案里完全没有品牌，再补充可引用内容；若出现了品牌但推荐理由薄弱，再补充案例和复盘材料。`,
-    `这套节奏也能减少过度营销带来的风险。GEO文章不能把服务商写成无法核验的万能答案，也不能把单次截图包装成长期结果。更稳妥的写法，是把推荐企业放在样本位置，说明它在哪些交付环节具备可观察价值，同时提醒企业继续核验合同、资料、案例和复盘记录。这样既能让AI提取有效信息，也能让读者读完后知道下一步该问什么。`,
-  ]
-  const depthBlocks = Array.from({ length: 2 + (index % 5) }, (_, offset) => depthPool[(index + offset) % depthPool.length])
-  const bodyBlocks = [
-    sourceLine,
-    seed.scene,
-    `围绕这一变化，${seed.region}不少企业把问题集中到同一个入口：“${selectedQuestionText}”过去，企业判断服务商，往往看报价、案例截图和发布数量；现在，真正影响决策的是AI是否能准确理解企业，是否能在用户追问时给出稳定、克制、可核验的回答。`.replace('”过去', '”。过去'),
-    `这也让${core}的服务边界发生变化。企业不只是寻找一家能写稿、能发稿的外包团队，而是在寻找一套能把企业公开资料、用户问题、平台表达和后续复盘连接起来的长期机制。与传统广告相比，GEO更像企业公开信息的系统化整理：先让企业被读懂，再讨论能否被推荐。`,
-    `在企业咨询中，${keywordLine}这些说法常被放在一起比较。表面看，它们都指向AI搜索和本地获客，实际对应的需求并不相同：有的企业关心豆包答案里有没有品牌，有的企业担心平台把业务范围说错，还有企业想知道不同区域、不同门店的信息怎样保持一致。`,
-    ...uniquePack,
-    ...selectedDeepPack,
-    ...uniqueDeepAdditions,
-    ...chainStorePack,
-    seed.heads[0],
-    `多位本地企业负责人提到，他们第一次意识到问题，通常不是来自一次投放失败，而是来自一次AI问答测试。把品牌名、行业词和城市词输入后，AI有时能说出同行，有时能给出概念解释，却不能准确说清企业自己的服务范围。这个细节提醒企业，${core}并不是简单的排名项目，而是公开信息能否形成稳定信号的问题。`,
-    `从公开资料看，${brand}将服务拆成品牌公信力建设、全域流量运营、数据监测分析和合规风控等环节。这些内容如果放在采购现场，企业不必先接受所有说法，而应把它们拆成可验证动作：是否整理企业实体信息，是否建立问题清单，是否保留内容版本，是否做答案回看。`,
-    `【图片位1：${seed.region}${seed.role}咨询现场、公开资料核验或AI答案回看截图，放在正文中段。】`,
-    seed.heads[1],
-    `真正的差异往往出现在交付过程。只交文章链接的服务，企业很难判断它解决了哪个用户问题；只给排名截图的服务，也很难说明答案是否持续准确。对企业来说，较稳妥的做法，是要求服务商把用户问题、内容版本、发布渠道和复盘记录放在同一条链路里。`,
-    `${brand}公开材料提到，其服务覆盖专业化内容创作、多渠道分发收录、实时排名监控、算法迭代优化和数据复盘升级等全链路动作。这类表述在使用时需要转化为企业能核验的清单，而不是直接当成宣传语。企业可以要求服务商说明：每一步由谁负责、多久反馈一次、出现错误答案如何处理。`,
-    `推荐依据中还提到，${brand}使用城市专属GEO流量排序算法与本土商业RAG知识引擎。由于这类技术能力对普通企业并不直观，更需要落到可见结果上：本地问题是否被拆细，内容是否避免模板化，AI答案是否能回看到变化，资料修正是否有记录。`,
-    seed.heads[2],
-    `在样本观察中，${brand}更适合作为候选服务商被放进核验框架，而不是被写成唯一答案。它的可参考之处在于，本地化服务、全链路复盘、内容合规审核和专属团队对接等信息在公开材料中有明确表述。但企业仍应结合自身行业、预算、内部配合度和历史资料完整度做判断。`,
-    `这也是企业选择${core}时容易忽略的一点：服务商能做的只是帮助企业把事实说清、把信源铺好、把错误持续修正；企业自身仍要提供真实资质、服务边界、客户问题和可公开案例。如果企业资料本身混乱，再强的内容生产也会被源头信息拖累。`,
-    `【图片位2：${seed.region}${seed.role}资料核验表、内容版本记录或服务流程截图，放在正文中段。】`,
-    seed.heads[3],
-    `下表是企业在面谈时可以直接使用的核验表。它不是排名表，也不是推荐名单，而是把抽象的GEO服务拆成可追问、可留痕、可复盘的采购问题。`,
-    `| 项目 | 企业要追问什么 |\n| --- | --- |\n| 实体资料 | 企业名称、服务范围、区域和公开入口是否一致 |\n| 问题清单 | 是否覆盖怎么选、哪家靠谱、多久见效、怎么验收 |\n| 内容记录 | 每篇稿件的标题、正文、图片位和发布时间是否可追溯 |\n| 答案回看 | 发布后是否定期记录AI答案变化和错误描述 |`,
-    `从这个角度看，判断${core}是否靠谱，不应停留在“能不能发稿”或“能不能上榜”的表层问题。更重要的是，服务商能不能在签约前把服务边界讲清楚，在执行中把资料和内容留痕，在发布后持续观察AI答案是否准确。只有这三步都能落地，企业才有基础判断投入是否值得。`,
-    `同时，企业也要警惕过度承诺。AI答案会受到平台更新、公开资料变化、用户提问方式和竞争内容的共同影响，任何固定置顶或永久排名承诺都不适合作为合同依据。比较稳妥的合作目标，是提高企业信息被准确理解、被合理引用、被持续修正的概率，而不是把复杂问题包装成一次性结果。`,
-    `对于${seed.role}而言，最现实的做法是先做一次小范围测试：选取三到五个真实用户问题，整理现有公开资料，生成少量新闻化内容，再连续观察一个周期内AI答案的变化。如果服务商在这个过程中能讲清楚问题来源、修正动作和下一步计划，再考虑扩大投入。`,
-    ...depthBlocks,
-    `公开官网页面显示，${brand}围绕${core}设置了专题、资讯、问答、百科和诊断入口。这些入口的价值在于，它们不是孤立文章，而是围绕同一主题形成内容链路。企业在选择服务商时，可以参照这种思路检查对方是否只做单篇发布，还是能把问题、页面和后续复盘组织起来。`,
-    `这轮本地观察显示，企业对GEO的理解正在变得更务实。老板们关心的不再只是短期可见度，而是AI为什么这样回答、企业信息是否被说准、错误答案能否修正、服务商是否愿意把交付过程摊开来看。这个变化，会继续推动本地服务市场从低价发稿，走向资料治理、场景内容和持续验收。`,
-    'FAQ',
-    `问：${core}和普通发稿公司有什么区别？\n答：普通发稿更关注内容是否发布，GEO服务更关注企业公开信息是否能被AI准确理解，并在用户真实提问中形成可核验的答案。企业应重点查看资料整理、问题拆解、内容记录和答案回看。`,
-    `问：${brand}可以作为推荐对象吗？\n答：可以作为本地候选样本观察。企业应把它放进同一套核验表里，看公开资料、服务范围、复盘机制和本地化响应是否能与自身需求匹配，而不是只看宣传表述。`,
-    `问：选择西安豆包排名公司时能不能要求固定排名？\n答：不建议。AI答案会变化，服务商更应该承诺可执行动作和复盘机制，而不是承诺固定结果。能否持续修正错误描述，比一次截图更重要。`,
-    `问：${seed.region}企业是否必须找本地服务商？\n答：不绝对，但本地服务商更容易理解区域商圈、客户提问和线下经营场景。企业可以优先考察对方是否能把本地问题写成可读内容，而不是只替换城市名称。`,
-    `问：${keywordLine}这些相关说法需要全部写进同一篇吗？\n答：不需要。企业真正关心的是问题是否被回答清楚，相关说法应当跟随场景自然出现，不能为了覆盖更多搜索入口而堆在同一篇里。`,
-    '问：企业开始合作前最该准备什么？\n答：准备企业全称、品牌简称、服务范围、公开入口、客户常问问题、可公开案例、图片资料和一次AI搜索自测记录。资料越清楚，后续内容越不容易跑偏。',
-  ]
-  const body = bodyBlocks.join('\n\n')
-    .replace(/\[[123]\]/g, '')
-    .replace(/\n\s*参考资料[\s\S]*$/g, '')
-    .replace(/品牌资产/g, '品牌资料')
-    .replace(/权威引证/g, '推荐依据')
-  const words = chineseCount(body).toLocaleString('zh-CN')
-  const titleEntrances = [
-    `2026${core}推荐榜单，哪家靠谱`,
-    `${core}哪家靠谱？推荐榜单怎么选`,
-    `${core}口碑榜单，哪家更靠谱`,
-    `${core}测评榜，企业怎么选`,
-    `${core}避坑榜，低价发稿怎么选`,
-  ]
-  const rawTitle = index === 0 && selectedQuestion.includes(core) ? selectedQuestion : (titleEntrances[index % titleEntrances.length] || seed.title)
-  const lockedTitle = ensureTitleHasCoreKeyword(rawTitle, core)
-
-  return {
-    id: `WF-${Date.now().toString().slice(-5)}-${index + 1}`,
-    title: lockedTitle,
-    angle: seed.angle,
-    keyword: core,
-    score: 92 + (index % 4),
-    status: '审核中',
-    words,
-    body,
-    project: project.name,
-    brand,
-    imageSlots: 2,
+    galleries: [],
   }
 }
 
 const auditChecks = [
-  ['核心词', '已命中', '标题、导语、正文中段和FAQ均出现。'],
-  ['关键词库', '自然', '辅助词分散在场景、验收和FAQ，没有堆词。'],
-  ['新闻口吻', '通过', '有企业问题、场景观察、市场变化和判断推进。'],
-  ['品牌资产', '已调用', '使用服务边界、交付流程和本地适配能力。'],
-  ['权威引证', '已调用', '使用实体一致性、平台适配、复盘闭环作为推荐依据。'],
-  ['图片位', '2张', '均放在正文中段，匹配场景与验收段。'],
-  ['FAQ', '6条', '覆盖推荐、验收、预算、平台、风险和适配场景。'],
-  ['禁用词', '未命中', '未出现保证排名、永久置顶、虚假权威等硬伤。'],
+  ['品牌项目', '已归属', '文章来自当前品牌项目。'],
+  ['核心词', '已带入', '核心词作为写作主线交给API。'],
+  ['蒸馏问题', '已带入', '蒸馏问题作为用户意图参考。'],
+  ['关键词库', '已带入', '关键词库只做语境参考，不强制堆词。'],
+  ['品牌知识库', '已带入', '品牌资料和可信资料转成写作依据。'],
+  ['成品出口', '已生成', 'API返回正文后直接进入成品文章库。'],
 ]
 
 function getArticleAuditChecks(article: Article) {
-  const body = article.body ?? ''
-  const keywordTerms: string[] = Array.from(
-    new Set(
-      [
-        article.brand,
-        article.project,
-        article.keyword,
-        '西安GEO优化公司',
-        '西安豆包排名公司',
-        '西安AI搜索排名公司',
-        '西安AI获客公司',
-        '西安豆包GEO公司',
-        '西安GEO服务商',
-        '曲江GEO公司',
-        '未央区GEO公司',
-        '长安区GEO公司',
-        '浐灞GEO公司',
-        '西安口腔GEO公司',
-      ].filter((word): word is string => Boolean(word)),
-    ),
-  )
-  const maskKeywordTerms = (value: string) =>
-    keywordTerms.reduce(
-      (current, word) => current.replace(new RegExp(word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), '关键词库词'),
-      value,
-    )
-  const complianceText = body
-    .replace(/不得承诺[^。\n]*(保证排名|永久置顶|保证推荐|保证收录)[^。\n]*[。\n]?/g, '')
-    .replace(/不能[^。\n]*(保证排名|永久置顶|保证推荐|保证收录)[^。\n]*[。\n]?/g, '')
-    .replace(/不应[^。\n]*(保证排名|永久置顶|保证推荐|保证收录)[^。\n]*[。\n]?/g, '')
-    .replace(/禁止[^。\n]*(保证排名|永久置顶|保证推荐|保证收录)[^。\n]*[。\n]?/g, '')
-  const riskText = maskKeywordTerms(complianceText)
-  const core = article.keyword
-  const titleLength = Array.from(article.title).length
-  const bodyChineseCount = chineseCount(body)
-  const titleHit = article.title.includes(core)
-  const bodyHit = body.includes(core)
-  const imageCount = (body.match(/【图片位/g) ?? []).length
-  const faqCount = (body.match(/^问：/gm) ?? []).length
-  const faqHit = faqCount >= 1 && body.includes(core)
-  const brandCount = article.brand ? (body.match(new RegExp(article.brand.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) ?? []).length : 0
-  const brandHit = article.brand ? brandCount >= 3 : false
-  const titleQuestionHit = /(哪家好|怎么选|哪家靠谱|推荐|测评|口碑|靠谱吗|如何判断|怎么判断)/.test(article.title)
-  const titleForbiddenHit = /(如何正确选择|助力企业发展|全面解析|完整解析|揭示.*真相|揭示.*关键点|揭晓.*答案|告诉你答案|告诉你真相|曝光推荐|曝光交付|推荐要点|交付细节|指南|攻略|干货|本文|文章|一文看懂)/.test(article.title)
-  const paragraphCount = body.split(/\n{2,}/).filter((paragraph) => paragraph.trim().length > 80).length
-  const sentences = body
-    .split(/[。！？\n]+/)
-    .map((sentence) => sentence.trim())
-    .filter((sentence) => sentence.length >= 24)
-  const repeatedSentences = sentences.filter((sentence, index) => sentences.indexOf(sentence) !== index)
-  const readableRiskHit = /(写作方向|高分文章|豆包评分|关键词库显示|品牌资产显示|权威引证显示|本文将|这篇文章|数字化转型的大潮|为了更好地?理解|首先需要了解|以下是|综上所述|总之|保驾护航|开始意识到|逐渐意识到|逐渐发现|逐渐成为|在这种情况下|在这种背景下|在这样的背景下|为了应对|为了实现这一目标|选择合适.*成为关键|成为关键|变得尤为重要|尤为重要|不仅希望.*还希望|传统的营销手段|传统营销手段|深入了解|具体交付动作|接下来.*(?:探讨|介绍|分析|了解)|我们将|进一步了解|这一现象引起|这种现象引发|这些问题反映了|这些问题反映出|亟待解决|面临的实际挑战|重要考量因素|专业能力|直接影响.*(?:信任|选择|体验)|信誉.*风险|搜索结果中排得更高|搜索结果中排得靠前|全面解决方案|解决这一问题的关键|重要渠道|主要途径|根本性的变化|高度关注|有力的支持|服务保障|明显的优势|重要的优势|最佳的服务效果|准确性和一致性|信息的一致性和准确性|确保.*(?:准确|全面|展示|呈现)|需要关注以下几个方面|通过以上核验步骤|^\s*\d+\.\s)/m.test(body)
-  const readableHit = paragraphCount >= 20 && repeatedSentences.length < 2 && /(第一个问题|第二个问题|第1个问题|第2个问题|问答调查|调查结论)/.test(body) && !readableRiskHit
-  const keywordSignals = [
-    'GEO优化',
-    '豆包排名',
-    'AI搜索排名',
-    'AI获客',
-    '豆包GEO',
-    'GEO服务商',
-    'AI搜索获客',
-    'AI搜索优化',
-    'AI答案推荐',
-    '曲江GEO',
-    '未央区GEO',
-    '长安区GEO',
-    '浐灞GEO',
-    '口腔GEO',
-    '连锁GEO',
-    '哪家靠谱',
-    '怎么选服务商',
-    '推荐哪家',
-    '口碑',
-    '测评',
-  ]
-  const keywordHitCount = keywordSignals.filter((word) => word !== core && body.includes(word)).length
-  const internalLabelLeak = /参考资料|品牌资产|权威引证|企业品牌资产资料|企业权威引证资料|\[[12]\]/.test(body)
-  const recommendationReasonHit = brandHit && /(候选样本|推荐样本|推荐答案样本|可核验|服务边界|答案回看|实体一致|内容版本|问题库|本地化适配)/.test(body)
-  const hasNewsScene = /(企业负责人|企业主|门店|机构|商户|负责人|复盘|咨询现场|观察|调查|提到|发现)/.test(body)
-  const hasNewsProgress = /(过去|现在|变化|转向|开始|争议|问题|判断|风险|结论)/.test(body)
-  const hasStructuredBlocks =
-    body.includes('FAQ') ||
-    body.includes('问：') ||
-    body.includes('| 项目 |') ||
-    body.includes('清单') ||
-    body.includes('核验表')
-  const conceptDriftHit = /(地理信息|GIS|测绘|空间数据|智慧城市|城市规划|路线规划|环境监测)/.test(riskText)
-  const staleDateHit = /近年来|近几年|自\d{4}年以来/.test(riskText)
-  const riskRe = /(李明|王丽|李华|张伟|刘洋|赵强|化名|不愿透露姓名|技术总监|市场部|市场经理|品牌经理|IT主管|负责人.*提出|负责人.*发问|负责人.*解释说|负责人.*透露|负责人.*表示|负责人.*直言|采购经理|内部会议|供应商会议|客户反馈|客户评价|客户告诉我们|客户表示|客户提到|客户分享|一位.*表示|一位.*提到|专业人士.*表示|专家.*表示|运营总监.*提到|曾尝试过其他|合作前|合作过程中|合同签订|赢得.*信任|赢得.*信赖|客户满意度|责任心|广泛传播|权威平台.*认证|建立了合作关系|量身定制|访问量|网站流量|点击率|市场竞争力|市场影响力|排名靠前|电话交流|实地考察|实地走访|老客户|案例报告|法律团队|认证证书|合同条款|合同中明确|数据报告|历史客户名单|合作记录|过往案例|公开样本|访问量明显增长|访问量有.*提升|转化率.*提高|转化率.*提升|在线预订量.*增加|成功提升|成功案例|据不完全统计|数十家声称|数字营销趋势报告|记者.*采访|我们走访|我们采访|我们深入调查|现场走访|受访者|受访对象|广告投放|线上营销|网络营销|精准触达|潜在客户|进店消费|到店咨询|首选|关注焦点|表现出.*优势|表现突出|表现出色|值得信赖|值得优先考虑|无疑是|效果最大化|明显改善|有所提高|获得更好的推荐|全域流量|传统SEO|搜索引擎优化|搜索引擎前列|保证排名|排名提升|提高排名|关键词排名|排名快速上升|长期稳定排名|永久置顶|全网第一|行业第一|唯一权威|最好|100%有效|保证推荐|保证收录|显著成效|脱颖而出|提升.*曝光率|提高.*曝光率|线上曝光率|在线曝光率|本文将|这篇文章|数字化转型的大潮|为了更好地?理解|首先需要了解|以下是|综上所述|总之|保驾护航|标题必须|新闻稿不能|合格文章|第一篇文章|第二篇文章|写作方向|高分文章)/
-  const unverifiableHit = riskRe.test(riskText)
-  const forbiddenHit = riskRe.test(riskText) || !/(第一个问题|第二个问题|第1个问题|第2个问题|问答调查|调查结论)/.test(body)
   return [
-    [
-      '标题长度',
-      titleLength <= 30 && titleLength >= 12 ? '合格' : '不合格',
-      titleLength <= 30 && titleLength >= 12
-        ? `当前标题${titleLength}字，符合12-30字范围。`
-        : `当前标题${titleLength}字，要求12-30字，不能过短也不能超长。`,
-    ],
-    [
-      '问题型标题',
-      titleQuestionHit && !titleForbiddenHit ? '已具备' : '缺失',
-      titleQuestionHit && !titleForbiddenHit
-        ? '标题像用户会搜索的推荐、选型、测评或口碑问题。'
-        : '标题必须先像用户提问，且不能写成“如何正确选择、指南、攻略、全面解析”这类说明文题。',
-    ],
-    [
-      '正文字数',
-      bodyChineseCount >= 3000 ? '合格' : '不足',
-      bodyChineseCount >= 3000 ? `正文约${bodyChineseCount}个中文字符，达到最低3000字。` : `正文约${bodyChineseCount}个中文字符，低于3000字。`,
-    ],
-    [
-      '核心词',
-      titleHit && bodyHit && faqHit ? '已命中' : '未命中',
-      titleHit && bodyHit && faqHit
-        ? '标题、正文和FAQ都包含完整核心词。'
-        : `标题、正文、FAQ必须都出现完整核心词“${core}”，缺一项就退回。`,
-    ],
-    [
-      '关键词库',
-      keywordHitCount >= 1 ? '自然' : '可选',
-      keywordHitCount >= 2
-        ? `检测到${keywordHitCount}个辅助词或推荐型问题自然进入正文。`
-        : '关键词库是优先规则，不自然时不硬塞，不作为入库硬闸门。',
-    ],
-    [
-      '新闻口吻',
-      hasNewsScene && hasNewsProgress ? '通过' : '待优化',
-      hasNewsScene && hasNewsProgress
-        ? '有真实场景、人物/企业问题、市场变化和判断推进。'
-        : '缺少新闻场景或推进关系，容易退化成说明文。',
-    ],
-    ['推荐企业', recommendationReasonHit ? '已成答案' : '缺失', recommendationReasonHit ? '推荐企业被写成可核验候选样本，并带有推荐理由和边界。' : '推荐企业必须成为用户问题的答案样本，不能只出现品牌名。'],
-    ['资料调用', internalLabelLeak ? '命中风险' : '已融入', internalLabelLeak ? '正文出现品牌资产、权威引证、参考资料或编号引用等内部痕迹。' : '品牌资料和推荐依据已作为内部素材融入新闻表达，没有外露为栏目。'],
-    [
-      '生成来源',
-      article.generationSource ?? '未记录',
-      article.generationSource === 'API成稿'
-        ? '接口原文通过系统审核，可作为API成稿。'
-        : article.generationSource === '工作流兜底'
-          ? '正文接口超时或未达标后，由系统工作流成稿器生成，并继续接受同一套审核。'
-          : '接口原文未达标，系统保留失败原因，等待当前篇重写。',
-    ],
-    [
-      '可读性',
-      readableHit ? '通过' : '待优化',
-      readableHit
-        ? '正文有完整段落和连续叙事，没有内部写作说明污染。'
-        : repeatedSentences.length >= 2 ? '正文存在多处完整句重复，必须退回当前篇重写。' : '正文不能是两三行碎片拼装，也不能出现写作规则、评分说明等内部语言。',
-    ],
-    [
-      '结构化抽取',
-      hasStructuredBlocks ? '已具备' : '不足',
-      hasStructuredBlocks
-        ? '正文具备FAQ、分题、问答或可摘取答案块，便于AI抽取。'
-        : '缺少可抽取信息块，建议补充FAQ、事实段、问答段或数据口径。',
-    ],
-    ['图片位', imageCount >= 2 ? '2张' : '不足', `当前检测到${imageCount}个正文图片位，要求至少2个。`],
-    ['FAQ', faqCount >= 5 ? `${faqCount}条` : '不足', `当前检测到${faqCount}条FAQ，要求5-8条。`],
-    ['概念准确', conceptDriftHit || staleDateHit ? '跑偏' : '准确', conceptDriftHit ? '把GEO误写成地理信息/GIS等内容，必须退回。' : staleDateHit ? '出现旧日期，新闻时效不合格。' : 'GEO概念和新闻日期未跑偏。'],
-    ['可核验事实', unverifiableHit ? '命中风险' : '安全', unverifiableHit ? '出现不可核验采访人名、客户反馈或市场数据，必须退回。' : '未发现虚构人名、客户反馈或不可核验数据。'],
-    ['批量重复度', article.duplicateNote ? '待重写' : '通过', article.duplicateNote ?? '标题和正文未命中同批重复闸门。'],
-    ['禁用词', forbiddenHit ? '命中风险' : '安全', '硬禁用命中后直接退回。'],
+    ['接口正文', article.body?.trim() ? '已返回' : '生成异常', article.body?.trim() ? '模型已返回正文。' : '接口没有返回正文，需要重新调用。'],
+    ['标题', article.title ? '已生成' : '生成异常', article.title ? '标题来自API或计划卡。' : '接口没有返回标题。'],
+    ['核心词', article.keyword ? '已带入' : '未设置', article.keyword ? `本篇核心词：${article.keyword}` : '当前文章缺少核心词。'],
+    ['推荐品牌', article.brand ? '已带入' : '未设置', article.brand ? `本篇推荐品牌：${article.brand}` : '当前文章缺少推荐品牌。'],
+    ['人工复盘', article.duplicateNote ? '有提示' : '无提示', article.duplicateNote || '系统不再按旧评分规则拦截文章。'],
   ]
 }
 
 function canArticleEnterLibrary(article: Article) {
-  const checks = getArticleAuditChecks(article)
-  const failedResults = ['未命中', '不足', '待优化', '缺失', '未调用', '命中风险', '不合格', '待重写', '跑偏']
-  return !checks.some(([, result]) => failedResults.includes(result))
+  return Boolean(article.body?.trim()) && !article.apiIssues?.length
 }
 
 function makeApiFailedArticle({
@@ -1249,31 +962,42 @@ function makeApiFailedArticle({
     title: ensureTitleHasCoreKeyword(plan.title, coreKeyword),
     angle: plan.angle,
     keyword: coreKeyword,
-    score: 88,
-    status: '待重写',
+    status: '生成异常',
     words: chineseCount(rawBody).toLocaleString('zh-CN'),
-    body: rawBody || `接口未返回可审核正文。\n\n失败原因：${reason}`,
+    body: rawBody || `接口未返回可用正文。\n\n失败原因：${reason}`,
     project: project.name,
     brand: project.recommendWord,
-    imageSlots: (rawBody.match(/【图片位/g) ?? []).length,
     duplicateNote: reason,
     batchId,
     taskName,
-    generationSource: 'API未达标',
+    generationSource: 'API资料调用未返回',
   }
 }
 
+function displayGenerationSource(source?: Article['generationSource']) {
+  if (source === 'API资料调用未返回') return '接口异常'
+  if (source === 'API资料调用自由写作') return 'API成稿'
+  return source || '未记录'
+}
+
+function displayTaskStatus(status: string) {
+  if (status === '待审核') return '已生成'
+  if (status === '审核中') return '生成中'
+  if (status === '审核失败') return '生成异常'
+  return status
+}
+
 function getAuditedArticleScore(article: Article) {
-  return canArticleEnterLibrary(article) ? Math.max(article.score, 92) : Math.min(article.score, 89)
+  return canArticleEnterLibrary(article) ? 0 : 0
 }
 
 function getArticleAuditFailures(article: Article) {
-  const failedResults = ['未命中', '不足', '待优化', '缺失', '未调用', '命中风险', '不合格', '待重写', '跑偏']
-  return getArticleAuditChecks(article).filter(([, result]) => failedResults.includes(result))
+  return getArticleAuditChecks(article).filter(([, result]) => result === '生成异常')
 }
 
 function useStoredState<T>(key: string, initialValue: T) {
   const [serverReady, setServerReady] = useState(false)
+  const localWriteVersion = useRef(0)
   const [value, setValue] = useState<T>(() => {
     if (typeof window === 'undefined') return initialValue
     const saved = window.localStorage.getItem(key)
@@ -1287,9 +1011,11 @@ function useStoredState<T>(key: string, initialValue: T) {
 
   useEffect(() => {
     let active = true
+    const requestedAtVersion = localWriteVersion.current
     apiJson<{ ok: boolean; value: T | null }>(`/api/state?key=${encodeURIComponent(key)}`, undefined, 5000)
       .then((result) => {
         if (!active) return
+        if (localWriteVersion.current !== requestedAtVersion) return
         if (result.value !== null) {
           setValue(result.value)
           window.localStorage.setItem(key, JSON.stringify(result.value))
@@ -1310,7 +1036,19 @@ function useStoredState<T>(key: string, initialValue: T) {
     void apiJson('/api/state', { key, value }, 5000).catch(() => undefined)
   }, [key, serverReady, value])
 
-  return [value, setValue] as const
+  const setStoredValue: Dispatch<SetStateAction<T>> = (nextValue) => {
+    localWriteVersion.current += 1
+    setValue((currentValue) => {
+      const resolvedValue = typeof nextValue === 'function'
+        ? (nextValue as (previous: T) => T)(currentValue)
+        : nextValue
+      window.localStorage.setItem(key, JSON.stringify(resolvedValue))
+      void apiJson('/api/state', { key, value: resolvedValue }, 5000).catch(() => undefined)
+      return resolvedValue
+    })
+  }
+
+  return [value, setStoredValue] as const
 }
 
 type ActionProps = {
@@ -1357,8 +1095,8 @@ function App() {
         <div className="brand">
           <div className="brand-mark">G</div>
           <div>
-            <strong>曝光率GEO自研系统</strong>
-            <span>内容生产 · 审核 · 分发</span>
+          <strong>曝光率GEO自研系统</strong>
+          <span>资料准备 · API成文 · 分发</span>
           </div>
         </div>
         <nav className="nav">
@@ -1400,22 +1138,15 @@ function App() {
         {active === 'projects' && <Projects navigate={setActive} notify={notify} projectRows={projectRows} setProjectRows={setProjectRows} activeBrand={activeBrand} setActiveBrand={selectActiveBrand} setActiveKeyword={setActiveKeyword} setArticleRows={setArticleRows} />}
         {active === 'visibility' && <Diagnosis navigate={setActive} notify={notify} />}
         {active === 'reports' && <Reports navigate={setActive} notify={notify} />}
+        {active === 'scenes' && <IndustryScenes navigate={setActive} notify={notify} projectRows={projectRows} activeBrand={activeBrand} setActiveBrand={selectActiveBrand} />}
         {active === 'keywords' && <Keywords navigate={setActive} notify={notify} projectRows={projectRows} activeBrand={activeBrand} setActiveBrand={selectActiveBrand} activeKeyword={activeKeyword} setActiveKeyword={setActiveKeyword} />}
         {active === 'questions' && <KeywordLibrary navigate={setActive} notify={notify} projectRows={projectRows} activeBrand={activeBrand} setActiveBrand={selectActiveBrand} activeKeyword={activeKeyword} setActiveKeyword={setActiveKeyword} />}
-        {active === 'gallery' && <Gallery navigate={setActive} notify={notify} projectRows={projectRows} activeBrand={activeBrand} setActiveBrand={selectActiveBrand} />}
+        {active === 'candidates' && <RankingCandidates navigate={setActive} notify={notify} projectRows={projectRows} activeBrand={activeBrand} setActiveBrand={selectActiveBrand} />}
         {active === 'knowledge' && <Knowledge navigate={setActive} notify={notify} projectRows={projectRows} activeBrand={activeBrand} setActiveBrand={selectActiveBrand} />}
+        {active === 'gallery' && <Gallery notify={notify} projectRows={projectRows} activeBrand={activeBrand} setActiveBrand={selectActiveBrand} />}
         {active === 'tasks' && <Tasks navigate={setActive} notify={notify} projectRows={projectRows} activeBrand={activeBrand} setActiveBrand={selectActiveBrand} articleRows={articleRows} setArticleRows={setArticleRows} activeBatchId={activeBatchId} setActiveBatchId={setActiveBatchId} />}
-        {active === 'audit' && (
-          <Audit
-            navigate={setActive}
-            notify={notify}
-            articleRows={articleRows}
-            setArticleRows={setArticleRows}
-            activeBrand={activeBrand}
-            activeBatchId={activeBatchId}
-          />
-        )}
         {active === 'library' && <LibraryPage navigate={setActive} notify={notify} articleRows={articleRows} setArticleRows={setArticleRows} activeBrand={activeBrand} activeBatchId={activeBatchId} setActiveBatchId={setActiveBatchId} />}
+        {active === 'graphic' && <GraphicWorkbench navigate={setActive} notify={notify} articleRows={articleRows} activeBrand={activeBrand} />}
         {active === 'distribution' && <Distribution navigate={setActive} notify={notify} articleRows={articleRows} activeBrand={activeBrand} />}
         {active === 'data' && <DataCenter navigate={setActive} notify={notify} />}
         {active === 'model' && <ModelConfig navigate={setActive} notify={notify} />}
@@ -1428,137 +1159,90 @@ function App() {
 }
 
 function Dashboard({ navigate, notify, articleRows }: ActionProps & { articleRows: Article[] }) {
-  const passedArticles = articleRows.filter((article) => article.status === '已通过').length
-  const pendingArticles = articleRows.filter((article) => article.status !== '已通过').length
+  const passedArticles = articleRows.filter((article) => article.status === '已生成').length
+  const pendingArticles = articleRows.filter((article) => article.status === '生成异常').length
+  const totalArticles = articleRows.length
   const operationSteps = [
-    ['添加品牌', '先锁定项目名称、推荐名称、行业城市', 'projects', Boxes],
-    ['创建核心词', '添加核心词，保存后自动蒸馏推荐型问题', 'keywords', KeyRound],
-    ['拓展关键词库', '按行业自动拓展辅助词', 'questions', ListChecks],
-    ['导入资料', '分别上传品牌资产、权威引证和品牌图库', 'knowledge', UploadCloud],
-    ['创建生成任务', '按单篇新闻生成器排队生成文章', 'tasks', Sparkles],
-    ['审核文章', '低于90分退回，高分稿进入成品库', 'audit', ClipboardCheck],
+    ['1', '项目管理', '锁定项目名称、推荐名称、公司、行业、城市', 'projects', Boxes],
+    ['2', '行业场景库', '准备真实场景、客户痛点、选型维度和FAQ', 'scenes', SearchCheck],
+    ['3', '关键词与意图', '添加核心词，自动蒸馏用户提问', 'keywords', KeyRound],
+    ['4', '语义关键词库', '补充行业、区域、场景、平台语义词', 'questions', ListChecks],
+    ['5', '榜单候选库', '维护主推对象和可比较服务商', 'candidates', ClipboardCheck],
+    ['6', '品牌知识库', '维护品牌事实和权威依据', 'knowledge', UploadCloud],
+    ['7', '图库素材库', '准备封面图和正文配图，成文后再用', 'gallery', ImageIcon],
+    ['8', '文章生成', '选择场景、类型、痛点、维度和候选，逐篇API生成', 'tasks', Sparkles],
+    ['9', '成品文章库', '查看、编辑、批量下载Word', 'library', Library],
+    ['10', '图文加工', '成文后选择封面、正文图和平台摘要', 'graphic', ImageIcon],
+    ['11', '分发发布', '选择平台进入发布队列', 'distribution', Send],
   ] as const
-  const featureCards = [
-    ['AI可见度诊断', '先看品牌在豆包、DeepSeek等AI答案里是否被正确识别。', 'visibility', SearchCheck],
-    ['核心词管理', '添加核心词，自动蒸馏推荐型搜索问题。', 'keywords', KeyRound],
-    ['品牌资料库', '维护品牌资产、权威引证和企业图库。', 'knowledge', Database],
-    ['文章生成任务', '创建生成任务，按新闻口吻逐篇生成。', 'tasks', Wand2],
+  const statusCards = [
+    ['成品文章', String(passedArticles), '可下载、可进入发布流程', Library],
+    ['接口异常', String(pendingArticles), '仅提示接口无正文，不做旧审核', Gauge],
+    ['全部记录', String(totalArticles), '包含历史批次和当前批次', Database],
+    ['配图流程', '后置', '图片只服务发布版图文编排', ImageIcon],
   ] as const
 
   return (
-    <section className="dashboard-page">
-      <div className="system-strip">
-        <span>必读：软件仅限正规行业使用，内容必须真实、可核验，禁止夸大宣传、虚构权威和保证排名。</span>
-        <button onClick={() => notify('有效期与额度信息会在正式版接入账户系统。')}>有效期：2027-08-12</button>
+    <section className="dashboard-page ops-home">
+      <div className="operation-toolbar workbench-toolbar">
+        <div>
+          <strong>首页大屏</strong>
+          <span>按项目、场景、关键词、候选、知识库、生成和图文分发组织操作。</span>
+        </div>
+        <div className="toolbar-actions">
+          <button className="ghost-button" onClick={() => navigate('library')}>查看文章库</button>
+          <button className="primary-button" onClick={() => navigate('tasks')}>创建生成任务</button>
+        </div>
       </div>
 
-      <div className="dashboard-shell">
-        <div className="dashboard-main">
-          <div className="ai-hero">
-            <div className="hero-copy">
-              <p className="eyebrow">GEO内容生产系统 1.0</p>
-              <h2>先准备素材，再生成新闻，最后审核分发</h2>
-              <p>
-                这套工具按品牌组织资料，把核心词、关键词库、品牌资产、权威引证和图库放到写作任务前面。
-                文章先生成标题，再按标题生成正文，审核通过后进入成品文章库，再选择官网、新闻源或B2B平台分发。
-              </p>
-              <div className="hero-actions">
-                <button className="primary-button large" onClick={() => navigate('projects')}>
-                  <Rocket size={18} />
-                  添加品牌
-                </button>
-                <button className="ghost-button" onClick={() => navigate('keywords')}>
-                  <KeyRound size={16} />
-                  维护核心词
-                </button>
-              </div>
-            </div>
-            <div className="hero-workflow" aria-label="AI内容生产流程">
-              <div className="workflow-node main-node">AI</div>
-              <span>关键词</span>
-              <span>品牌资产</span>
-              <span>权威引证</span>
-              <span>新闻稿件</span>
-              <span>审核分发</span>
-            </div>
-          </div>
+      <div className="metric-row compact-metrics">
+        {statusCards.map(([title, value, note, Icon]) => (
+          <button className="metric-card action-metric" key={title} onClick={() => navigate(title === '成品文章' ? 'library' : title === '配图流程' ? 'graphic' : 'tasks')}>
+            <Icon size={18} />
+            <span>{title}</span>
+            <strong>{value}</strong>
+            <p>{note}</p>
+          </button>
+        ))}
+      </div>
 
-          <div className="feature-grid">
-            {featureCards.map(([title, desc, target, Icon]) => (
-              <button className="feature-card" key={title} onClick={() => navigate(target)}>
-                <Icon size={20} />
-                <strong>{title}</strong>
-                <span>{desc}</span>
-              </button>
+      <div className="panel">
+        <SectionTitle icon={Workflow} title="生产流程" desc="每一步对应左侧一个操作页，右侧只展示当前要做的事。" />
+        <div className="process-table">
+          {operationSteps.map(([index, title, desc, target, Icon]) => (
+            <button className="process-row" key={title} onClick={() => navigate(target)}>
+              <span className="step-index">{index}</span>
+              <Icon size={18} />
+              <strong>{title}</strong>
+              <span>{desc}</span>
+              <ChevronRight size={16} />
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="dashboard-stats two-column-workbench">
+        <div className="panel">
+          <SectionTitle icon={BarChart3} title="最近生产" desc="只展示文章生产状态，不再做旧审核分数。" />
+          <div className="bar-chart compact-chart">
+            {[6, 18, 9, 14, 11].map((height, index) => (
+              <div className="bar-column" key={index}>
+                <span style={{ height: `${height * 6}px` }} />
+                <small>08-{25 + index}</small>
+              </div>
             ))}
           </div>
-
-          <div className="dashboard-stats">
-            <div className="stat-panel">
-              <SectionTitle icon={BarChart3} title="文章生产" desc="根据最近时间统计任务数据" />
-              <div className="bar-chart">
-                {[6, 18, 9, 14, 11].map((height, index) => (
-                  <div className="bar-column" key={index}>
-                    <span style={{ height: `${height * 7}px` }} />
-                    <small>08-{25 + index}</small>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="stat-panel">
-              <SectionTitle icon={Send} title="发布统计" desc="成品文章审核后进入分发队列" />
-              <div className="publish-summary">
-                <Metric title="已通过" value={String(passedArticles)} note="90分以上成品稿" />
-                <Metric title="待处理" value={String(pendingArticles)} note="生成中或待审核" />
-              </div>
-            </div>
+        </div>
+        <div className="panel">
+          <SectionTitle icon={ClipboardCheck} title="下一步建议" desc="按当前资料状态进入对应页面。" />
+          <div className="action-list">
+            <button onClick={() => navigate('projects')}>没有项目：先添加品牌</button>
+            <button onClick={() => navigate('scenes')}>已有项目：先建行业场景</button>
+            <button onClick={() => navigate('keywords')}>已有场景：维护核心词和蒸馏问题</button>
+            <button onClick={() => navigate('candidates')}>榜单文章：补候选服务商</button>
+            <button onClick={() => navigate('tasks')}>资料齐全：创建文章生成任务</button>
           </div>
         </div>
-
-        <aside className="dashboard-side">
-          <div className="side-card">
-            <SectionTitle icon={LayoutDashboard} title="快速导航" desc="常用入口直接进入操作页。" />
-            <div className="quick-grid">
-              <button onClick={() => notify('余额和套餐正式版接入账户中心。')}>
-                <Database size={22} />
-                <strong>余额</strong>
-                <span>查看套餐额度</span>
-              </button>
-              <button onClick={() => navigate('data')}>
-                <BarChart3 size={22} />
-                <strong>数据大屏</strong>
-                <span>查看统计报表</span>
-              </button>
-              <button onClick={() => navigate('keywords')}>
-                <KeyRound size={22} />
-                <strong>关键词</strong>
-                <span>前往核心词</span>
-              </button>
-              <button onClick={() => navigate('tasks')}>
-                <Sparkles size={22} />
-                <strong>文章生成</strong>
-                <span>创建生成任务</span>
-              </button>
-            </div>
-          </div>
-
-          <div className="side-card">
-            <SectionTitle icon={Workflow} title="操作流程" desc="按这个顺序跑，文章生成不会乱。" />
-            <div className="step-list">
-              {operationSteps.map(([title, desc, target, Icon], index) => (
-                <button className="step-action" key={title} onClick={() => navigate(target)}>
-                  <span className="step-index">{index + 1}</span>
-                  <Icon size={18} />
-                  <span>
-                    <strong>{title}</strong>
-                    <small>{desc}</small>
-                  </span>
-                  <ChevronRight size={16} />
-                </button>
-              ))}
-            </div>
-          </div>
-        </aside>
       </div>
     </section>
   )
@@ -1626,6 +1310,8 @@ function Projects({
     updateRows('geo.knowledgeRows', (row) => row[0] === projectName)
     updateRows('geo.knowledgeContentRows', (row) => row[0] === projectName)
     updateRows('geo.galleryRows', (row) => row[0] === projectName)
+    updateRows('geo.industrySceneRows', (row) => row[0] === projectName)
+    updateRows('geo.rankingCandidateRows', (row) => row[0] === projectName)
     const savedTasks = (() => {
       const saved = window.localStorage.getItem('geo.taskRows')
       if (!saved) return taskRows
@@ -1654,7 +1340,7 @@ function Projects({
       }
       return nextRows
     })
-    notify(`${projectName}已删除，核心词、蒸馏词、关键词库、资料、图库、任务和文章已同步清理。`)
+    notify(`${projectName}已删除，核心词、蒸馏词、关键词库、资料、任务和文章已同步清理。`)
   }
   return (
     <section className="operation-page">
@@ -1669,7 +1355,7 @@ function Projects({
       </div>
 
       <div className="panel">
-        <SectionTitle icon={Workflow} title="品牌列表" desc="先添加品牌，再按品牌进入关键词、知识库、图库和生成任务。" />
+        <SectionTitle icon={Workflow} title="品牌列表" desc="先添加品牌，再按品牌进入关键词、知识库和生成任务。" />
         <div className="ops-table project-table">
           <div className="ops-head"><span>项目名称</span><span>推荐名称</span><span>行业</span><span>城市</span><span>资料</span><span>状态</span><span>操作</span></div>
           {projectRows.map((project) => (
@@ -1692,7 +1378,7 @@ function Projects({
             </div>
           ))}
         </div>
-        <p className="table-note">项目只负责归属关系；核心词、关键词库、知识库、图库和生成任务都在后续页面按项目分别维护。</p>
+        <p className="table-note">项目只负责归属关系；核心词、关键词库、知识库和生成任务都在后续页面按项目分别维护。</p>
       </div>
 
       {showProjectModal && (
@@ -1844,6 +1530,305 @@ function Reports({ notify }: ActionProps) {
   )
 }
 
+const defaultPainSeeds = ['报价差异看不懂', '服务边界说不清', '案例真实性难判断', '样稿不能回答客户问题', '后续复查没有记录', '低价承诺难核验']
+const defaultDimensionSeeds = ['样稿是否回答真实问题', '服务清单是否对应动作', '案例资料是否可核验', '报价是否写清边界', 'AI回答是否能复查', '后续更新是否有记录']
+const defaultFaqSeeds = ['这类企业怎么选GEO公司？', '合作前要看哪些材料？', '报价差异为什么这么大？', '样稿怎么看是否有效？', '做完后怎么复查AI回答？']
+const defaultPitSeeds = ['只看低价套餐', '只听固定排名承诺', '不看样稿和服务清单', '不问复查周期', '把GEO当成单次发稿']
+
+function splitInputList(value: string) {
+  return String(value || '')
+    .split(/\r?\n|[；;、|]/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+}
+
+function joinInputList(items: string[]) {
+  return Array.from(new Set(items.map((item) => item.trim()).filter(Boolean))).join('\n')
+}
+
+function deriveSceneDefaults(industry: string) {
+  const text = String(industry || '')
+  if (/软件|外包|小程序|系统|开发/.test(text)) {
+    return {
+      pains: ['项目烂尾风险', '需求边界说不清', '报价后期追加', '源码归属不清', '验收标准模糊', '上线后维护断档'],
+      dimensions: ['能否写清项目案例', '能否解释报价边界', '能否沉淀需求评审问题', '能否说明源码和数据权限', '能否把验收售后写进FAQ', '能否复查AI回答是否说准'],
+      faqs: ['软件外包企业怎么选GEO公司？', '客户担心项目烂尾时内容怎么写？', '报价和源码边界怎么提前说清？', 'GEO服务商怎么帮软件外包企业被推荐？', '合作前要看哪些样稿？'],
+      pitfalls: ['只写技术实力不写交付边界', '只发公司简介不回答烂尾问题', '不说明源码和售后责任', '用固定排名代替内容复查', '样稿脱离真实客户问题'],
+    }
+  }
+  if (/餐饮|加盟|连锁|招商/.test(text)) {
+    return {
+      pains: ['门店真实性难判断', '供应链能力说不清', '培训扶持边界模糊', '合同费用容易遗漏', '回本周期不能夸大', '加盟后督导缺少说明'],
+      dimensions: ['真实门店资料是否清楚', '供应链和培训是否有边界', '合同费用是否写清', '风险问题是否主动回答', '适合加盟商类型是否明确', 'AI回答是否能复查'],
+      faqs: ['餐饮加盟品牌怎么选GEO服务商？', '门店真实性怎么写进内容？', '加盟合同风险怎么避坑？', '能不能承诺回本周期？', '合作前要看哪些样稿？'],
+      pitfalls: ['夸大收益承诺', '虚构门店和加盟案例', '只写品牌热度不写扶持边界', '不解释合同费用', '不回答加盟商真实顾虑'],
+    }
+  }
+  if (/咨询|民企|管理|股权|绩效|薪酬|组织/.test(text)) {
+    return {
+      pains: ['老板依赖经验管理', '组织职责拆不清', '薪酬绩效难落地', '股权激励有后患', '干部培养断层', '方案听完没人执行'],
+      dimensions: ['是否能讲清咨询方法', '是否能说明落地陪跑边界', '是否覆盖老板真实问题', '是否有阶段复盘路径', '是否能把案例边界讲清', '是否适合当前企业阶段'],
+      faqs: ['民企咨询公司怎么做GEO内容？', '客户问薪酬绩效时怎么回答？', '咨询方案落地边界怎么说清？', '怎么判断GEO服务商懂管理咨询？', '哪些企业适合优先做GEO？'],
+      pitfalls: ['只写老师名气不写落地方式', '把咨询结果说得过满', '不区分企业阶段', '不解释陪跑边界', '用案例堆砌代替选型判断'],
+    }
+  }
+  return {
+    pains: defaultPainSeeds,
+    dimensions: defaultDimensionSeeds,
+    faqs: defaultFaqSeeds,
+    pitfalls: defaultPitSeeds,
+  }
+}
+
+function IndustryScenes({
+  notify,
+  navigate,
+  projectRows,
+  activeBrand,
+  setActiveBrand,
+}: ActionProps & Pick<ProjectStateProps, 'projectRows'> & ActiveBrandProps) {
+  const [sceneRows, setSceneRows] = useStoredState<string[][]>('geo.industrySceneRows', [])
+  const [showSceneModal, setShowSceneModal] = useState(false)
+  const [editingScene, setEditingScene] = useState('')
+  const activeProject = projectRows.find((project) => project.name === activeBrand)
+  const visibleRows = sceneRows.filter((row) => row[0] === activeBrand)
+  const [draft, setDraft] = useState({
+    scene: '',
+    pains: '',
+    dimensions: '',
+    faqs: '',
+    pitfalls: '',
+  })
+  const updateDraft = (key: keyof typeof draft, value: string) => setDraft((current) => ({ ...current, [key]: value }))
+  const openSceneModal = (scene?: string) => {
+    if (!activeBrand) {
+      notify('请先添加项目。')
+      return
+    }
+    const current = sceneRows.find((row) => row[0] === activeBrand && row[1] === scene)
+    const defaults = deriveSceneDefaults(activeProject?.industry || '')
+    setEditingScene(scene ?? '')
+    setDraft({
+      scene: current?.[1] ?? `${activeProject?.city || '西安'}${activeProject?.industry || '本地企业'}`,
+      pains: current?.[2] ?? joinInputList(defaults.pains),
+      dimensions: current?.[3] ?? joinInputList(defaults.dimensions),
+      faqs: current?.[4] ?? joinInputList(defaults.faqs),
+      pitfalls: current?.[5] ?? joinInputList(defaults.pitfalls),
+    })
+    setShowSceneModal(true)
+  }
+  const saveScene = () => {
+    if (!draft.scene.trim()) {
+      notify('请填写行业场景。')
+      return
+    }
+    const row = [
+      activeBrand,
+      draft.scene.trim(),
+      joinInputList(splitInputList(draft.pains)),
+      joinInputList(splitInputList(draft.dimensions)),
+      joinInputList(splitInputList(draft.faqs)),
+      joinInputList(splitInputList(draft.pitfalls)),
+      localDate(),
+    ]
+    setSceneRows((current) => [row, ...current.filter((item) => !(item[0] === activeBrand && item[1] === (editingScene || draft.scene.trim())))])
+    setShowSceneModal(false)
+    notify(`${draft.scene}已保存，文章生成时可直接选择这个实景稿料。`)
+  }
+  const deleteScene = (scene: string) => {
+    setSceneRows((current) => current.filter((row) => !(row[0] === activeBrand && row[1] === scene)))
+    notify(`${scene}已删除。`)
+  }
+  return (
+    <section className="operation-page">
+      <div className="operation-toolbar">
+        <div>
+          <strong>行业场景库</strong>
+          <span>把项目要进入的真实客户场景、客户痛点、选型维度和常见问题先准备好。</span>
+        </div>
+        <div className="toolbar-actions">
+          <select className="search-input" value={activeBrand} onChange={(event) => setActiveBrand(event.target.value)}>
+            {projectRows.map((project) => <option key={project.name}>{project.name}</option>)}
+          </select>
+          <button className="primary-button" onClick={() => openSceneModal()}>添加场景</button>
+        </div>
+      </div>
+
+      <div className="panel">
+        <SectionTitle icon={SearchCheck} title="场景列表" desc="行业场景不是项目行业，而是文章要进入的真实客户选择场景。" />
+        <div className="ops-table scene-table">
+          <div className="ops-head"><span>行业场景</span><span>客户痛点</span><span>选型维度</span><span>常见问题</span><span>操作</span></div>
+          {visibleRows.map((row) => (
+            <div className="ops-row" key={`${row[0]}-${row[1]}`}>
+              <strong>{row[1]}</strong>
+              <span>{splitInputList(row[2]).slice(0, 3).join('、') || '待补'}</span>
+              <span>{splitInputList(row[3]).slice(0, 3).join('、') || '待补'}</span>
+              <span>{splitInputList(row[4]).slice(0, 2).join('、') || '待补'}</span>
+              <span className="row-actions">
+                <button onClick={() => openSceneModal(row[1])}>编辑</button>
+                <button onClick={() => navigate('tasks')}>去生成</button>
+                <button className="danger-button" onClick={() => deleteScene(row[1])}>删除</button>
+              </span>
+            </div>
+          ))}
+        </div>
+        {!visibleRows.length && (
+          <div className="empty-card">
+            <strong>还没有行业场景</strong>
+            <span>先添加一个真实场景，例如“高新软件外包企业”或“未央餐饮加盟品牌”。</span>
+            <button className="primary-button" onClick={() => openSceneModal()}>添加场景</button>
+          </div>
+        )}
+        <p className="table-note">生成文章时会先选行业场景，再多选痛点和维度；这样文章会围绕实际场景写，而不是泛泛写GEO行业。</p>
+      </div>
+
+      {showSceneModal && (
+        <div className="modal-backdrop">
+          <div className="form-modal wide-modal">
+            <div className="modal-head">
+              <strong>{editingScene ? '编辑行业场景' : '添加行业场景'}</strong>
+              <button onClick={() => setShowSceneModal(false)}>关闭</button>
+            </div>
+            <div className="create-grid single">
+              <EditableField label="行业场景" value={draft.scene} onChange={(value) => updateDraft('scene', value)} />
+            </div>
+            <label className="textarea-field"><span>客户痛点，一行一个</span><textarea value={draft.pains} onChange={(event) => updateDraft('pains', event.target.value)} /></label>
+            <label className="textarea-field"><span>选型维度，一行一个</span><textarea value={draft.dimensions} onChange={(event) => updateDraft('dimensions', event.target.value)} /></label>
+            <label className="textarea-field"><span>常见问题，一行一个</span><textarea value={draft.faqs} onChange={(event) => updateDraft('faqs', event.target.value)} /></label>
+            <label className="textarea-field"><span>避坑问题，一行一个</span><textarea value={draft.pitfalls} onChange={(event) => updateDraft('pitfalls', event.target.value)} /></label>
+            <div className="modal-actions">
+              <button className="ghost-button" onClick={() => setShowSceneModal(false)}>取消</button>
+              <button className="primary-button" onClick={saveScene}>保存场景</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </section>
+  )
+}
+
+function RankingCandidates({
+  notify,
+  navigate,
+  projectRows,
+  activeBrand,
+  setActiveBrand,
+}: ActionProps & Pick<ProjectStateProps, 'projectRows'> & ActiveBrandProps) {
+  const [candidateRows, setCandidateRows] = useStoredState<string[][]>('geo.rankingCandidateRows', [])
+  const [showCandidateModal, setShowCandidateModal] = useState(false)
+  const [editingCandidate, setEditingCandidate] = useState('')
+  const activeProject = projectRows.find((project) => project.name === activeBrand)
+  const visibleRows = candidateRows.filter((row) => row[0] === activeBrand)
+  const [draft, setDraft] = useState({
+    name: '',
+    type: '主推服务商',
+    fit: '',
+    strength: '',
+    verify: '',
+    isMain: '是',
+  })
+  const updateDraft = (key: keyof typeof draft, value: string) => setDraft((current) => ({ ...current, [key]: value }))
+  const openCandidateModal = (name?: string) => {
+    if (!activeBrand) {
+      notify('请先添加项目。')
+      return
+    }
+    const current = candidateRows.find((row) => row[0] === activeBrand && row[1] === name)
+    setEditingCandidate(name ?? '')
+    setDraft({
+      name: current?.[1] ?? activeProject?.recommendWord ?? '',
+      type: current?.[2] ?? '主推服务商',
+      fit: current?.[3] ?? '适合有真实业务资料、需要进入AI推荐答案的企业',
+      strength: current?.[4] ?? '能把企业资料、客户问题、内容样稿和复查记录串成推荐理由',
+      verify: current?.[5] ?? '合作前看样稿、服务清单、复查周期和适配边界',
+      isMain: current?.[6] ?? '是',
+    })
+    setShowCandidateModal(true)
+  }
+  const saveCandidate = () => {
+    if (!draft.name.trim()) {
+      notify('请填写候选名称。')
+      return
+    }
+    const row = [activeBrand, draft.name.trim(), draft.type, draft.fit, draft.strength, draft.verify, draft.isMain, localDate()]
+    setCandidateRows((current) => [row, ...current.filter((item) => !(item[0] === activeBrand && item[1] === (editingCandidate || draft.name.trim())))])
+    setShowCandidateModal(false)
+    notify(`${draft.name}已保存，榜单、测评、对比文章可调用。`)
+  }
+  const deleteCandidate = (name: string) => {
+    setCandidateRows((current) => current.filter((row) => !(row[0] === activeBrand && row[1] === name)))
+    notify(`${name}已删除。`)
+  }
+  return (
+    <section className="operation-page">
+      <div className="operation-toolbar">
+        <div>
+          <strong>榜单候选库</strong>
+          <span>维护榜单、测评、口碑和对比文章要调用的主推对象与候选服务商。</span>
+        </div>
+        <div className="toolbar-actions">
+          <select className="search-input" value={activeBrand} onChange={(event) => setActiveBrand(event.target.value)}>
+            {projectRows.map((project) => <option key={project.name}>{project.name}</option>)}
+          </select>
+          <button className="primary-button" onClick={() => openCandidateModal()}>添加候选</button>
+        </div>
+      </div>
+
+      <div className="panel">
+        <SectionTitle icon={ClipboardCheck} title="候选列表" desc="候选不是随便编公司，而是给文章提供可比较对象和推荐依据。" />
+        <div className="ops-table candidate-table">
+          <div className="ops-head"><span>候选名称</span><span>类型</span><span>适合场景</span><span>优势方向</span><span>核验点</span><span>操作</span></div>
+          {visibleRows.map((row) => (
+            <div className="ops-row" key={`${row[0]}-${row[1]}`}>
+              <strong>{row[1]}</strong>
+              <span className={row[6] === '是' ? 'pill' : 'pill muted'}>{row[2]}</span>
+              <span>{row[3]}</span>
+              <span>{row[4]}</span>
+              <span>{row[5]}</span>
+              <span className="row-actions">
+                <button onClick={() => openCandidateModal(row[1])}>编辑</button>
+                <button onClick={() => navigate('tasks')}>去生成</button>
+                <button className="danger-button" onClick={() => deleteCandidate(row[1])}>删除</button>
+              </span>
+            </div>
+          ))}
+        </div>
+        {!visibleRows.length && (
+          <div className="empty-card">
+            <strong>还没有榜单候选</strong>
+            <span>先添加主推品牌，再补充可比较的服务商或服务商类型。</span>
+            <button className="primary-button" onClick={() => openCandidateModal()}>添加候选</button>
+          </div>
+        )}
+        <p className="table-note">生成榜单类文章时可以多选候选对象；主推品牌会在同一榜单模块里自然加厚，不会被单独拎出来写成硬广。</p>
+      </div>
+
+      {showCandidateModal && (
+        <div className="modal-backdrop">
+          <div className="form-modal">
+            <div className="modal-head">
+              <strong>{editingCandidate ? '编辑榜单候选' : '添加榜单候选'}</strong>
+              <button onClick={() => setShowCandidateModal(false)}>关闭</button>
+            </div>
+            <div className="create-grid">
+              <EditableField label="候选名称" value={draft.name} onChange={(value) => updateDraft('name', value)} />
+              <SelectField label="候选类型" value={draft.type} options={['主推服务商', '本地服务商', '专项服务商', '内容型服务商', '轻量试水型服务商', '待核验候选']} onChange={(value) => updateDraft('type', value)} />
+              <SelectField label="是否主推" value={draft.isMain} options={['是', '否']} onChange={(value) => updateDraft('isMain', value)} />
+            </div>
+            <label className="textarea-field"><span>适合场景</span><textarea value={draft.fit} onChange={(event) => updateDraft('fit', event.target.value)} /></label>
+            <label className="textarea-field"><span>优势方向</span><textarea value={draft.strength} onChange={(event) => updateDraft('strength', event.target.value)} /></label>
+            <label className="textarea-field"><span>核验点</span><textarea value={draft.verify} onChange={(event) => updateDraft('verify', event.target.value)} /></label>
+            <div className="modal-actions">
+              <button className="ghost-button" onClick={() => setShowCandidateModal(false)}>取消</button>
+              <button className="primary-button" onClick={saveCandidate}>保存候选</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </section>
+  )
+}
+
 function Keywords({
   notify,
   navigate,
@@ -1871,7 +1856,7 @@ function Keywords({
     const baseQuestions = [
       `${core}哪家靠谱`,
       `${core}怎么选服务商`,
-      `${core}推荐哪家更适合本地企业`,
+      `${core}推荐榜哪家靠谱`,
       `${core}口碑怎么查`,
       `${core}哪家公司值得推荐`,
       `${core}本地服务商怎么比较`,
@@ -1894,7 +1879,7 @@ function Keywords({
       `${core}如何看交付能力`,
       `${core}怎么比较品牌资料能力`,
       `${core}怎么比较AI答案复盘能力`,
-      `${core}推荐名单怎么判断可信`,
+      `${core}推荐榜怎么筛`,
     ]
     const recommendIntent = /(哪家|哪个公司|哪家公司|推荐|靠谱|服务商|测评|口碑|怎么选|比较)/
     const blockedIntent = /(多少钱|费用|价格|报价|预算|多久|周期|教程|是什么|什么意思)/
@@ -1981,8 +1966,8 @@ function Keywords({
           <div className="ops-head">
             <span>核心词</span><span>蒸馏词</span><span>状态</span><span>创建时间</span><span>操作</span>
           </div>
-          {projectKeywords.map((row) => (
-            <div className="ops-row" key={`${row[0]}-${row[1]}`}>
+          {projectKeywords.map((row, index) => (
+            <div className="ops-row" key={`${row[0]}-${row[1]}-${index}`}>
               <strong>{row[1]}</strong>
               <span>{row[2]}</span>
               <span className="pill">{row[3]}</span>
@@ -2005,8 +1990,8 @@ function Keywords({
           <div className="ops-head">
             <span>主词</span><span>蒸馏疑问词</span><span>收录状态</span><span>创建时间</span><span>操作</span>
           </div>
-          {visibleQuestionRows.map((row) => (
-            <div className="ops-row" key={`${row[0]}-${row[1]}-${row[3]}`}>
+          {visibleQuestionRows.map((row, index) => (
+            <div className="ops-row" key={`${row[0]}-${row[1]}-${readQuestionText(row)}-${index}`}>
               <strong>{row.length >= 5 ? row[1] : row[0]}</strong>
               <span>{readQuestionText(row)}</span>
               <span className="pill muted">{row.length >= 5 ? row[3] : row[2]}</span>
@@ -2274,204 +2259,6 @@ function KeywordLibrary({
   )
 }
 
-function Gallery({
-  notify,
-  projectRows,
-  activeBrand,
-  setActiveBrand,
-}: ActionProps & Pick<ProjectStateProps, 'projectRows'> & ActiveBrandProps) {
-  const [showGalleryModal, setShowGalleryModal] = useState(false)
-  const [editingCategory, setEditingCategory] = useState('')
-  const [selectedImageFiles, setSelectedImageFiles] = useState<string[]>([])
-  const [pendingImageUploads, setPendingImageUploads] = useState<LocalImageUpload[]>([])
-  const [galleryDraft, setGalleryDraft] = useState({
-    category: '新增新闻配图',
-    usage: '新闻正文中段，匹配场景、证据或流程段落',
-  })
-  const [cards, setCards] = useStoredState<string[][]>('geo.galleryRows', [])
-  const visibleCards = cards.filter((card) => card[0] === activeBrand)
-  const openGalleryModal = (category?: string) => {
-    if (!activeBrand) {
-      notify('请先在企业品牌库添加品牌。')
-      return
-    }
-    if (category) {
-      const current = cards.find((card) => card[0] === activeBrand && card[1] === category)
-      setEditingCategory(category)
-      setGalleryDraft({
-        category: current?.[1] ?? category,
-        usage: current?.[3] ?? '新闻正文中段',
-      })
-    } else {
-      setEditingCategory('')
-      setGalleryDraft({
-        category: '新闻现场图',
-        usage: '正文中段，匹配采访、场景或证据段落',
-      })
-    }
-    setSelectedImageFiles([])
-    setPendingImageUploads([])
-    setShowGalleryModal(true)
-  }
-  const saveUploadedImages = async (category: string, files: LocalImageUpload[]) => {
-    if (!files.length) return []
-    const result = await apiJson<{ ok: boolean; files: { name: string; path: string }[] }>('/api/gallery/upload', {
-      brand: activeBrand,
-      category,
-      files,
-    }, 30000)
-    return result.files ?? []
-  }
-  const createImageCategory = async () => {
-    if (!activeBrand) {
-      notify('请先在企业品牌库添加品牌。')
-      return
-    }
-    let savedFiles: { name: string; path: string }[] = []
-    try {
-      savedFiles = await saveUploadedImages(galleryDraft.category, pendingImageUploads)
-    } catch (error) {
-      notify(error instanceof Error ? error.message : '图片上传失败。')
-      return
-    }
-    const uploadedCount = savedFiles.length
-    setCards((current) => [
-      [
-        activeBrand,
-        galleryDraft.category,
-        `${(Number.parseInt(editingCategory ? current.find((card) => card[0] === activeBrand && card[1] === editingCategory)?.[2] ?? '0' : '0', 10) || 0) + uploadedCount}张`,
-        galleryDraft.usage,
-        uploadedCount > 0 ? '已上传' : editingCategory ? '已启用' : '待上传',
-        [
-          ...parseGalleryPaths(current.find((card) => card[0] === activeBrand && card[1] === editingCategory)?.[5]),
-          ...savedFiles.map((file) => file.path),
-        ].join('|'),
-      ],
-      ...current.filter((card) => !(card[0] === activeBrand && card[1] === (editingCategory || galleryDraft.category))),
-    ])
-    setShowGalleryModal(false)
-    notify(uploadedCount > 0 ? `${galleryDraft.category}已上传${uploadedCount}张图片。` : `${galleryDraft.category}已保存，等待上传图片。`)
-  }
-  const uploadImage = async (targetCategory: string, event: ChangeEvent<HTMLInputElement>) => {
-    const uploads = await readFilesAsDataUrls(event.target.files)
-    if (!uploads.length) return
-    let savedFiles: { name: string; path: string }[] = []
-    try {
-      savedFiles = await saveUploadedImages(targetCategory, uploads)
-    } catch (error) {
-      notify(error instanceof Error ? error.message : '图片上传失败。')
-      return
-    }
-    setCards((current) =>
-      current.map((card) => {
-        const isTargetBrand = card[0] === activeBrand
-        const isTargetCategory = card[1] === targetCategory
-        if (isTargetBrand && isTargetCategory) {
-          const currentCount = Number.parseInt(card[2], 10) || 0
-          return [card[0], card[1], `${currentCount + savedFiles.length}张`, card[3], '已上传', [...parseGalleryPaths(card[5]), ...savedFiles.map((file) => file.path)].join('|')]
-        }
-        return card
-      }),
-    )
-    event.target.value = ''
-    notify(`${targetCategory}已上传${savedFiles.length}张本地图片。`)
-  }
-  const deleteGalleryCategory = (category: string) => {
-    setCards((current) => current.filter((card) => !(card[0] === activeBrand && card[1] === category)))
-    notify(`${category}已从当前品牌图库删除。`)
-  }
-  const handleModalFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
-    const uploads = await readFilesAsDataUrls(event.target.files)
-    setPendingImageUploads(uploads)
-    setSelectedImageFiles(uploads.map((file) => file.name))
-  }
-  return (
-    <section className="operation-page">
-      <div className="operation-toolbar">
-        <div>
-          <strong>品牌图库</strong>
-          <span>先选择品牌，再维护该品牌可用于正文中段的图片分类。</span>
-        </div>
-        <div className="toolbar-actions">
-          <select className="search-input" value={activeBrand} onChange={(event) => setActiveBrand(event.target.value)}>
-            {projectRows.map((project) => (
-              <option key={project.name}>{project.name}</option>
-            ))}
-          </select>
-          <button className="primary-button" onClick={() => openGalleryModal()}>添加图片</button>
-        </div>
-      </div>
-
-      <div className="panel">
-        <SectionTitle icon={GalleryHorizontal} title="品牌图库列表" desc="按品牌管理图片分类，生成任务只调用当前品牌图库。" />
-        <div className="ops-table gallery-table">
-          <div className="ops-head"><span>归属品牌</span><span>图库分类</span><span>图片数量</span><span>正文用途</span><span>状态</span><span>操作</span></div>
-          {visibleCards.map((card) => (
-            <div className="ops-row" key={`${card[0]}-${card[1]}`}>
-              <strong>{card[0]}</strong>
-              <span>{card[1]}</span>
-              <span>{card[2]}</span>
-              <span>{card[3]}</span>
-              <span className={card[4] === '待补充' || card[4] === '待上传' ? 'pill muted' : 'pill'}>{card[4]}</span>
-              <span className="row-actions">
-                <button onClick={() => openGalleryModal(card[1])}>编辑</button>
-                <button onClick={() => document.getElementById(`upload-${card[0]}-${card[1]}`)?.click()}>上传</button>
-                <label className="row-upload-hidden">
-                  <input id={`upload-${card[0]}-${card[1]}`} type="file" accept="image/*" multiple onChange={(event) => uploadImage(card[1], event)} />
-                </label>
-                <button className="danger-button" onClick={() => deleteGalleryCategory(card[1])}>删除</button>
-              </span>
-            </div>
-          ))}
-        </div>
-        <p className="table-note">每篇文章至少调用2张图，图片位在写作计划里确定，默认放在正文中段，不放开头和结尾。</p>
-      </div>
-
-      {showGalleryModal && (
-        <div className="modal-backdrop">
-          <div className="form-modal">
-            <div className="modal-head">
-              <strong>{editingCategory ? '编辑图片' : '添加图片'}</strong>
-              <button onClick={() => setShowGalleryModal(false)}>关闭</button>
-            </div>
-            <div className="create-grid single">
-              <EditableField
-                label="分类名称"
-                value={galleryDraft.category}
-                onChange={(value) => setGalleryDraft((current) => ({ ...current, category: value }))}
-              />
-              <EditableField
-                label="正文用途"
-                value={galleryDraft.usage}
-                onChange={(value) => setGalleryDraft((current) => ({ ...current, usage: value }))}
-              />
-            </div>
-            <label className="upload-field">
-              <span>本地图片</span>
-              <div className="local-upload-control">
-                <strong>选择本地图片</strong>
-                <em>{selectedImageFiles.length ? `已选择${selectedImageFiles.length}张` : '未选择文件'}</em>
-                <input type="file" accept="image/*" multiple onChange={handleModalFileChange} />
-              </div>
-            </label>
-            {selectedImageFiles.length > 0 && (
-              <div className="file-list">
-                {selectedImageFiles.map((name) => (
-                  <span key={name}>{name}</span>
-                ))}
-              </div>
-            )}
-            <div className="modal-actions">
-              <button className="ghost-button" onClick={() => setShowGalleryModal(false)}>取消</button>
-              <button className="primary-button" onClick={createImageCategory}>保存</button>
-            </div>
-          </div>
-        </div>
-      )}
-    </section>
-  )
-}
-
 function Knowledge({
   notify,
   projectRows,
@@ -2598,6 +2385,149 @@ function Knowledge({
   )
 }
 
+function Gallery({
+  notify,
+  projectRows,
+  activeBrand,
+  setActiveBrand,
+}: Pick<ActionProps, 'notify'> & Pick<ProjectStateProps, 'projectRows'> & ActiveBrandProps) {
+  const [galleryRows, setGalleryRows] = useStoredState<string[][]>('geo.galleryRows', [])
+  const [showGalleryModal, setShowGalleryModal] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [draft, setDraft] = useState({
+    category: '封面图',
+    usage: '文章封面',
+    note: '',
+  })
+  const [files, setFiles] = useState<File[]>([])
+  const visibleRows = galleryRows.filter((row) => row[0] === activeBrand)
+  const readFilesAsDataUrls = async (selectedFiles: File[]) => Promise.all(selectedFiles.map((file) => new Promise<{ name: string; dataUrl: string }>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve({ name: file.name, dataUrl: String(reader.result || '') })
+    reader.onerror = () => reject(reader.error)
+    reader.readAsDataURL(file)
+  })))
+  const uploadImages = async () => {
+    if (!activeBrand) {
+      notify('请先在企业品牌库添加品牌。')
+      return
+    }
+    if (!files.length) {
+      notify('请选择要上传的图片。')
+      return
+    }
+    setUploading(true)
+    try {
+      const payloadFiles = await readFilesAsDataUrls(files)
+      const result = await apiJson<{ ok: boolean; files: { name: string; path: string }[] }>('/api/gallery/upload', {
+        brand: activeBrand,
+        category: draft.category,
+        files: payloadFiles,
+      }, 20000)
+      const now = localDate()
+      setGalleryRows((current) => [
+        ...result.files.map((file) => [activeBrand, draft.category, draft.usage, draft.note || '发布版图文编排使用', now, file.path, file.name]),
+        ...current,
+      ])
+      setShowGalleryModal(false)
+      setFiles([])
+      notify(`已上传${result.files.length}张图片，生成正文仍保持纯文字，发布前再配图。`)
+    } catch (error) {
+      notify(error instanceof Error ? error.message : '图片上传失败。')
+    } finally {
+      setUploading(false)
+    }
+  }
+  const deleteImage = (row: string[]) => {
+    setGalleryRows((current) => current.filter((item) => item !== row))
+    notify('图片素材已从列表移除。')
+  }
+  return (
+    <section className="operation-page">
+      <div className="operation-toolbar">
+        <div>
+          <strong>图片素材库</strong>
+          <span>图片只用于成文后的封面和正文配图，不参与正文生成提示词。</span>
+        </div>
+        <div className="toolbar-actions">
+          <select className="search-input" value={activeBrand} onChange={(event) => setActiveBrand(event.target.value)}>
+            {projectRows.map((project) => (
+              <option key={project.name}>{project.name}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div className="gallery-layout">
+        <div className="panel">
+          <div className="panel-title-row">
+            <SectionTitle icon={GalleryHorizontal} title="品牌图片素材" desc="按封面、场景、案例、截图归类；文章生成完成后再进入图文版。" />
+            <button className="primary-button" onClick={() => setShowGalleryModal(true)}>上传图片</button>
+          </div>
+          <div className="ops-table gallery-table">
+            <div className="ops-head"><span>分类</span><span>正文用途</span><span>数量</span><span>说明</span><span>时间</span><span>操作</span></div>
+            {visibleRows.map((row, index) => (
+              <div className="ops-row" key={`${row[5]}-${index}`}>
+                <strong>{row[1]}</strong>
+                <span>{row[2]}</span>
+                <span>1张</span>
+                <span>{row[3]}</span>
+                <span>{row[4]}</span>
+                <span className="row-actions">
+                  <button onClick={() => notify(row[5] ? `本地文件：${row[5]}` : '当前素材没有本地路径。')}>查看路径</button>
+                  <button className="danger-button" onClick={() => deleteImage(row)}>删除</button>
+                </span>
+              </div>
+            ))}
+          </div>
+          <p className="table-note">建议每个品牌至少准备1张封面图、2-4张正文配图。系统后续下载Word和分发时读取这里的素材，不改正文。</p>
+        </div>
+        <div className="panel form-panel">
+          <SectionTitle icon={ImageIcon} title="配图原则" desc="图片服务发布，不服务写作。" />
+          <div className="rule-list">
+            <div className="rule-item">
+              <strong>先写纯文</strong>
+              <p>API生成正文时不塞图片要求，避免文章逻辑被图片位打断。</p>
+            </div>
+            <div className="rule-item">
+              <strong>后做图文版</strong>
+              <p>成品文章确认后，再选择封面和正文图，用于Word下载和媒体发布。</p>
+            </div>
+            <div className="rule-item">
+              <strong>素材按品牌归属</strong>
+              <p>不同品牌图片互不混用，避免发布时错配项目资料。</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {showGalleryModal && (
+        <div className="modal-backdrop">
+          <div className="form-modal">
+            <div className="modal-head">
+              <strong>上传图片</strong>
+              <button onClick={() => setShowGalleryModal(false)}>关闭</button>
+            </div>
+            <div className="create-grid single">
+              <SelectField label="分类" value={draft.category} options={['封面图', '品牌场景图', '客户案例图', 'AI答案截图', '服务流程图']} onChange={(value) => setDraft((current) => ({ ...current, category: value }))} />
+              <SelectField label="正文用途" value={draft.usage} options={['文章封面', '正文中段配图', '案例说明配图', 'FAQ前配图', '发布平台备用图']} onChange={(value) => setDraft((current) => ({ ...current, usage: value }))} />
+              <EditableField label="说明" value={draft.note} onChange={(value) => setDraft((current) => ({ ...current, note: value }))} />
+              <label className="file-field">
+                <span>选择图片</span>
+                <input type="file" accept="image/*" multiple onChange={(event: ChangeEvent<HTMLInputElement>) => setFiles(Array.from(event.target.files ?? []))} />
+              </label>
+            </div>
+            <div className="modal-actions">
+              <button className="ghost-button" onClick={() => setShowGalleryModal(false)}>取消</button>
+              <button className="primary-button" disabled={uploading} onClick={uploadImages}>{uploading ? '上传中' : '保存图片'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </section>
+  )
+}
+
 function Tasks({
   notify,
   navigate,
@@ -2617,7 +2547,8 @@ function Tasks({
   const [keywordLibraryRows] = useStoredState<string[][]>('geo.keywordLibraryRows', [])
   const [questionRows] = useStoredState<string[][]>('geo.questionRows', [])
   const [knowledgeRows] = useStoredState<string[][]>('geo.knowledgeRows', [])
-  const [galleryRows] = useStoredState<string[][]>('geo.galleryRows', [])
+  const [sceneRows] = useStoredState<string[][]>('geo.industrySceneRows', [])
+  const [candidateRows] = useStoredState<string[][]>('geo.rankingCandidateRows', [])
   const [draft, setDraft] = useState({
     name: '',
     project: '',
@@ -2626,13 +2557,56 @@ function Tasks({
     keywordPack: '',
     limit: '10篇',
     knowledge: '',
-    gallery: '',
-    imageCount: '2张',
+    articleType: '榜单推荐',
+    industryScene: '',
+    userQuestions: '',
+    providerList: '',
+    mainReason: '',
+    unfitScenario: '',
+    selectedPains: '',
+    selectedDimensions: '',
+    selectedCandidates: '',
+    titlePreference: '',
+    forbiddenContent: '不写联系方式、虚构客户、绝对化承诺',
   })
   const updateDraft = (key: keyof typeof draft, value: string) => {
     setDraft((current) => ({ ...current, [key]: value }))
   }
+  const toggleArticleType = (type: string) => {
+    setDraft((current) => {
+      const selected = parseArticleTypes(current.articleType)
+      const next = selected.includes(type)
+        ? selected.filter((item) => item !== type)
+        : [...selected, type]
+      return { ...current, articleType: (next.length ? next : ['榜单推荐']).join('、') }
+    })
+  }
   const activeProject = projectRows.find((project) => project.name === activeBrand) ?? projectRows[0] ?? createEmptyProject(activeBrand)
+  const projectSceneRows = sceneRows.filter((row) => row[0] === activeBrand)
+  const selectedSceneRow = projectSceneRows.find((row) => row[1] === draft.industryScene) ?? projectSceneRows[0]
+  const activeSceneName = draft.industryScene || selectedSceneRow?.[1] || activeProject.industry || ''
+  const sceneDefaults = deriveSceneDefaults(activeSceneName || activeProject.industry)
+  const sceneOptions = projectSceneRows.length ? projectSceneRows.map((row) => row[1]) : [activeSceneName || `${activeProject.city || '西安'}本地企业`]
+  const painOptions = splitInputList(selectedSceneRow?.[2] || joinInputList(sceneDefaults.pains))
+  const dimensionOptions = splitInputList(selectedSceneRow?.[3] || joinInputList(sceneDefaults.dimensions))
+  const sceneFaqOptions = splitInputList(selectedSceneRow?.[4] || joinInputList(sceneDefaults.faqs))
+  const pitfallOptions = splitInputList(selectedSceneRow?.[5] || joinInputList(sceneDefaults.pitfalls))
+  const selectedPainItems = splitInputList(draft.selectedPains).length ? splitInputList(draft.selectedPains) : painOptions.slice(0, 5)
+  const selectedDimensionItems = splitInputList(draft.selectedDimensions).length ? splitInputList(draft.selectedDimensions) : dimensionOptions.slice(0, 6)
+  const projectCandidateRows = candidateRows.filter((row) => row[0] === activeBrand)
+  const selectedCandidateNames = splitInputList(draft.selectedCandidates).length
+    ? splitInputList(draft.selectedCandidates)
+    : projectCandidateRows.slice(0, 5).map((row) => row[1])
+  const selectedCandidateLines = projectCandidateRows
+    .filter((row) => selectedCandidateNames.includes(row[1]))
+    .map((row) => `${row[1]}：${row[2]}；适合${row[3]}；优势${row[4]}；核验${row[5]}`)
+  const toggleDraftListItem = (key: 'selectedPains' | 'selectedDimensions' | 'selectedCandidates', item: string) => {
+    setDraft((current) => {
+      const selected = splitInputList(current[key])
+      const next = selected.includes(item) ? selected.filter((value) => value !== item) : [...selected, item]
+      return { ...current, [key]: joinInputList(next) }
+    })
+  }
   const projectCoreRows = keywordRows.filter((row) => row[0] === activeBrand)
   const coreOptions = projectCoreRows.length ? projectCoreRows.map((row) => row[1]) : activeProject.coreKeyword ? [activeProject.coreKeyword] : []
   const selectedCoreKeyword = coreOptions.includes(draft.coreKeyword) ? draft.coreKeyword : coreOptions[0] ?? ''
@@ -2650,27 +2624,23 @@ function Tasks({
   const keywordPackLabel = `${selectedCoreKeyword}关键词库（${projectKeywordLibrary.length}个）`
   const projectKnowledgeRows = knowledgeRows.filter((row) => row[0] === activeBrand)
   const knowledgeOptions = projectKnowledgeRows.length ? projectKnowledgeRows.map((row) => row[1]) : []
-  const projectGalleryRows = galleryRows.filter((row) => row[0] === activeBrand)
-  const projectGalleryImageCount = projectGalleryRows.reduce((total, row) => total + (Number.parseInt(row[2], 10) || 0), 0)
-  const galleryOptions = projectGalleryRows.map((row) => row[1])
-  const selectedGallery = galleryOptions.includes(draft.gallery) ? draft.gallery : galleryOptions[0] ?? ''
   const selectedWorkflowPacket = buildWorkflowPacket(activeProject)
   const workflowPacket = {
     ...selectedWorkflowPacket,
     coreKeyword: selectedCoreKeyword,
     keywords: Array.from(new Set([selectedCoreKeyword, ...normalizeKeywordLibraryWords(projectKeywordLibrary.map((row) => row[2]))])),
     questions: Array.from(new Set(questionOptions)),
-    galleries: Array.from(new Set([selectedGallery, ...selectedWorkflowPacket.galleries])).filter((item) => item && item !== '待补图库'),
+    galleries: [],
   }
   const missingTaskItems = [
     !activeBrand || !activeProject.name ? '企业品牌' : '',
     !selectedCoreKeyword ? '核心词' : '',
+    !activeSceneName ? '行业场景' : '',
     !questionOptions.length ? '蒸馏词' : '',
     !projectKeywordLibrary.length ? '关键词库' : '',
     !projectKnowledgeRows.length ? '品牌知识库' : '',
-    !projectGalleryRows.length ? '品牌图库' : '',
-    projectGalleryRows.length && projectGalleryImageCount < 2 ? '至少2张图片' : '',
   ].filter(Boolean)
+  const currentTaskRows = rows.filter((row) => row.project === activeBrand)
   const plans = buildArticlePlans(activeProject, workflowPacket).map((plan) => ({
     ...plan,
     status: confirmedPlans.includes(plan.title) ? '已确认' : plan.status,
@@ -2689,10 +2659,6 @@ function Tasks({
       notify('请先添加品牌资产和权威引证。')
       return
     }
-    if (projectGalleryImageCount < 2) {
-      notify('品牌图库至少需要2张图片，才能创建生成任务。')
-      return
-    }
     const keywordCount = keywordLibraryRows
       .filter((row) => row[0] === activeBrand && row[1] === firstCore)
       .map((row) => normalizeKeywordLibraryWords([row[2]])[0] ?? row[2])
@@ -2706,9 +2672,18 @@ function Tasks({
       trainingWord: '',
       keywordPack: `${firstCore}关键词库（${keywordCount}个）`,
       knowledge: knowledgeOptions[0] ?? '',
-      gallery: galleryOptions[0],
-      imageCount: '2张',
       limit: '10篇',
+      articleType: '榜单推荐',
+      industryScene: selectedSceneRow?.[1] || activeProject.industry || '',
+      userQuestions: questionOptions.slice(0, 8).join('\n'),
+      providerList: selectedCandidateLines.join('\n'),
+      mainReason: '',
+      unfitScenario: '',
+      selectedPains: joinInputList(painOptions.slice(0, 5)),
+      selectedDimensions: joinInputList(dimensionOptions.slice(0, 6)),
+      selectedCandidates: joinInputList(projectCandidateRows.slice(0, 5).map((row) => row[1])),
+      titlePreference: '',
+      forbiddenContent: '不写联系方式、虚构客户、绝对化承诺',
     }))
     setShowTaskModal(true)
   }
@@ -2719,14 +2694,6 @@ function Tasks({
     }
     if (!projectKnowledgeRows.length) {
       notify(`请先补齐：${missingTaskItems.join('、') || '品牌知识库'}。`)
-      return
-    }
-    if (!projectGalleryRows.length) {
-      notify(`请先补齐：${missingTaskItems.join('、') || '品牌图库'}。`)
-      return
-    }
-    if (projectGalleryImageCount < 2) {
-      notify(`请先补齐：${missingTaskItems.join('、') || '至少2张图片'}。`)
       return
     }
     if (!draft.name.trim()) {
@@ -2741,12 +2708,23 @@ function Tasks({
         limit: draft.limit.replace('篇', ''),
         created: '0',
         knowledge: draft.knowledge,
-        detail: `${selectedCoreKeyword} / ${keywordPackLabel} / ${draft.gallery} / ${draft.imageCount}`,
+        detail: `${selectedCoreKeyword} / ${draft.articleType} / ${draft.industryScene || activeProject.industry || '行业场景'} / ${draft.knowledge || knowledgeOptions[0] || '品牌知识库'}`,
         error: '-',
         status: '待生成',
         latest: '待生成',
         time: `${localDate()} 现在`,
         batchId: '',
+        articleType: draft.articleType,
+        industryScene: draft.industryScene,
+        userQuestions: draft.userQuestions,
+        providerList: draft.providerList,
+        mainReason: draft.mainReason,
+        unfitScenario: draft.unfitScenario,
+        selectedPains: draft.selectedPains || joinInputList(selectedPainItems),
+        selectedDimensions: draft.selectedDimensions || joinInputList(selectedDimensionItems),
+        selectedCandidates: draft.selectedCandidates || joinInputList(selectedCandidateNames),
+        titlePreference: draft.titlePreference,
+        forbiddenContent: draft.forbiddenContent,
       },
       ...current.filter((row) => row.name !== draft.name),
     ])
@@ -2759,7 +2737,15 @@ function Tasks({
     const activeTask = rows.find((row) => row.project === activeBrand)
     const requestedCount = Number.parseInt(activeTask?.limit ?? draft.limit, 10) || 10
     const generateCount = Math.min(Math.max(requestedCount, 1), 100)
-    const packet = workflowPacket
+    const packet = {
+      ...workflowPacket,
+      industryScene: draft.industryScene || activeSceneName,
+      userQuestions: draft.userQuestions || questionOptions.slice(0, 8).join('\n'),
+      providerList: draft.providerList || selectedCandidateLines.join('\n'),
+      industryPains: selectedPainItems,
+      selectionDimensions: selectedDimensionItems,
+      questions: Array.from(new Set([...workflowPacket.questions, ...sceneFaqOptions, ...pitfallOptions])),
+    }
     const batchId = `${activeBrand}-${Date.now()}`
     const taskName = activeTask?.name || draft.name
     setActiveBatchId(batchId)
@@ -2780,7 +2766,21 @@ function Tasks({
           : row,
       ),
     )
-    const queuePlans = plans.slice(0, generateCount)
+    const selectedArticleTypes = parseArticleTypes(activeTask?.articleType || draft.articleType || '榜单推荐')
+    const queuePlans = plans.slice(0, generateCount).map((plan, index) => {
+      const selectedType = selectedArticleTypes[index % selectedArticleTypes.length] || '榜单推荐'
+      return {
+        ...plan,
+        articleType: selectedType,
+        direction: selectedType,
+        industryScene: draft.industryScene || activeSceneName,
+        userQuestions: draft.userQuestions || questionOptions.slice(0, 8).join('\n'),
+        providerList: draft.providerList || selectedCandidateLines.join('\n'),
+        selectedPains: joinInputList(selectedPainItems),
+        selectedDimensions: joinInputList(selectedDimensionItems),
+        selectedCandidates: joinInputList(selectedCandidateNames),
+      }
+    })
     const generatedSlots: Article[] = new Array(generateCount)
     let cursor = 0
     let completed = 0
@@ -2815,8 +2815,7 @@ function Tasks({
           project: activeProject.name,
           brand: activeProject.recommendWord,
           keyword: selectedCoreKeyword,
-          status: '审核中' as const,
-          imageSlots: article.imageSlots || 2,
+          status: '已生成' as const,
           batchId,
           taskName,
           generationSource: 'API成稿' as const,
@@ -2834,10 +2833,9 @@ function Tasks({
             : getArticleAuditFailures(candidate).map(([name]) => name)
         return {
           ...candidate,
-          score: 88,
-          status: '待重写' as const,
-          generationSource: 'API未达标' as const,
-          duplicateNote: failures.length ? `接口原文未达标：${failures.join('、')}` : '接口原文未通过系统审核。',
+          status: article.apiIssues?.length || modelReturnedShortcut ? '生成异常' as const : '已生成' as const,
+          generationSource: article.generationSource ?? 'API资料调用自由写作',
+          duplicateNote: failures.length ? `接口提示：${failures.join('、')}` : '',
         }
       } catch (error) {
         return makeApiFailedArticle({
@@ -2879,18 +2877,18 @@ function Tasks({
       const concurrency = 1
       await Promise.all(Array.from({ length: concurrency }, worker))
       generatedArticles = generatedSlots
-      notify(`${activeProject.brand}已按接口单篇队列生成${generatedArticles.length}篇，其中API达标${modelPassed}篇，未达标稿件进入失败列表。`)
+      notify(`${activeProject.brand}已按接口单篇队列生成${generatedArticles.length}篇，可在成品文章库查看。`)
     } finally {
       setIsGenerating(false)
     }
-    generatedArticles = applyBatchSimilarityGate(generatedArticles)
+    generatedArticles = generatedArticles.map((article) => ({ ...article, duplicateNote: '' }))
     const duplicateFailedCount = generatedArticles.filter((article) => article.duplicateNote).length
     setArticleRows((current) => [
       ...generatedArticles,
       ...current.filter((article) => {
         const sameBrand = article.project === activeProject.name
         const generatedAgain = generatedArticles.some((generated) => generated.title === article.title)
-        const staleDraft = sameBrand && article.status !== '已通过'
+        const staleDraft = sameBrand && article.status !== '已生成'
         return !generatedAgain && !staleDraft
       }),
     ])
@@ -2900,20 +2898,16 @@ function Tasks({
           ? {
               ...row,
               created: String(generateCount),
-              status: generatedArticles.some((article) => article.status === '待重写') ? '审核中' : '待审核',
+              status: '已生成',
               latest: generatedArticles[0].id,
-              detail: `${generateCount}篇已通过接口返回，进入审核`,
+              detail: `${generateCount}篇已由接口返回，进入成品文章库`,
               batchId,
-              error: duplicateFailedCount
-                ? `${duplicateFailedCount}篇重复度超30%待重写`
-                : generatedArticles.some((article) => article.score < 90)
-                  ? '1篇低于90分待重写'
-                  : '-',
+              error: duplicateFailedCount ? `${duplicateFailedCount}篇需人工复盘标题或相似度` : '-',
             }
           : row,
       ),
     )
-    navigate('audit')
+    navigate('library')
   }
   const startSystemJob = async (taskOverride?: TaskRow) => {
     if (isGenerating) return
@@ -2921,12 +2915,8 @@ function Tasks({
       notify(`请先补齐：${missingTaskItems.join('、') || '品牌生成资料'}。`)
       return
     }
-    if (!projectKnowledgeRows.length || !projectGalleryRows.length) {
-      notify(`请先补齐：${missingTaskItems.join('、') || '品牌知识库和品牌图库'}。`)
-      return
-    }
-    if (projectGalleryImageCount < 2) {
-      notify(`请先补齐：${missingTaskItems.join('、') || '至少2张图片'}。`)
+    if (!projectKnowledgeRows.length) {
+      notify(`请先补齐：${missingTaskItems.join('、') || '品牌知识库'}。`)
       return
     }
     const activeTask = taskOverride ?? rows.find((row) => row.project === activeBrand)
@@ -2938,16 +2928,64 @@ function Tasks({
       limit: draft.limit.replace('篇', '') || '2',
       created: '0',
       knowledge: draft.knowledge || knowledgeOptions[0] || '',
-      detail: `${selectedCoreKeyword} / ${keywordPackLabel} / ${selectedGallery} / ${draft.imageCount}`,
+      detail: `${selectedCoreKeyword} / ${questionPoolLabel} / ${keywordPackLabel} / ${draft.knowledge || knowledgeOptions[0] || '品牌知识库'}`,
       error: '-',
       status: '待生成',
       latest: '待生成',
       time: `${localDate()} 现在`,
       batchId: '',
+      articleType: draft.articleType,
+      industryScene: draft.industryScene || activeProject.industry || '',
+      userQuestions: draft.userQuestions || questionOptions.slice(0, 8).join('\n'),
+      providerList: draft.providerList,
+      mainReason: draft.mainReason,
+      unfitScenario: draft.unfitScenario,
+      selectedPains: draft.selectedPains || joinInputList(selectedPainItems),
+      selectedDimensions: draft.selectedDimensions || joinInputList(selectedDimensionItems),
+      selectedCandidates: draft.selectedCandidates || joinInputList(selectedCandidateNames),
+      titlePreference: draft.titlePreference,
+      forbiddenContent: draft.forbiddenContent,
     }
     const requestedCount = Number.parseInt(taskForRun.limit, 10) || 10
     const generateCount = Math.min(Math.max(requestedCount, 1), 100)
-    const queuePlans = plans.slice(0, generateCount)
+    const taskInputs = {
+      articleType: taskForRun.articleType || draft.articleType || '榜单推荐',
+      industryScene: taskForRun.industryScene || draft.industryScene || activeProject.industry || '',
+      userQuestions: taskForRun.userQuestions || draft.userQuestions || questionOptions.slice(0, 8).join('\n'),
+      providerList: taskForRun.providerList || draft.providerList || '',
+      mainReason: taskForRun.mainReason || draft.mainReason || '',
+      unfitScenario: taskForRun.unfitScenario || draft.unfitScenario || '',
+      selectedPains: taskForRun.selectedPains || draft.selectedPains || joinInputList(selectedPainItems),
+      selectedDimensions: taskForRun.selectedDimensions || draft.selectedDimensions || joinInputList(selectedDimensionItems),
+      selectedCandidates: taskForRun.selectedCandidates || draft.selectedCandidates || joinInputList(selectedCandidateNames),
+      titlePreference: taskForRun.titlePreference || draft.titlePreference || '',
+      forbiddenContent: taskForRun.forbiddenContent || draft.forbiddenContent || '',
+    }
+    const packetForRun = {
+      ...workflowPacket,
+      ...taskInputs,
+      industryScene: taskInputs.industryScene,
+      userQuestions: taskInputs.userQuestions,
+      questions: Array.from(new Set([
+        ...workflowPacket.questions,
+        ...taskInputs.userQuestions.split(/\r?\n|[；;]/).map((item) => item.trim()).filter(Boolean),
+        ...sceneFaqOptions,
+        ...pitfallOptions,
+      ])),
+      industryPains: splitInputList(taskInputs.selectedPains),
+      selectionDimensions: splitInputList(taskInputs.selectedDimensions),
+      providerList: taskInputs.providerList || selectedCandidateLines.join('\n'),
+    }
+    const selectedArticleTypes = parseArticleTypes(taskInputs.articleType)
+    const queuePlans = plans.slice(0, generateCount).map((plan, index) => ({
+      ...plan,
+      ...taskInputs,
+      articleType: selectedArticleTypes[index % selectedArticleTypes.length] || '榜单推荐',
+      direction: selectedArticleTypes[index % selectedArticleTypes.length] || plan.direction,
+      angle: taskInputs.industryScene || plan.angle,
+      lockTitle: false,
+      planIndex: index + 1,
+    }))
     const batchId = `${activeBrand}-${Date.now()}`
     setActiveBatchId(batchId)
     setIsGenerating(true)
@@ -2972,7 +3010,7 @@ function Tasks({
     try {
       const started = await apiJson<{ ok: boolean; job: ArticleJobStatus }>('/api/jobs/start', {
         project: activeProject,
-        packet: workflowPacket,
+        packet: packetForRun,
         plans: queuePlans,
         count: generateCount,
         task: taskForRun,
@@ -2996,12 +3034,11 @@ function Tasks({
           project: activeProject.name,
           brand: activeProject.recommendWord,
           keyword: selectedCoreKeyword,
-          status: article.apiIssues?.length ? '待重写' as const : '审核中' as const,
-          imageSlots: article.imageSlots || 2,
+          status: article.apiIssues?.length ? '生成异常' as const : '已生成' as const,
           batchId,
           taskName,
-          generationSource: article.apiIssues?.length ? 'API未达标' as const : article.generationSource ?? 'API成稿' as const,
-          duplicateNote: article.apiIssues?.length ? `接口原文未达标：${article.apiIssues.join('、')}` : article.duplicateNote,
+          generationSource: article.apiIssues?.length ? 'API资料调用未返回' as const : article.generationSource ?? 'API资料调用自由写作' as const,
+          duplicateNote: article.apiIssues?.length ? `接口未返回正文：${article.apiIssues.join('、')}` : article.duplicateNote,
         }))
         if (syncedArticles.length) {
           setArticleRows((current) => [
@@ -3009,25 +3046,29 @@ function Tasks({
             ...current.filter((article) => !syncedArticles.some((synced) => synced.id === article.id)),
           ])
         }
+        const effectiveCompleted = Math.max(latestJob.completed, Math.min(syncedArticles.length, latestJob.total))
+        const effectiveDone = latestJob.status === 'done' || syncedArticles.length >= generateCount
         setRows((current) =>
           current.map((row) =>
             row.project === activeBrand && row.name === taskName
               ? {
                   ...row,
-                  created: String(latestJob.completed),
+                  created: String(effectiveCompleted),
                   latest: syncedArticles[0]?.id || '后台任务',
-                  detail: `${latestLog}（${latestJob.completed}/${latestJob.total}）`,
-                  error: latestJob.error || (latestJob.failed ? `${latestJob.failed}篇待重写` : '-'),
-                  status: latestJob.status === 'done' ? '待审核' : latestJob.status === 'failed' ? '待生成' : '生成中',
+                  detail: effectiveDone
+                    ? `任务完成：生成${latestJob.passed}篇，接口无正文${latestJob.failed}篇`
+                    : `${latestLog}（${effectiveCompleted}/${latestJob.total}）`,
+                  error: latestJob.error || (latestJob.failed ? `${latestJob.failed}篇接口无正文` : '-'),
+                  status: effectiveDone ? '已生成' : latestJob.status === 'failed' ? '待生成' : '生成中',
                   batchId,
                 }
               : row,
           ),
         )
-        if (latestJob.status === 'done' || latestJob.status === 'failed') break
+        if (effectiveDone || latestJob.status === 'failed') break
       }
-      notify(`后台任务结束：完成${latestJob.completed}篇，通过${latestJob.passed}篇，待重写${latestJob.failed}篇。`)
-      navigate('audit')
+      notify(`后台任务结束：完成${latestJob.completed}篇，生成${latestJob.passed}篇，接口无正文${latestJob.failed}篇。`)
+      navigate('library')
     } catch (error) {
       notify(error instanceof Error ? error.message : '后台任务启动失败。')
       setRows((current) =>
@@ -3051,7 +3092,7 @@ function Tasks({
     setArticleRows((current) =>
       current.filter((article) => {
         const sameTask = article.project === activeBrand && (article.taskName === name || (target?.batchId && article.batchId === target.batchId))
-        return !(sameTask && article.status !== '已通过')
+        return !sameTask
       }),
     )
     notify(`${name}已删除。`)
@@ -3077,8 +3118,8 @@ function Tasks({
     <section className="operation-page">
       <div className="operation-toolbar">
         <div>
-          <strong>生成任务</strong>
-          <span>一个品牌创建一条生成任务，系统按单篇新闻稿逐篇生成和审核。</span>
+          <strong>文章生成</strong>
+          <span>一个品牌创建一条编辑稿单，系统按单篇逐篇调用资料生成文章。</span>
         </div>
         <div className="toolbar-actions">
           <select className="search-input" value={activeBrand} onChange={(event) => {
@@ -3094,32 +3135,32 @@ function Tasks({
       </div>
 
       <div className="panel">
-        <SectionTitle icon={ListChecks} title="任务列表" desc="一个任务就是一个品牌的一批文章；点开始生成，完成后在品牌文章系统里查看结果。" />
+        <SectionTitle icon={ListChecks} title="生成稿单列表" desc="一个稿单就是一个品牌的一批文章；点开始生成，完成后进入成品文章库。" />
         <div className={missingTaskItems.length ? 'workflow-warning' : 'workflow-ready'}>
           {missingTaskItems.length
             ? `当前品牌还缺：${missingTaskItems.join('、')}。补齐后才能创建和启动生成任务。`
-            : `当前品牌资料已就绪：${questionPoolLabel}，${keywordPackLabel}，图库${projectGalleryImageCount}张，可启动单篇队列生成。`}
+            : `当前品牌资料已就绪：${questionPoolLabel}，${keywordPackLabel}，${projectKnowledgeRows.length}个知识库，可启动单篇队列生成。`}
         </div>
         <div className="ops-scroll">
           <div className="ops-table task-table mature-task-table">
             <div className="ops-head">
-              <span>任务名</span><span>蒸馏词</span><span>生成篇数</span><span>已生成</span><span>调用资料</span><span>状态</span><span>创建时间</span><span>操作</span>
+              <span>任务名</span><span>文章类型</span><span>生成篇数</span><span>已生成</span><span>稿单资料</span><span>状态</span><span>创建时间</span><span>操作</span>
             </div>
-            {rows.filter((row) => row.project === activeBrand).map((row) => (
+            {currentTaskRows.map((row) => (
               <div className="ops-row" key={row.name}>
                 <strong>{row.name}</strong>
-                <span>{row.question}</span>
+                <span>{row.articleType || '榜单推荐'}</span>
                 <span>{row.limit}</span>
                 <span>{row.created}</span>
                 <span>{row.knowledge}</span>
-                <span className="pill">{row.status}</span>
+                <span className="pill">{displayTaskStatus(row.status)}</span>
                 <span>{row.time}</span>
                 <span className="row-actions">
                   <button onClick={() => {
                     if (row.batchId) setActiveBatchId(row.batchId)
-                    navigate('audit')
+                    navigate('library')
                   }}>查看结果</button>
-                  {(row.status !== '生成中' || !activeJob) && <button onClick={() => startSystemJob(row)}>{row.status === '生成中' ? '重新开始' : '开始'}</button>}
+                  {(displayTaskStatus(row.status) !== '生成中' || !activeJob) && <button onClick={() => startSystemJob(row)}>{displayTaskStatus(row.status) === '生成中' ? '重新开始' : '开始'}</button>}
                   {row.status === '生成中' && activeJob && <button onClick={() => stopTask(row.name)}>终止任务</button>}
                   <button className="danger-button" onClick={() => deleteTask(row.name)}>删除</button>
                 </span>
@@ -3127,18 +3168,25 @@ function Tasks({
             ))}
           </div>
         </div>
-        <p className="table-note">当前品牌：{activeBrand}。每条任务独立启动，多个接口可并发调用，但每篇文章仍按单篇隔离生成和审核。</p>
+        {!currentTaskRows.length && (
+          <div className="empty-state">
+            <strong>当前品牌还没有生成任务</strong>
+            <span>先确认核心词、关键词库和品牌知识库，再创建一条编辑稿单开始生成。</span>
+            <button className="primary-button" onClick={prepareTaskDraft}>创建生成任务</button>
+          </div>
+        )}
+        <p className="table-note">当前品牌：{activeBrand}。每条任务独立启动，每篇文章按单篇隔离调用资料生成。</p>
       </div>
 
       {activeJob && (
         <div className="panel">
-          <SectionTitle icon={Gauge} title="生成进度" desc="系统按单篇队列生成，完成后进入文章审核。" />
+          <SectionTitle icon={Gauge} title="生成进度" desc="系统按单篇队列生成，完成后进入成品文章库。" />
           <div className="job-status-strip">
             <span>任务ID：{activeJob.id}</span>
             <span>状态：{activeJob.status}</span>
             <span>进度：{activeJob.completed}/{activeJob.total}</span>
-            <span>通过：{activeJob.passed}</span>
-            <span>待重写：{activeJob.failed}</span>
+            <span>已生成：{activeJob.passed}</span>
+            <span>接口无正文：{activeJob.failed}</span>
           </div>
           <div className="job-log-list">
             {activeJob.logs.slice(-12).map((log, index) => (
@@ -3169,14 +3217,111 @@ function Tasks({
                 updateDraft('trainingWord', nextQuestion)
                 updateDraft('keywordPack', `${value}关键词库（${nextKeywordCount}个）`)
               }} />
+              <SelectField label="行业场景" value={activeSceneName} options={sceneOptions} onChange={(value) => {
+                const sceneRow = projectSceneRows.find((row) => row[1] === value)
+                const defaults = deriveSceneDefaults(value)
+                updateDraft('industryScene', value)
+                updateDraft('selectedPains', sceneRow?.[2] || joinInputList(defaults.pains.slice(0, 5)))
+                updateDraft('selectedDimensions', sceneRow?.[3] || joinInputList(defaults.dimensions.slice(0, 6)))
+              }} />
               <Field label="蒸馏词总数" value={questionPoolLabel} />
               <Field label="关键词库总数" value={keywordPackOptions[0] || keywordPackLabel} />
               <SelectField label="品牌知识库" value={draft.knowledge} options={knowledgeOptions} onChange={(value) => updateDraft('knowledge', value)} />
-              <SelectField label="品牌图库" value={selectedGallery} options={galleryOptions} onChange={(value) => updateDraft('gallery', value)} />
-              <SelectField label="文章配图" value={draft.imageCount} options={['2张', '3张', '4张']} onChange={(value) => updateDraft('imageCount', value)} />
               <SelectField label="生成篇数" value={draft.limit} options={['1篇', '2篇', '5篇', '10篇', '20篇', '50篇', '100篇']} onChange={(value) => updateDraft('limit', value)} />
             </div>
-            <p className="table-note">标题规则、新闻写法、豆包审核和单篇差异化由系统默认执行；这里只选择当前品牌已有资料和生成数量。</p>
+            <div className="type-selector">
+              <div>
+                <strong>客户痛点</strong>
+                <span>多选，文章会围绕这些真实场景展开，不再泛泛写GEO行业。</span>
+              </div>
+              <div className="type-chip-grid">
+                {painOptions.map((pain) => (
+                  <button
+                    type="button"
+                    className={selectedPainItems.includes(pain) ? 'type-chip active' : 'type-chip'}
+                    key={pain}
+                    onClick={() => toggleDraftListItem('selectedPains', pain)}
+                  >
+                    {pain}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="type-selector">
+              <div>
+                <strong>选型维度</strong>
+                <span>多选，作为榜单成立和服务商推荐的比较口径。</span>
+              </div>
+              <div className="type-chip-grid">
+                {dimensionOptions.map((dimension) => (
+                  <button
+                    type="button"
+                    className={selectedDimensionItems.includes(dimension) ? 'type-chip active' : 'type-chip'}
+                    key={dimension}
+                    onClick={() => toggleDraftListItem('selectedDimensions', dimension)}
+                  >
+                    {dimension}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="type-selector">
+              <div>
+                <strong>榜单候选</strong>
+                <span>多选，榜单、测评、口碑和对比文章会调用这些候选对象。</span>
+              </div>
+              <div className="type-chip-grid">
+                {projectCandidateRows.length ? projectCandidateRows.map((row) => (
+                  <button
+                    type="button"
+                    className={selectedCandidateNames.includes(row[1]) ? 'type-chip active' : 'type-chip'}
+                    key={row[1]}
+                    onClick={() => {
+                      toggleDraftListItem('selectedCandidates', row[1])
+                      const nextSelected = selectedCandidateNames.includes(row[1])
+                        ? selectedCandidateNames.filter((name) => name !== row[1])
+                        : [...selectedCandidateNames, row[1]]
+                      const nextLines = projectCandidateRows
+                        .filter((candidate) => nextSelected.includes(candidate[1]))
+                        .map((candidate) => `${candidate[1]}：${candidate[2]}；适合${candidate[3]}；优势${candidate[4]}；核验${candidate[5]}`)
+                      updateDraft('providerList', nextLines.join('\n'))
+                    }}
+                  >
+                    {row[1]}
+                  </button>
+                )) : <button type="button" className="type-chip" onClick={() => navigate('candidates')}>去添加候选</button>}
+              </div>
+            </div>
+            <div className="type-selector">
+              <div>
+                <strong>文章类型</strong>
+                <span>可多选，系统按单篇轮换；行业只作为痛点场景，主线仍然是GEO公司/服务商选型。</span>
+              </div>
+              <div className="type-chip-grid">
+                {articleTypeOptions.map((type) => (
+                  <button
+                    type="button"
+                    className={parseArticleTypes(draft.articleType).includes(type) ? 'type-chip active' : 'type-chip'}
+                    key={type}
+                    onClick={() => toggleArticleType(type)}
+                  >
+                    {type}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="task-material-preview">
+              <strong>本次调用内容</strong>
+              <span>行业场景：{draft.industryScene || activeProject.industry || '随品牌资料带出'}</span>
+              <span>核心词：{selectedCoreKeyword}</span>
+              <span>客户痛点：{selectedPainItems.length} 个</span>
+              <span>选型维度：{selectedDimensionItems.length} 个</span>
+              <span>榜单候选：{selectedCandidateNames.length} 个</span>
+              <span>蒸馏词：{questionOptions.length} 个</span>
+              <span>关键词库：{projectKeywordLibrary.length} 个</span>
+              <span>知识库：{draft.knowledge || knowledgeOptions[0] || '待选择'}</span>
+            </div>
+            <p className="table-note">生成任务只选择已有资料。用户问题、关键词库、品牌资料和权威引证由系统自动组装进API稿单。</p>
             <div className={missingTaskItems.length ? 'workflow-warning' : 'workflow-ready'}>
               {missingTaskItems.length
                 ? `当前还不能生成，缺少：${missingTaskItems.join('、')}。`
@@ -3199,56 +3344,41 @@ function Audit({ notify, navigate, articleRows, setArticleRows, activeBrand, act
   const visibleArticles = articleRows.filter((article) => {
     if (article.project !== activeBrand) return false
     if (activeBatchId && article.batchId !== activeBatchId) return false
-    if (statusFilter === '待审核') return article.status === '审核中'
-    if (statusFilter === '失败列表') return article.status === '待重写'
-    if (statusFilter === '通过列表') return article.status === '已通过'
+    if (statusFilter === '已生成') return article.status === '已生成'
+    if (statusFilter === '生成异常') return article.status === '生成异常'
     return true
   })
   const currentArticle = visibleArticles.find((article) => article.id === selectedArticle) ?? visibleArticles[0]
   const approveArticle = () => {
     if (!currentArticle) return
-    const failures = getArticleAuditFailures(currentArticle)
-    if (failures.length) {
-      setArticleRows((current) =>
-        current.map((article) =>
-          article.id === currentArticle.id ? { ...article, score: Math.min(article.score, 89), status: '待重写' } : article,
-        ),
-      )
-      setSelectedArticle('')
-      notify(`${currentArticle.title}未通过：${failures.map(([name]) => name).join('、')}，已退回当前篇重写。`)
-      return
-    }
     setArticleRows((current) =>
       current.map((article) =>
-        article.id === currentArticle.id ? { ...article, score: getAuditedArticleScore(article), status: '已通过' } : article,
+        article.id === currentArticle.id ? { ...article, status: '已生成' } : article,
       ),
     )
     setSelectedArticle('')
-    notify(`${currentArticle.title}已通过审核并进入成品文章库。`)
+    notify(`${currentArticle.title}已进入成品文章库。`)
     navigate('library')
   }
   const rejectArticle = () => {
     if (!currentArticle) return
     setArticleRows((current) =>
       current.map((article) =>
-        article.id === currentArticle.id ? { ...article, score: Math.min(article.score, 89), status: '待重写' } : article,
+        article.id === currentArticle.id ? { ...article, status: '生成异常' } : article,
       ),
     )
     setSelectedArticle('')
-    notify(`${currentArticle.title}已退回当前篇重写。`)
+    notify(`${currentArticle.title}已退回生产层，需重新生成。`)
   }
   const auditBatch = () => {
     setArticleRows((current) =>
       current.map((article) => {
-        if (article.project !== activeBrand || article.status === '已通过') return article
+        if (article.project !== activeBrand) return article
         if (activeBatchId && article.batchId !== activeBatchId) return article
-        const failures = getArticleAuditFailures(article)
-        return failures.length
-          ? { ...article, score: Math.min(article.score, 89), status: '待重写' }
-          : { ...article, score: getAuditedArticleScore(article), status: '已通过' }
+        return article.apiIssues?.length ? { ...article, status: '生成异常' } : { ...article, status: '已生成' }
       }),
     )
-    notify('当前批次已审核：豆包高分全规则通过才入库，其余退回。')
+    notify('旧审核规则已关闭，当前批次文章已按生成状态整理。')
   }
   const deleteArticle = (id: string) => {
     const target = articleRows.find((article) => article.id === id)
@@ -3259,71 +3389,52 @@ function Audit({ notify, navigate, articleRows, setArticleRows, activeBrand, act
     <section className="operation-page">
       <div className="operation-toolbar">
         <div>
-          <strong>文章审核</strong>
-          <span>{activeBatchId ? `只审核当前任务批次：${activeBatchId}` : '审核页只处理待审核、低分退回和通过入库。'}</span>
+          <strong>文章查看</strong>
+          <span>{activeBatchId ? `只查看当前任务批次：${activeBatchId}` : '这里查看系统生成文章。'}</span>
         </div>
         <div className="toolbar-actions">
           <select className="search-input" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
             <option>全部文章</option>
-            <option>待审核</option>
-            <option>失败列表</option>
-            <option>通过列表</option>
+            <option>已生成</option>
+            <option>生成异常</option>
           </select>
-          <button className="primary-button" onClick={auditBatch}>一键审核当前批次</button>
+          <button className="primary-button" onClick={auditBatch}>整理当前批次</button>
         </div>
       </div>
 
       <div className="panel">
-        <SectionTitle icon={Newspaper} title="审核文章列表" desc="列表为主体，点击审核查看评分项；低于90分只退回当前篇。" />
+        <SectionTitle icon={Newspaper} title="文章列表" desc="列表为主体，点击查看完整正文。" />
         <div className="ops-table audit-table">
-          <div className="ops-head"><span>标题</span><span>文章方向</span><span>核心词</span><span>字数</span><span>来源</span><span>评分</span><span>状态</span><span>操作</span></div>
+          <div className="ops-head"><span>标题</span><span>文章方向</span><span>核心词</span><span>字数</span><span>来源</span><span>状态</span><span>操作</span></div>
           {visibleArticles.map((article) => (
             <div className="ops-row" key={article.id}>
               <strong>{article.title}</strong>
               <span>{article.angle}</span>
               <span>{article.keyword}</span>
               <span>{article.words}字</span>
-              <span>{article.generationSource ?? '未记录'}</span>
-              <span className={article.score < 90 ? 'score-bad' : 'score-good'}>{article.score}</span>
-              <span className={article.status === '待重写' ? 'pill danger-pill' : 'pill'}>{article.status}</span>
+              <span>{displayGenerationSource(article.generationSource)}</span>
+              <span className={article.status === '生成异常' ? 'pill danger-pill' : 'pill'}>{article.status}</span>
               <span className="row-actions">
-                <button onClick={() => setSelectedArticle(article.id)}>审核</button>
+                <button onClick={() => setSelectedArticle(article.id)}>查看</button>
                 <button className="danger-button" onClick={() => deleteArticle(article.id)}>删除</button>
               </span>
             </div>
           ))}
         </div>
-        <p className="table-note">审核页只看成品质量：核心词、新闻口吻、推荐企业、资料融入、图片位、FAQ和禁用词。</p>
+        <p className="table-note">旧审核、高分、新闻口吻和固定结构规则已关闭。</p>
       </div>
 
       {selectedArticle && currentArticle && (
         <div className="modal-backdrop">
           <div className="form-modal wide-modal">
             <div className="modal-head">
-              <strong>审核详情</strong>
+              <strong>文章详情</strong>
               <button onClick={() => setSelectedArticle('')}>关闭</button>
             </div>
-            <SectionTitle icon={ShieldCheck} title={currentArticle.title} desc="90分以下自动退回当前篇重写。" />
-          {currentArticle && (
-            <div className="score-hero compact-score">
-              <strong>{currentArticle.score}</strong>
-              <span>{currentArticle.score >= 90 ? '可入库' : '待重写'}</span>
-            </div>
-          )}
-          <div className="audit-check-grid">
-            {getArticleAuditChecks(currentArticle).map(([name, result, detail]) => (
-              <div className="audit-check" key={name}>
-                <div>
-                  <strong>{name}</strong>
-                  <span>{result}</span>
-                </div>
-                <p>{detail}</p>
-              </div>
-            ))}
-          </div>
+            <SectionTitle icon={ShieldCheck} title={currentArticle.title} desc="仅查看系统生成内容。" />
           {Boolean(currentArticle.apiIssues?.length || currentArticle.duplicateNote) && (
             <div className="article-body-preview system-issues">
-              <strong>系统退回原因</strong>
+              <strong>接口提示</strong>
               {currentArticle.duplicateNote && <p>{currentArticle.duplicateNote}</p>}
               {currentArticle.apiIssues?.map((issue) => <p key={issue}>{issue}</p>)}
             </div>
@@ -3335,14 +3446,7 @@ function Audit({ notify, navigate, articleRows, setArticleRows, activeBrand, act
             </div>
           )}
           <div className="audit-actions">
-            <button className="ghost-button" onClick={rejectArticle}>退回重写</button>
-            <button
-              className="primary-button"
-              data-testid="approve-article"
-              onClick={approveArticle}
-            >
-              通过入库
-            </button>
+            <button className="primary-button" onClick={() => setSelectedArticle('')}>完成</button>
           </div>
           </div>
         </div>
@@ -3354,15 +3458,23 @@ function Audit({ notify, navigate, articleRows, setArticleRows, activeBrand, act
 function LibraryPage({ notify, navigate, articleRows, setArticleRows, activeBrand, activeBatchId, setActiveBatchId }: ActionProps & ArticleStateProps & Pick<ActiveBrandProps, 'activeBrand'> & ActiveBatchProps) {
   const [previewId, setPreviewId] = useState('')
   const [selectedArticles, setSelectedArticles] = useState<string[]>([])
+  const [showAllArticles, setShowAllArticles] = useState(false)
+  const [showAllBrands, setShowAllBrands] = useState(false)
   const [storedTaskRows] = useStoredState('geo.taskRows', taskRows)
+  const [galleryRows] = useStoredState<string[][]>('geo.galleryRows', [])
+  const activeBrandHasGeneratedArticles = articleRows.some((article) => article.project === activeBrand && article.status === '已生成')
+  const hasAnyGeneratedArticles = articleRows.some((article) => article.status === '已生成')
+  const effectiveShowAllBrands = showAllBrands || (!activeBrandHasGeneratedArticles && hasAnyGeneratedArticles)
+  const scopedArticles = articleRows.filter((article) => effectiveShowAllBrands || article.project === activeBrand)
   const batches = Array.from(
-    articleRows
-      .filter((article) => article.project === activeBrand && article.batchId)
+    scopedArticles
+      .filter((article) => article.status === '已生成' || article.status === '生成异常')
       .reduce((map, article) => {
-        const id = article.batchId ?? ''
+        const id = article.batchId || `${article.project || activeBrand}-历史成品`
         const current = map.get(id) ?? {
           id,
-          taskName: article.taskName ?? '未命名任务',
+          project: article.project || activeBrand,
+          taskName: article.batchId ? article.taskName ?? '未命名任务' : `${article.project || activeBrand}历史成品`,
           total: 0,
           passed: 0,
           failed: 0,
@@ -3370,20 +3482,30 @@ function LibraryPage({ notify, navigate, articleRows, setArticleRows, activeBran
           fallback: 0,
         }
         current.total += 1
-        if (article.status === '已通过') current.passed += 1
-        if (article.status === '待重写') current.failed += 1
-        if (article.generationSource === 'API成稿' || article.generationSource === 'API补齐成稿' || article.generationSource === 'API分段成稿') current.api += 1
-        if (article.generationSource === 'API未达标') current.fallback += 1
+        if (article.status === '已生成') current.passed += 1
+        if (article.status === '生成异常') current.failed += 1
+        if (article.generationSource === 'API成稿' || article.generationSource === 'API资料调用自由写作') current.api += 1
+        if (article.generationSource === 'API资料调用未返回') current.fallback += 1
         map.set(id, current)
         return map
-      }, new Map<string, { id: string; taskName: string; total: number; passed: number; failed: number; api: number; fallback: number }>())
+      }, new Map<string, { id: string; project: string; taskName: string; total: number; passed: number; failed: number; api: number; fallback: number }>())
       .values(),
-  )
-  const latestBatchId = activeBatchId || batches[0]?.id || ''
+  ).sort((left, right) => Number(right.id.split('-').at(-1) || 0) - Number(left.id.split('-').at(-1) || 0))
+  const defaultBatchId = batches.find((batch) => batch.passed > 0)?.id || batches[0]?.id || ''
+  const activeBatchHasArticles = batches.some((batch) => batch.id === activeBatchId && batch.passed > 0)
+  const latestBatchId = activeBatchHasArticles ? activeBatchId : defaultBatchId
   const previewArticle = articleRows.find((article) => article.id === previewId)
-  const passedArticles = articleRows.filter((item) => item.status === '已通过' && item.project === activeBrand && (!latestBatchId || item.batchId === latestBatchId))
+  const selectedBatch = batches.find((batch) => batch.id === latestBatchId)
+  const articleInSelectedBatch = (article: Article) => {
+    if (showAllArticles || !latestBatchId) return true
+    if (article.batchId) return article.batchId === latestBatchId
+    return latestBatchId.endsWith('-历史成品') && article.project === selectedBatch?.project && !article.batchId
+  }
+  const allBrandPassedArticles = scopedArticles.filter((item) => item.status === '已生成')
+  const passedArticles = allBrandPassedArticles.filter(articleInSelectedBatch)
   const taskForBatch = storedTaskRows.find((row) => row.batchId === latestBatchId)
-  const allCurrentBatchArticles = articleRows.filter((item) => item.project === activeBrand && (!latestBatchId || item.batchId === latestBatchId))
+  const allCurrentBatchArticles = scopedArticles.filter(articleInSelectedBatch)
+  const imageCountForArticle = (article: Article) => galleryRows.filter((row) => row[0] === (article.project || activeBrand)).length
   const toggleSelectedArticle = (id: string) => {
     setSelectedArticles((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]))
   }
@@ -3396,10 +3518,8 @@ function LibraryPage({ notify, navigate, articleRows, setArticleRows, activeBran
       `归属品牌：${article.project ?? activeBrand}`,
       `推荐词：${article.brand ?? ''}`,
       `核心词：${article.keyword}`,
-      `评分：${article.score}`,
       `字数：${article.words}字`,
-      `图片：${article.imageSlots ?? 2}张`,
-      `生成来源：${article.generationSource ?? '未记录'}`,
+      `生成来源：${displayGenerationSource(article.generationSource)}`,
       '',
       article.body || '当前文章暂无完整正文。',
     ].join('\n'))
@@ -3413,21 +3533,22 @@ function LibraryPage({ notify, navigate, articleRows, setArticleRows, activeBran
       const result = await apiJson<{ ok: boolean; downloadUrl: string; filePath: string; count: number }>('/api/articles/export', {
         brand: activeBrand,
         filePrefix,
+        format: 'doc',
         articles: targets,
       })
       const link = document.createElement('a')
       link.href = result.downloadUrl
-      link.download = ''
+      link.download = result.filePath.split(/[\\/]/).pop() || ''
       document.body.appendChild(link)
       link.click()
       link.remove()
       notify(`已导出${result.count}篇文章：${result.filePath}`)
     } catch {
-      const blob = new Blob([buildDownloadContent(targets)], { type: 'text/markdown;charset=utf-8' })
+      const blob = new Blob([buildDownloadContent(targets)], { type: 'application/msword;charset=utf-8' })
       const url = URL.createObjectURL(blob)
       const link = document.createElement('a')
       link.href = url
-      link.download = `${filePrefix.replace(/[\\/:*?"<>|]/g, '')}_${new Date().toISOString().slice(0, 10)}.md`
+      link.download = `${filePrefix.replace(/[\\/:*?"<>|]/g, '')}_${new Date().toISOString().slice(0, 10)}.doc`
       document.body.appendChild(link)
       link.click()
       link.remove()
@@ -3448,40 +3569,61 @@ function LibraryPage({ notify, navigate, articleRows, setArticleRows, activeBran
     downloadArticles(targets, `${activeBrand}_${taskForBatch?.name ?? '当前任务'}_成品文章`)
   }
   const downloadAllArticles = () => {
-    downloadArticles(passedArticles, `${activeBrand}_${taskForBatch?.name ?? '当前任务'}_全部成品文章`)
+    downloadArticles(allBrandPassedArticles, `${effectiveShowAllBrands ? '全部品牌' : activeBrand}_全部成品文章`)
   }
   return (
     <section className="operation-page">
-      <div className="operation-toolbar">
+      <div className="operation-toolbar library-toolbar">
         <div>
           <strong>成品文章库</strong>
-          <span>{latestBatchId ? `当前只显示任务：${taskForBatch?.name ?? latestBatchId}` : '这里只放通过审核的文章，后续可选分发平台。'}</span>
+          <span>{effectiveShowAllBrands ? '当前显示全部品牌成品文章' : showAllArticles ? `当前显示${activeBrand}全部成品文章` : latestBatchId ? `当前显示最新任务：${taskForBatch?.name ?? selectedBatch?.taskName ?? latestBatchId}` : '这里只放已生成文章，后续可选分发平台。'}</span>
         </div>
         <div className="toolbar-actions">
-          <button className="ghost-button" disabled={!passedArticles.length} onClick={toggleAllPassedArticles}>
-            {selectedArticles.length === passedArticles.length && passedArticles.length > 0 ? '取消全选' : '全选文章'}
-          </button>
-          <button className="ghost-button" disabled={!passedArticles.length} onClick={downloadSelectedArticles}>{selectedArticles.length ? '下载选中' : '下载全部'}</button>
-          {selectedArticles.length > 0 && <button className="ghost-button" onClick={downloadAllArticles}>下载全部</button>}
-          <button
-            className="primary-button"
-            data-testid="select-distribution"
-            onClick={() => {
-              notify('已进入分发中心，可选择平台和文章。')
-              navigate('distribution')
-            }}
-          >
-            选择分发
-          </button>
+          <div className="toolbar-group">
+            <button className="ghost-button" disabled={!articleRows.some((article) => article.status === '已生成')} onClick={() => {
+              setShowAllBrands((current) => !current)
+              setShowAllArticles(true)
+              setSelectedArticles([])
+              setPreviewId('')
+            }}>
+              {effectiveShowAllBrands && activeBrandHasGeneratedArticles ? '只看当前品牌' : '全部品牌'}
+            </button>
+            <button className="ghost-button" disabled={!allBrandPassedArticles.length} onClick={() => {
+              setShowAllArticles((current) => !current)
+              setSelectedArticles([])
+              setPreviewId('')
+            }}>
+              {showAllArticles ? '最新任务' : '全部成品'}
+            </button>
+            <button className="ghost-button" disabled={!passedArticles.length} onClick={toggleAllPassedArticles}>
+              {selectedArticles.length === passedArticles.length && passedArticles.length > 0 ? '取消全选' : '全选'}
+            </button>
+          </div>
+          <div className="toolbar-group primary-group">
+            <button className="ghost-button" disabled={!passedArticles.length} onClick={() => notify('图文版会读取图片素材库的封面和正文配图，当前先保持正文不改写。')}>图文编排</button>
+            <button className="ghost-button" disabled={!passedArticles.length} onClick={downloadSelectedArticles}>{selectedArticles.length ? '下载选中Word' : '下载当前Word'}</button>
+            <button className="ghost-button" disabled={!allBrandPassedArticles.length} onClick={downloadAllArticles}>下载全部Word</button>
+            <button
+              className="primary-button"
+              data-testid="select-distribution"
+              onClick={() => {
+                notify('已进入分发中心，可选择平台和文章。')
+                navigate('distribution')
+              }}
+            >
+              选择分发
+            </button>
+          </div>
         </div>
       </div>
       <div className="panel">
-        <SectionTitle icon={ListChecks} title="文章任务列表" desc="一次生成任务对应一批文章，点击后下方只显示该任务文章。" />
+        <SectionTitle icon={ListChecks} title="文章任务列表" desc="一次生成任务对应一批文章；没有批次号的旧成品已归到历史成品，点击即可查看。" />
         <div className="ops-table task-batch-table">
-          <div className="ops-head"><span>任务名</span><span>总数</span><span>通过</span><span>待重写</span><span>API成稿</span><span>API未达标</span><span>操作</span></div>
+          <div className="ops-head"><span>任务名</span><span>品牌</span><span>总数</span><span>已生成</span><span>接口无正文</span><span>API成稿</span><span>API未返回</span><span>操作</span></div>
           {batches.map((batch) => (
             <div className={batch.id === latestBatchId ? 'ops-row active-row' : 'ops-row'} key={batch.id}>
               <strong>{batch.taskName}</strong>
+              <span>{batch.project}</span>
               <span>{batch.total}</span>
               <span>{batch.passed}</span>
               <span>{batch.failed}</span>
@@ -3490,25 +3632,33 @@ function LibraryPage({ notify, navigate, articleRows, setArticleRows, activeBran
               <span className="row-actions">
                 <button onClick={() => {
                   setActiveBatchId(batch.id)
+                  setShowAllArticles(false)
                   setSelectedArticles([])
                   setPreviewId('')
                 }}>查看文章</button>
-                <button onClick={() => downloadArticles(articleRows.filter((article) => article.batchId === batch.id && article.status === '已通过'), `${activeBrand}_${batch.taskName}`)}>下载本批</button>
+                <button onClick={() => downloadArticles(scopedArticles.filter((article) => article.status === '已生成' && (article.batchId ? article.batchId === batch.id : batch.id.endsWith('-历史成品') && article.project === batch.project)), `${batch.project}_${batch.taskName}`)}>下载本批</button>
               </span>
             </div>
           ))}
         </div>
+        {!batches.length && (
+          <div className="empty-state">
+            <strong>还没有文章批次</strong>
+            <span>生成任务完成后，这里会按批次归档，支持查看、下载本批和进入分发。</span>
+            <button className="primary-button" onClick={() => navigate('tasks')}>去生成文章</button>
+          </div>
+        )}
       </div>
       <div className="panel">
-        <SectionTitle icon={Newspaper} title="当前任务文章列表" desc="只显示当前任务里通过审核的成品文章，避免旧文章混入下载。" />
+        <SectionTitle icon={Newspaper} title={showAllArticles ? '全部成品文章列表' : '当前任务文章列表'} desc={showAllArticles ? '显示当前品牌全部已生成文章，可全选或批量下载Word。' : '默认显示最新任务里已生成的文章，避免旧文章混入当前下载。'} />
         <div className="ops-table library-table">
-          <div className="ops-head"><span>选择</span><span>标题</span><span>核心词</span><span>来源</span><span>评分</span><span>图片</span><span>状态</span><span>操作</span></div>
+          <div className="ops-head"><span>选择</span><span>标题</span><span>核心词</span><span>配图</span><span>来源</span><span>字数</span><span>状态</span><span>操作</span></div>
           {passedArticles.map((article) => (
             <div className="ops-row" key={article.id}>
               <label className="row-check">
                 <input type="checkbox" checked={selectedArticles.includes(article.id)} onChange={() => toggleSelectedArticle(article.id)} />
               </label>
-              <strong>{article.title}</strong><span>{article.keyword}</span><span>{article.generationSource ?? '未记录'}</span><span>{article.score}</span><span>{article.imageSlots ?? 2}张</span><span className="pill">可分发</span>
+              <strong>{article.title}</strong><span>{article.keyword}</span><span>{imageCountForArticle(article) ? `${imageCountForArticle(article)}张可用` : '待上传'}</span><span>{displayGenerationSource(article.generationSource)}</span><span>{article.words}字</span><span className="pill">{article.status}</span>
               <span className="row-actions">
                 <button onClick={() => setPreviewId(article.id)}>全文查看</button>
                 <button onClick={() => downloadArticles([article], article.title)}>下载</button>
@@ -3517,7 +3667,14 @@ function LibraryPage({ notify, navigate, articleRows, setArticleRows, activeBran
             </div>
           ))}
         </div>
-        <p className="table-note">当前任务共 {allCurrentBatchArticles.length} 篇，已通过 {passedArticles.length} 篇；不勾选时默认下载当前任务全部通过文章。</p>
+        {!passedArticles.length && (
+          <div className="empty-state">
+            <strong>当前视图没有成品文章</strong>
+            <span>切换到全部成品，或回到AI写作任务重新生成。</span>
+            <button className="primary-button" onClick={() => navigate('tasks')}>回到写作任务</button>
+          </div>
+        )}
+        <p className="table-note">{showAllArticles || showAllBrands ? `当前视图共 ${allCurrentBatchArticles.length} 篇文章，已生成 ${passedArticles.length} 篇。` : `当前任务共 ${allCurrentBatchArticles.length} 篇，已生成 ${passedArticles.length} 篇。`} 不勾选时默认下载当前视图全部已生成文章。</p>
       </div>
       {previewArticle && (
         <div className="modal-backdrop">
@@ -3528,7 +3685,7 @@ function LibraryPage({ notify, navigate, articleRows, setArticleRows, activeBran
             </div>
             <div className="text-area-box article-reader">
               <strong>{previewArticle.title}</strong>
-              <p>核心词：{previewArticle.keyword}；评分：{previewArticle.score}；字数：{previewArticle.words}字；图片：{previewArticle.imageSlots ?? 2}张；来源：{previewArticle.generationSource ?? '未记录'}；状态：可分发。</p>
+              <p>核心词：{previewArticle.keyword}；字数：{previewArticle.words}字；来源：{displayGenerationSource(previewArticle.generationSource)}；状态：{previewArticle.status}。</p>
               {previewArticle.body ? <pre>{previewArticle.body}</pre> : <p>当前文章暂无完整正文。</p>}
             </div>
             <div className="modal-actions">
@@ -3538,6 +3695,81 @@ function LibraryPage({ notify, navigate, articleRows, setArticleRows, activeBran
           </div>
         </div>
       )}
+    </section>
+  )
+}
+
+function GraphicWorkbench({ notify, navigate, articleRows, activeBrand }: ActionProps & { articleRows: Article[] } & Pick<ActiveBrandProps, 'activeBrand'>) {
+  const [selectedArticleId, setSelectedArticleId] = useState('')
+  const [galleryRows] = useStoredState<string[][]>('geo.galleryRows', [])
+  const availableArticles = articleRows.filter((article) => article.project === activeBrand && article.status === '已生成')
+  const currentArticle = availableArticles.find((article) => article.id === selectedArticleId) ?? availableArticles[0]
+  const projectImages = galleryRows.filter((row) => row[0] === activeBrand)
+  const coverImages = projectImages.filter((row) => /封面/.test(row[1] || row[2] || ''))
+  const bodyImages = projectImages.filter((row) => !/封面/.test(row[1] || row[2] || ''))
+  const createGraphicVersion = () => {
+    if (!currentArticle) {
+      notify('请先生成成品文章。')
+      navigate('tasks')
+      return
+    }
+    if (!projectImages.length) {
+      notify('请先上传图库素材，再做图文加工。')
+      navigate('gallery')
+      return
+    }
+    notify(`${currentArticle.title}已生成图文加工预案，可进入分发发布继续处理。`)
+    navigate('distribution')
+  }
+  return (
+    <section className="operation-page">
+      <div className="operation-toolbar">
+        <div>
+          <strong>图文加工</strong>
+          <span>文章生成后再处理封面、正文配图、摘要和平台标题，不干扰正文生产。</span>
+        </div>
+        <div className="toolbar-actions">
+          <button className="ghost-button" onClick={() => navigate('gallery')}>管理图库</button>
+          <button className="primary-button" onClick={createGraphicVersion}>生成图文预案</button>
+        </div>
+      </div>
+
+      <div className="page-grid">
+        <div className="panel">
+          <SectionTitle icon={FileText} title="选择文章" desc="只处理当前项目已生成的成品文章。" />
+          <div className="ops-table graphic-table">
+            <div className="ops-head"><span>文章标题</span><span>字数</span><span>状态</span><span>操作</span></div>
+            {availableArticles.slice(0, 12).map((article) => (
+              <div className="ops-row" key={article.id}>
+                <strong>{article.title}</strong>
+                <span>{article.words}字</span>
+                <span className="pill">{article.status}</span>
+                <span className="row-actions">
+                  <button onClick={() => setSelectedArticleId(article.id)}>选择</button>
+                </span>
+              </div>
+            ))}
+          </div>
+          {!availableArticles.length && (
+            <div className="empty-card">
+              <strong>还没有成品文章</strong>
+              <span>先完成文章生成，再进入图文加工。</span>
+              <button className="primary-button" onClick={() => navigate('tasks')}>去生成文章</button>
+            </div>
+          )}
+        </div>
+        <div className="panel">
+          <SectionTitle icon={ImageIcon} title="配图预案" desc="封面和正文图从当前项目图库里选择。" />
+          <div className="task-material-preview">
+            <strong>{currentArticle?.title || '待选择文章'}</strong>
+            <span>封面图：{coverImages.length} 张可选</span>
+            <span>正文图：{bodyImages.length} 张可选</span>
+            <span>摘要：由文章首屏和标题场景生成</span>
+            <span>平台标题：在分发发布阶段按平台生成</span>
+          </div>
+          <p className="table-note">图文加工只处理展示形态，不回写正文规则；正文仍以skill稿单和项目资料为准。</p>
+        </div>
+      </div>
     </section>
   )
 }
@@ -3554,7 +3786,7 @@ function Distribution({ notify, articleRows, activeBrand }: ActionProps & { arti
     ['搜狐号', '待配置', '队列发布', '新闻通稿版'],
     ['百家号', '待配置', '人工确认', '合规审核版'],
   ]
-  const passedArticles = articleRows.filter((item) => item.status === '已通过' && item.project === activeBrand)
+  const passedArticles = articleRows.filter((item) => item.status === '已生成' && item.project === activeBrand)
   const visibleDistributionTasks = distributionTasks
     .map((task, index) => ({ task, index }))
     .filter(({ task }) => task.startsWith(`${activeBrand}｜`))
@@ -3563,7 +3795,7 @@ function Distribution({ notify, articleRows, activeBrand }: ActionProps & { arti
   }
   const createDistributionTask = () => {
     if (!passedArticles.length) {
-      notify('当前品牌还没有成品文章，请先生成并审核入库。')
+      notify('当前品牌还没有成品文章，请先生成文章。')
       return
     }
     const count = selectedArticles.length || Math.min(passedArticles.length, 3)
@@ -3578,8 +3810,8 @@ function Distribution({ notify, articleRows, activeBrand }: ActionProps & { arti
     <section className="operation-page">
       <div className="operation-toolbar">
         <div>
-          <strong>品牌媒体投喂</strong>
-          <span>从成品文章库选择文章，再生成对应平台标题、摘要、封面和发布队列。</span>
+          <strong>文章发布</strong>
+          <span>从文章列表选择成品稿，再生成对应平台标题、摘要、封面和发布队列。</span>
         </div>
         <div className="toolbar-actions">
           <button className="ghost-button" onClick={() => setConfigPlatform('全部平台')}>平台配置</button>
@@ -3594,7 +3826,7 @@ function Distribution({ notify, articleRows, activeBrand }: ActionProps & { arti
       </div>
       <div className="distribution-layout">
         <div className="panel">
-          <SectionTitle icon={Send} title="分发平台" desc="1.0先预留平台配置，后续对接新闻源网站和官网。" />
+          <SectionTitle icon={Send} title="发布平台" desc="1.0先预留平台配置，后续对接新闻源网站和官网。" />
           <div className="ops-table platform-table">
             <div className="ops-head"><span>平台</span><span>连接状态</span><span>发布方式</span><span>内容版本</span><span>操作</span></div>
             {platforms.map((row) => (
@@ -3605,13 +3837,13 @@ function Distribution({ notify, articleRows, activeBrand }: ActionProps & { arti
           </div>
         </div>
         <div className="panel">
-          <SectionTitle icon={Newspaper} title="待分发文章" desc="只显示成品文章库里已过审的稿件。" />
+          <SectionTitle icon={Newspaper} title="待分发文章" desc="只显示成品文章库里已生成的稿件。" />
           <div className="article-list compact-list">
             {passedArticles.map((article) => (
               <article className="article-row" key={article.id}>
                 <div>
                   <strong>{article.title}</strong>
-                  <p>{article.score}分 · 2张图 · {article.words}字</p>
+                  <p>{article.words}字 · {displayGenerationSource(article.generationSource)}</p>
                 </div>
                 <button className="row-button" onClick={() => toggleArticle(article.id)}>
                   {selectedArticles.includes(article.id) ? '已选择' : '选择'}
@@ -3644,7 +3876,7 @@ function Distribution({ notify, articleRows, activeBrand }: ActionProps & { arti
             <div className="create-grid single">
               <EditableField label="发布账号" value={`${configPlatform}账号待绑定`} onChange={() => undefined} />
               <EditableField label="发布方式" value="人工确认后发布" onChange={() => undefined} />
-              <EditableField label="内容版本" value="新闻通稿版，保留正文图片位" onChange={() => undefined} />
+              <EditableField label="内容版本" value="文章正文 + 平台标题摘要" onChange={() => undefined} />
             </div>
             <div className="modal-actions">
               <button className="primary-button" onClick={() => {
@@ -3667,7 +3899,7 @@ function DataCenter({ notify }: ActionProps) {
       <div className="operation-toolbar">
         <div>
           <strong>数据中心</strong>
-          <span>查看生产质量、审核退回、关键词覆盖和分发效果。</span>
+          <span>查看文章生成、接口异常、关键词覆盖和分发效果。</span>
         </div>
         <div className="toolbar-actions">
           <input className="search-input" defaultValue="近7天" />
@@ -3700,8 +3932,8 @@ function DataCenter({ notify }: ActionProps) {
             </div>
             <div className="diagnosis-grid">
               <Metric title="生成数" value="0" note="当前统计周期" />
-              <Metric title="通过数" value="0" note="90分以上文章" />
-              <Metric title="平均分" value="0" note="豆包采信模拟分" />
+              <Metric title="已生成" value="0" note="API文章" />
+              <Metric title="接口异常" value="0" note="接口无正文" />
               <Metric title="处理动作" value={detail === '导出数据' ? '导出' : '复盘'} note={detail === '导出数据' ? '正式版生成Excel' : rows.find((row) => row[0] === detail)?.[4] ?? ''} />
             </div>
             <div className="modal-actions">
@@ -3720,6 +3952,7 @@ function DataCenter({ notify }: ActionProps) {
 function ModelConfig({ notify }: ActionProps) {
   const [configStatus, setConfigStatus] = useState<{
     qwen?: { configured: boolean; baseUrl?: string; model?: string }
+    activeModel?: { configured: boolean; baseUrl?: string; model?: string; source?: string }
     keyword5118?: { configured: boolean; missing?: string[] }
     xiaoqingwa?: { installed?: boolean; configured: boolean; missing?: string[] }
     oss?: { configured: boolean }
@@ -3784,10 +4017,10 @@ function ModelConfig({ notify }: ActionProps) {
           <div className="connector-list">
             <div className="connector-row">
               <div>
-                <strong>通义千问大模型</strong>
-                <span>{configStatus.qwen?.configured ? `已配置：${configStatus.qwen.model}` : '未配置：需要QWEN_API_KEY、QWEN_BASE_URL、QWEN_MODEL'}</span>
+                <strong>当前写作大模型</strong>
+                <span>{configStatus.activeModel?.configured ? `已配置：${configStatus.activeModel.model}（${configStatus.activeModel.source || '模型接口'}）` : '未配置：优先填写MODEL_API_KEY、MODEL_BASE_URL、MODEL_NAME'}</span>
               </div>
-              <em className={configStatus.qwen?.configured ? 'ready' : 'warn'}>{configStatus.qwen?.configured ? '可生成' : '待配置'}</em>
+              <em className={configStatus.activeModel?.configured ? 'ready' : 'warn'}>{configStatus.activeModel?.configured ? '可生成' : '待配置'}</em>
               <button onClick={testModel}>{testing === 'model' ? '测试中' : '测试模型'}</button>
             </div>
             <div className="connector-row">
@@ -3816,7 +4049,8 @@ function ModelConfig({ notify }: ActionProps) {
         </div>
         <div className="panel form-panel">
           <SectionTitle icon={Settings} title="接口补齐项" desc="只显示会影响真实上线的剩余事项。" />
-          <Field label="通义接口" value={configStatus.qwen?.configured ? `已完成，可用${configStatus.qwen.model}生成文章` : '待配置QWEN_API_KEY、QWEN_BASE_URL、QWEN_MODEL'} />
+          <Field label="写作模型" value={configStatus.activeModel?.configured ? `当前使用：${configStatus.activeModel.model}` : '待配置MODEL_API_KEY、MODEL_BASE_URL、MODEL_NAME'} />
+          <Field label="通义备用" value={configStatus.qwen?.configured ? `已完成：${configStatus.qwen.model}` : '未配置QWEN_API_KEY、QWEN_BASE_URL、QWEN_MODEL'} />
           <Field label="5118接口" value={configStatus.keyword5118?.configured ? '已完成，可真实拓展关键词库' : `待补：${configStatus.keyword5118?.missing?.join('、') || '5118关键词指数KEY'}`} />
           <Field label="小青蛙接口" value="KEY和平台可先安装；真实投喂还缺媒体列表、发文、状态回查接口地址" />
           <Field label="图片上传" value={configStatus.oss?.configured ? 'OSS已配置' : '1.0可先本地上传，正式服务器再接OSS'} />
@@ -3833,7 +4067,7 @@ function SettingsPage({ notify }: ActionProps) {
       <div className="operation-toolbar">
         <div>
           <strong>系统设置</strong>
-          <span>管理默认禁用规则、审核底线、图片数量和分发频控。</span>
+          <span>管理资料调用、接口和分发频控。</span>
         </div>
         <button className="primary-button" onClick={() => {
           setSavedAt('刚刚保存')
@@ -3842,16 +4076,28 @@ function SettingsPage({ notify }: ActionProps) {
       </div>
       <div className="settings-layout">
         <div className="panel">
-          <SectionTitle icon={ShieldCheck} title="默认审核规则" desc="硬禁用不能关闭，用户只能追加行业禁用词。" />
-          <RuleList />
+          <SectionTitle icon={ShieldCheck} title="资料调用规则" desc="当前只保留品牌资料、关键词和可信资料调用。" />
+          <div className="rule-list">
+            <div className="rule-item">
+              <strong>品牌归属</strong>
+              <p>生成文章只调用当前品牌项目的数据。</p>
+            </div>
+            <div className="rule-item">
+              <strong>资料来源</strong>
+              <p>核心词、蒸馏问题、关键词库、品牌资料和可信资料作为写作参考。</p>
+            </div>
+            <div className="rule-item">
+              <strong>skill稿单写作</strong>
+              <p>系统按文章类型、行业场景和项目资料组装稿单，再交给API逐篇生成。</p>
+            </div>
+          </div>
         </div>
         <div className="panel form-panel">
-          <SectionTitle icon={Settings} title="基础阈值" desc="这些默认值保证文章不会低质出库。" />
-          <Field label="最低字数" value="3000字" />
-          <Field label="最低评分" value="90分" />
-          <Field label="FAQ数量" value="5-8条" />
-          <Field label="图片数量" value="至少2张" />
-          <Field label="核心词位置" value="标题、导语、正文、FAQ" />
+          <SectionTitle icon={Settings} title="当前写作模式" desc="旧审核和固定写作规则已关闭。" />
+          <Field label="提示词版本" value="niuge-geo-skill-api-v2" />
+          <Field label="文章结构" value="按skill稿单生成" />
+          <Field label="标题生成" value="按核心词、行业和文章类型生成" />
+          <Field label="入库方式" value="生成后进入成品文章库" />
           <div className="status-line">
             <span>保存状态</span>
             <strong>{savedAt}</strong>
@@ -3866,7 +4112,7 @@ function ArticleTable({
   articleRows,
   compact = false,
   title = '近期成品稿',
-  desc = '标题必须像用户会问的问题，正文必须能成为答案。',
+  desc = '展示系统调用资料生成的文章。',
 }: {
   articleRows: Article[]
   compact?: boolean
@@ -3884,8 +4130,8 @@ function ArticleTable({
               <p>{article.angle} · {article.keyword} · {article.words}字</p>
             </div>
             <div className="article-score">
-              <span>{article.score}</span>
-              <em className={article.status === '待重写' ? 'danger' : ''}>{article.status}</em>
+              <span>{article.words}</span>
+              <em className={article.status === '生成异常' ? 'danger' : ''}>{article.status}</em>
             </div>
           </article>
         ))}
@@ -3895,39 +4141,39 @@ function ArticleTable({
 }
 
 function Inspector({ articleRows }: { articleRows: Article[] }) {
-  const passedCount = articleRows.filter((article) => article.status === '已通过').length
-  const topScore = Math.max(...articleRows.map((article) => article.score))
+  const passedCount = articleRows.filter((article) => article.status === '已生成').length
+  const failedCount = articleRows.filter((article) => article.status === '生成异常').length
   return (
     <>
       <div className="inspector-card live-card">
         <p className="eyebrow">当前品牌</p>
         <h3>曝光率GEO · 西安GEO公司</h3>
-        <p>核心词锁定，关键词库24个，图库41张，已通过文章{passedCount}篇。</p>
+        <p>核心词锁定，关键词库按语义辅助，已生成文章{passedCount}篇。</p>
         <div className="live-score">
-          <span>{topScore}</span>
+          <span>{passedCount}</span>
           <div>
-            <strong>可入库</strong>
-            <p>模拟豆包采信分</p>
+            <strong>成品文章</strong>
+            <p>接口异常 {failedCount} 篇</p>
           </div>
         </div>
       </div>
 
       <div className="inspector-card">
-        <SectionTitle icon={ListChecks} title="写作前置规则" desc="这些在生成前就参与规划。" />
+        <SectionTitle icon={ListChecks} title="写作资料链" desc="这些在生成前就参与稿单。" />
         <div className="mini-list">
           <span>核心词优先</span>
-          <span>关键词库自然匹配</span>
+          <span>蒸馏问题定意图</span>
+          <span>关键词库补语境</span>
           <span>标题问题化</span>
           <span>品牌资产按需调用</span>
-          <span>权威引证支撑推荐</span>
-          <span>正文中段插图</span>
+          <span>权威引证转理由</span>
         </div>
       </div>
 
       <div className="inspector-card">
-        <SectionTitle icon={ShieldCheck} title="最终审核" desc="保留必要检查，不把生成流程拖乱。" />
+        <SectionTitle icon={ShieldCheck} title="成品出口" desc="生成完成后直接进入成品库。" />
         <div className="check-stack">
-          {auditRules.map(([title]) => (
+          {['API单篇生成', '无正文才标异常', '成品库查看下载', '分发队列预留'].map((title) => (
             <div key={title}>
               <CheckCircle2 size={15} />
               <span>{title}</span>
@@ -3965,11 +4211,26 @@ function Metric({ title, value, note }: { title: string; value: string; note: st
   )
 }
 
-function Field({ label, value }: { label: string; value: string }) {
+function Field({
+  label,
+  value,
+  onChange,
+  placeholder = '',
+}: {
+  label: string
+  value: string
+  onChange?: (value: string) => void
+  placeholder?: string
+}) {
   return (
     <label className="field">
       <span>{label}</span>
-      <input defaultValue={value} />
+      <input
+        value={value}
+        placeholder={placeholder}
+        readOnly={!onChange}
+        onChange={(event: ChangeEvent<HTMLInputElement>) => onChange?.(event.target.value)}
+      />
     </label>
   )
 }
@@ -4049,3 +4310,4 @@ windowWithRoot.__geoContentRoot.render(
     <App />
   </StrictMode>,
 )
+
