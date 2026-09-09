@@ -26,7 +26,7 @@ if [ ! -d "${APP_DIR}/.git" ]; then
   if [ -f "${APP_DIR}/.env" ]; then
     cp "${APP_DIR}/.env" "${tmp_dir}/.env"
   fi
-  rsync -a --delete --exclude ".env" "${tmp_dir}/" "${APP_DIR}/"
+  cp -a "${tmp_dir}/." "${APP_DIR}/"
   rm -rf "${tmp_dir}"
 else
   cd "${APP_DIR}"
