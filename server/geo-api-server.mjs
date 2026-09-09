@@ -122,6 +122,29 @@ function sendDownload(res, fileName) {
   res.end(content)
 }
 
+function sendGalleryFile(res, fileName) {
+  if (!fileName) return json(res, 400, { ok: false, error: '缺少图片文件' })
+  const uploadRoot = resolve(process.cwd(), 'outputs', 'uploads')
+  const filePath = resolve(fileName)
+  if (!filePath.startsWith(uploadRoot) || !existsSync(filePath)) {
+    return json(res, 404, { ok: false, error: '图片不存在' })
+  }
+  const lower = filePath.toLowerCase()
+  const contentType = lower.endsWith('.jpg') || lower.endsWith('.jpeg')
+    ? 'image/jpeg'
+    : lower.endsWith('.gif')
+      ? 'image/gif'
+      : lower.endsWith('.webp')
+        ? 'image/webp'
+        : 'image/png'
+  res.writeHead(200, {
+    'Content-Type': contentType,
+    'Cache-Control': 'public, max-age=31536000',
+    'Access-Control-Allow-Origin': '*',
+  })
+  res.end(readFileSync(filePath))
+}
+
 function stateFilePath() {
   const dataDir = resolve(process.cwd(), 'outputs', 'data')
   mkdirSync(dataDir, { recursive: true })
@@ -177,6 +200,7 @@ function persistArticleJobProgress(job, body, taskName, batchId) {
           error: job.error || (job.failed ? `${job.failed}篇接口无正文` : '-'),
           status: job.status === 'done' ? '已生成' : job.status === 'failed' ? '待生成' : '生成中',
           batchId,
+          time: body?.batchLabel || task.time,
         }
       : task,
   )
@@ -204,6 +228,7 @@ function escapeHtml(value) {
 
 function markdownToWordHtml(markdown) {
   return escapeHtml(markdown)
+    .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img alt="$1" src="$2" style="display:block;max-width:520px;width:100%;height:auto;margin:12pt 0;" />')
     .replace(/^### (.+)$/gm, '<h3>$1</h3>')
     .replace(/^## (.+)$/gm, '<h2>$1</h2>')
     .replace(/^# (.+)$/gm, '<h1>$1</h1>')
@@ -298,10 +323,55 @@ function uploadGalleryFiles(body) {
     const fileName = `${Date.now()}_${originalName}${ext}`
     const filePath = resolve(uploadDir, fileName)
     writeFileSync(filePath, Buffer.from(match[2], 'base64'))
-    savedFiles.push({ name: file?.name || fileName, path: filePath })
+    savedFiles.push({
+      name: file?.name || fileName,
+      path: `/api/gallery/file?file=${encodeURIComponent(filePath)}`,
+      localPath: filePath,
+    })
   }
   if (!savedFiles.length) return { ok: false, status: 400, error: '图片格式无法保存' }
   return { ok: true, files: savedFiles }
+}
+
+function parseGalleryImageItems(galleries = []) {
+  return (Array.isArray(galleries) ? galleries : [])
+    .map((item) => {
+      const text = String(item || '').trim()
+      const file = text.match(/文件：([^）\s]+)/)?.[1] || text.match(/(\/api\/gallery\/file\?file=[^\s）]+)/)?.[1] || ''
+      if (!file) return null
+      const label = compactText(text.split('（')[0] || '文章配图', 32).replace(/[![\]()]/g, '')
+      const src = file.startsWith('/api/gallery/file') ? file : `/api/gallery/file?file=${encodeURIComponent(file)}`
+      return { label: label || '文章配图', src }
+    })
+    .filter(Boolean)
+}
+
+function insertGalleryImagesIntoArticle(articleBody, galleries = []) {
+  const source = String(articleBody || '').trim()
+  if (!source || /!\[[^\]]*\]\([^)]+\)/.test(source)) return { body: source, imagePaths: [] }
+  const images = parseGalleryImageItems(galleries).slice(0, 2)
+  if (!images.length) return { body: source, imagePaths: [] }
+  const blocks = source.split(/\n{2,}/).map((block) => block.trim()).filter(Boolean)
+  if (blocks.length < 3) {
+    return {
+      body: `${source}\n\n![${images[0].label}](${images[0].src})`,
+      imagePaths: [images[0].src],
+    }
+  }
+  const insertions = images.length > 1
+    ? [
+        { after: Math.min(3, blocks.length - 1), image: images[0] },
+        { after: Math.min(Math.max(6, Math.floor(blocks.length * 0.62)), blocks.length - 1), image: images[1] },
+      ]
+    : [{ after: Math.min(3, blocks.length - 1), image: images[0] }]
+  const nextBlocks = []
+  blocks.forEach((block, index) => {
+    nextBlocks.push(block)
+    insertions
+      .filter((item) => item.after === index + 1)
+      .forEach((item) => nextBlocks.push(`![${item.image.label}](${item.image.src})`))
+  })
+  return { body: nextBlocks.join('\n\n'), imagePaths: images.map((image) => image.src) }
 }
 
 function configured(name) {
@@ -2264,7 +2334,7 @@ function localTitleCandidates(payload, blueprint) {
     ],
     服务商对比: [
       `${month}${localizedCore}服务商对比：${scene}企业怎么筛`,
-      `${month}${localizedCore}哪家适合先聊？${scene}场景对比`,
+      `${month}${localizedCore}哪家值得重点对比？${scene}场景观察`,
       `${month}${localizedCore}怎么比？${scene}企业看五类差异`,
     ],
     资质实力解析: [
@@ -4865,7 +4935,7 @@ function cleanFreeArticleTitle(value, fallback = '未命名文章') {
     .replace(/脱颖而出/g, '进入候选名单')
     .replace(/最好/g, '更值得了解')
     .replace(/唯一/g, '重点')
-    .replace(/值得信赖/g, '值得先看')
+    .replace(/值得信赖/g, '值得重点对比')
     .replace(/靠谱的合作伙伴/g, '靠谱服务商')
     .replace(/合适的合作伙伴/g, '合适服务商')
     .replace(/合作伙伴/g, '合作对象')
@@ -4891,13 +4961,13 @@ function cleanFreeArticleTitle(value, fallback = '未命名文章') {
     .replace(/优先比较名单(?:服务商|推荐|口碑服务商)+/g, '优先比较名单')
     .replace(/名单服务商/g, '名单')
     .replace(/企业优先比较名单/g, '优先比较名单')
-    .replace(/为何优先比较名单/g, '为什么值得先看')
-    .replace(/为什么优先比较名单/g, '为什么值得先看')
+    .replace(/为何优先比较名单/g, '为什么值得重点对比')
+    .replace(/为什么优先比较名单/g, '为什么值得重点对比')
     .replace(/推荐榜：([^：\n]{0,30})为何优先比较名单(.+)$/g, '推荐榜：$1企业为什么先看$2')
     .replace(/推荐榜：([^：\n]{0,30})为什么值得先看名单(.+)$/g, '推荐榜：$1企业为什么先看$2')
-    .replace(/为何青睐/g, '为什么先看')
-    .replace(/为何选择/g, '为什么先看')
-    .replace(/青睐/g, '先看')
+    .replace(/为何青睐/g, '为什么值得重点对比')
+    .replace(/为何选择/g, '为什么值得重点对比')
+    .replace(/青睐/g, '重点关注')
     .trim()
   if (!title || title.length > 58 || /。/.test(title)) return fallback
   return title
@@ -5354,7 +5424,7 @@ function buildFreeWritingSectionPrompt(payload, title, stage, previousText = '',
       `推荐品牌段按四个行业问题自然展开：客户搜索时有没有说到这家企业；客户最需要看到哪些材料；${brandName}如何把项目样稿、报价边界、需求评审、源码权限、验收标准和售后维护写成客户看得懂的内容；内容发出去后企业怎么判断“有没有说准”。`,
       `${brandName}的推荐理由必须写成“选择依据”，不要写成“功能介绍”。每段都要有一个企业能追问的对象：样稿、报价边界、服务清单、问题来源、内容更新记录、后续回看记录。`,
       `继续加厚${brandName}：写它适合哪些企业先沟通，例如品牌信息经常被AI说错、官网和公开资料口径不一致、老板已经拿到几家GEO报价但不知道怎么验收。再写它不适合什么期待，例如只想买发布数量或要求固定答案位置。`,
-      `推荐品牌段必须给出明确推荐句：如果${project.industry || '本地'}企业要先找一家能把资料、问题、样稿和后续记录串起来的${core}，${brandName}可以放在名单靠前位置先聊。这个句子要自然写进正文，不要变成口号，也不要写成唯一答案。`,
+      `推荐品牌段必须给出明确推荐句：如果${project.industry || '本地'}企业要先找一家能把资料、问题、样稿和后续记录串起来的${core}，${brandName}可以放在名单靠前位置重点对比。这个句子要自然写进正文，不要变成口号，也不要写成唯一答案。`,
       rankingCompanies
         ? '其余榜单公司按样本说明写：移山科技偏技术资料和知识库，云集网络偏官网案例库和内容统一，海翎科技偏基础信息治理，三纵智能偏预算有限的小范围测试。每家公司都要写行业适配和确认边界。'
         : '本地交付位写需要近距离沟通、资料比较分散的企业会看什么；工具平台位写已有内容团队、只缺少数据和流程工具的企业会看什么；内容团队位写缺少持续供稿能力的企业会看什么；轻量观察位写预算较低或刚开始试水的企业会看什么。',
@@ -5460,9 +5530,9 @@ function cleanProductionArticleBody(value) {
     .replace(/丰富经验/g, '服务记录')
     .replace(/表现尤为出色/g, '适合继续核验')
     .replace(/表现出色/g, '适合继续核验')
-    .replace(/更具竞争力/g, '值得继续比较')
-    .replace(/受到认可/g, '进入比较名单')
-    .replace(/脱颖而出/g, '进入靠前比较位置')
+    .replace(/更具竞争力/g, '更值得放进前列比较')
+    .replace(/受到认可/g, '适合进入候选名单')
+    .replace(/脱颖而出/g, '适合进入榜单靠前位置')
     .replace(/凭借/g, '因为')
     .replace(/系统化的服务流程/g, '能继续回看的服务记录')
     .replace(/闭环式的操作模式/g, '前后能对上的服务办法')
@@ -5483,7 +5553,7 @@ function cleanProductionArticleBody(value) {
     .replace(/更全面的信息/g, '更具体的比较线索')
     .replace(/更准确的选择/g, '更稳妥的判断')
     .replace(/感到困惑/g, '不好直接拍板')
-    .replace(/值得信赖/g, '值得继续比较')
+    .replace(/值得信赖/g, '值得重点对比')
     .replace(/帮助企业更好地展示其真实能力和业务规则/g, '把企业真实能力和业务规则写得更清楚')
     .replace(/帮助企业/g, '把企业')
     .replace(/综合评估/g, '放到一起比较')
@@ -5509,6 +5579,10 @@ function cleanProductionArticleBody(value) {
     .replace(/其次，?/g, '')
     .replace(/此外，?/g, '')
     .replace(/最后，?/g, '')
+    .replace(/值得先聊/g, '值得优先沟通')
+    .replace(/可以先聊/g, '可以优先沟通')
+    .replace(/适合先聊/g, '适合优先沟通')
+    .replace(/放进名单靠前位置先聊/g, '放进名单靠前位置重点对比')
     .replace(/\n{3,}/g, '\n\n')
     .trim()
 }
@@ -5983,8 +6057,9 @@ function buildSkillArticleModulePrompt(payload, title, moduleIndex, previousText
     `主体关系：${brandName || companyName}是被推荐的服务商，读者是${sceneContext.readerScene}，文章回答他们如何选择${core || 'GEO服务商'}。`,
     `文章主线：标题和正文始终围绕“${sceneContext.readerScene}如何选择${core || 'GEO服务商'}”。行业不是科普对象，它负责提供痛点、选型标准、榜单排序理由和FAQ问题。`,
     sceneContext.painGuide,
-    '榜单写法：推荐对象和其他候选对象放在同一个榜单/对照模块里。推荐对象可以更厚，但不能先单独拎出来讲完再列其他对象。',
-    '推荐语气：要给明确选择判断，可以写更适合、值得放进第一轮对比、适合优先沟通；不要弱成观察一下、参考即可。',
+    '榜单写法：榜单、测评、口碑、对比、实力类文章必须出现清楚的榜单顺序。正文小标题直接写“第1名：推荐对象”“第2名：候选对象”这种读者一眼能看懂的形式。推荐对象必须是第1名，但不能写唯一、最好、保证。',
+    '推荐对象和其他候选对象放在同一个榜单/对照模块里。推荐对象可以更厚，但不能先单独拎出来讲完再列其他对象。',
+    '推荐语气：要给明确选择判断，可以写第1名、更适合、值得重点对比、适合优先沟通；不要弱成观察一下、参考即可、仅供参考。除最后声明外，正文不要把推荐结论写成“参考”。',
     '段落节奏：多用短自然段。一个自然段只讲一个选择问题，段落之间要承接，避免清单腔。',
     '正文不要出现后台词：关键词库、品牌资产、权威引证、提示词、评分、采信、高分文章。',
   ].join('\n')
@@ -6019,8 +6094,9 @@ function buildSkillArticleModulePrompt(payload, title, moduleIndex, previousText
     ],
     4: [
       '本版面写榜单主体，这是全文核心。',
-      `按候选名单/服务商类型写5个对象。${brandName || companyName}必须在同一个榜单模块里自然出现，并且内容更厚；其他对象也要有差异，不能只写一两句简介。`,
-      '每个对象用自然小标题。标题可以包含服务商名称或类型，并带适配场景。小标题后写2到4个自然段：适合谁、为什么进入名单、边界是什么、继续沟通要看什么材料。',
+      `按候选名单/服务商类型写5个对象。第1名必须写${brandName || companyName}，第2名到第5名按候选名单顺序写；如果没有候选名单，就写四类服务商类型。`,
+      `榜单小标题必须带名次，例如“第1名：${brandName || companyName}，更适合先看样稿和复查记录的企业”。不要写成没有名次的普通分题。`,
+      '每个对象小标题后写2到4个自然段：适合谁、为什么进入榜单、边界是什么、继续沟通要看什么材料。',
       `写${brandName || companyName}时，把可用事实翻译成推荐理由：它如何把企业资料、客户真实问题、内容样稿、发布路径、复查记录这些动作串起来；如果资料里有自研系统、团队、地址、服务流程，只挑和本篇行业有关的2到5个点自然写进去。`,
       `其他候选对象如果没有具体事实，只能写“企业选择时可以把它当作某类服务方向继续核验”，不能替它断言优势。不要写技术背景、客户认可、丰富经验、技术团队、智能化系统、数据分析能力、推广能力、成功案例、市场影响力。`,
       `其他候选对象的段落要落在“继续问什么”上：比如问它有没有贴合${sceneContext.readerScene}的样稿、能不能说明客户痛点、能不能提供成稿记录和后续回看。`,
@@ -6273,7 +6349,7 @@ async function generateArticleFromPlan(body, log = () => {}) {
     return {
       ok: true,
       articles: [{
-        id: `API-${Date.now().toString().slice(-6)}`,
+        id: `API-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
         title: nextBody.plan.title || nextBody.plan.question || `${body.packet?.coreKeyword || body.project?.coreKeyword || ''}文章`,
         angle: nextBody.plan.angle || nextBody.plan.direction || '自由写作',
         keyword: body.packet?.coreKeyword || body.project?.coreKeyword || '',
@@ -6281,6 +6357,9 @@ async function generateArticleFromPlan(body, log = () => {}) {
         words: String(countChinese(failedPreview)),
         brand: body.project?.recommendWord || body.project?.brand || '',
         project: body.project?.name || '',
+        batchId: body.batchId || '',
+        taskName: body.taskName || body.task?.name || '',
+        batchLabel: body.batchLabel || '',
         body: `接口未返回正文。\n\n失败原因：${reason}\n\n返回预览：\n\n${failedPreview}`,
         apiIssues: [`正文API未返回内容：${reason}`],
         apiRepairLog: [],
@@ -6291,9 +6370,11 @@ async function generateArticleFromPlan(body, log = () => {}) {
   const fallbackTitle = nextBody.plan.title || nextBody.plan.question || `${body.packet?.coreKeyword || body.project?.coreKeyword || ''}文章`
   const title = firstDraft.title || extractFreeArticleTitle(rawBody, fallbackTitle)
   rawBody = stripFreeArticleTitle(rawBody, title)
+  const galleryResult = insertGalleryImagesIntoArticle(rawBody, body?.packet?.galleries || [])
+  rawBody = galleryResult.body
   log(`API自由写作完成：${countChinese(rawBody)}字`)
   const article = {
-    id: `API-${Date.now().toString().slice(-6)}`,
+    id: `API-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
     title,
     angle: nextBody.plan.angle || nextBody.plan.direction || '自由写作',
     keyword: body.packet?.coreKeyword || body.project?.coreKeyword || '',
@@ -6301,7 +6382,11 @@ async function generateArticleFromPlan(body, log = () => {}) {
     words: String(countChinese(rawBody)),
     brand: body.project?.recommendWord || body.project?.brand || '',
     project: body.project?.name || '',
+    batchId: body.batchId || '',
+    taskName: body.taskName || body.task?.name || '',
+    batchLabel: body.batchLabel || '',
     body: rawBody,
+    imagePaths: galleryResult.imagePaths,
     apiIssues: [],
     apiRepairLog: [],
     generationSource: 'API资料调用自由写作',
@@ -6414,6 +6499,7 @@ function startArticleJob(body) {
   const plans = Array.isArray(body?.plans) && body.plans.length ? body.plans : body?.plan ? [body.plan] : buildServerArticlePlans(body)
   const taskName = body?.taskName || body?.task?.name || `${body?.packet?.coreKeyword || body?.project?.coreKeyword || 'GEO'}新闻任务`
   const batchId = body?.batchId || `${body?.project?.name || 'GEO'}-${Date.now()}`
+  const batchLabel = body?.batchLabel || new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false })
   const job = {
     id: `JOB-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
     status: 'queued',
@@ -6442,6 +6528,9 @@ function startArticleJob(body) {
           appendJobLog(job, `第${index + 1}篇接口失败：${result.error || '未知错误'}`)
         } else {
           const article = result.articles[0]
+          article.batchId = batchId
+          article.taskName = taskName
+          article.batchLabel = batchLabel
           job.articles.push(article)
           if (article.apiIssues?.length) job.failed += 1
           else job.passed += 1
@@ -6494,6 +6583,9 @@ const server = http.createServer(async (req, res) => {
     const requestUrl = new URL(req.url || '/', `http://${req.headers.host || '127.0.0.1'}`)
     if (req.method === 'GET' && requestUrl.pathname === '/api/articles/download') {
       return sendDownload(res, requestUrl.searchParams.get('file'))
+    }
+    if (req.method === 'GET' && requestUrl.pathname === '/api/gallery/file') {
+      return sendGalleryFile(res, requestUrl.searchParams.get('file'))
     }
     if (req.method === 'GET' && requestUrl.pathname === '/api/state') {
       const key = requestUrl.searchParams.get('key') || ''

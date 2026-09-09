@@ -54,6 +54,8 @@ type Article = {
   apiIssues?: string[]
   batchId?: string
   taskName?: string
+  batchLabel?: string
+  imagePaths?: string[]
   generationSource?: 'API成稿' | 'API资料调用自由写作' | 'API资料调用未返回'
 }
 
@@ -129,7 +131,6 @@ const nav: NavItem[] = [
     children: [
       { id: 'tasks', label: '文章生成', icon: Workflow },
       { id: 'library', label: '成品文章库', icon: Library },
-      { id: 'graphic', label: '图文加工', icon: ImageIcon },
     ],
   },
   { id: 'distribution', label: '分发发布', icon: Send },
@@ -144,7 +145,7 @@ const workflow = [
   ['榜单服务商', '维护主推品牌和可比较服务商，给榜单、测评、对比稿调用。'],
   ['品牌资料', '给品牌导入品牌事实和权威依据，并按资料方向使用。'],
   ['文章生成', '填写目标客户行业，系统自动带出痛点、维度和FAQ，逐篇调用API写作。'],
-  ['图文分发', '成文后再选择图片、封面和平台标题，生成发布版本。'],
+  ['图文成稿', '生成文章时自动插入1-2张项目图片，成品库可查看、编辑和下载。'],
 ]
 
 const projects: ProjectRow[] = []
@@ -721,6 +722,25 @@ function localChineseDate() {
   return `${year}年${Number(month)}月${Number(day)}日`
 }
 
+function localDateTime() {
+  return new Intl.DateTimeFormat('zh-CN', {
+    timeZone: 'Asia/Shanghai',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }).format(new Date()).replace(/\//g, '-')
+}
+
+function runBatchId(projectName: string, taskName: string) {
+  const stamp = localDateTime().replace(/[^\d]/g, '')
+  const random = Math.random().toString(36).slice(2, 6)
+  return `${projectName || 'GEO'}-${taskName || '生成任务'}-${stamp}-${random}`
+}
+
 function classifyKeyword(word: string) {
   if (word.includes('哪家') || word.includes('推荐') || word.includes('靠谱')) return '推荐类'
   if (word.includes('豆包') || word.includes('AI搜索') || word.includes('排名')) return '平台类'
@@ -927,7 +947,7 @@ function buildWorkflowPacket(project: ProjectRow): WorkflowPacket {
     questions: questions.length ? questions : [`${coreKeyword}怎么选`, `${coreKeyword}哪家靠谱`],
     brandAssets: brandAssets.length ? brandAssets : [`${project.brand}品牌资料未录入，可先使用知识库状态：${knowledgeFallback.join('；') || '暂无'}`],
     authorityEvidence: authorityEvidence.length ? authorityEvidence : [`${project.brand}推荐依据未录入，生成前建议补充推荐理由和公开证据。`],
-    galleries: [],
+    galleries,
   }
 }
 
@@ -994,6 +1014,32 @@ function displayGenerationSource(source?: Article['generationSource']) {
   if (source === 'API资料调用未返回') return '接口异常'
   if (source === 'API资料调用自由写作') return 'API成稿'
   return source || '未记录'
+}
+
+function imageSrcForDisplay(src: string) {
+  if (/^[A-Za-z]:[\\/]/.test(src)) return `/api/gallery/file?file=${encodeURIComponent(src)}`
+  return src
+}
+
+function markdownImageParts(block: string) {
+  const match = block.trim().match(/^!\[([^\]]*)\]\(([^)]+)\)$/)
+  return match ? { alt: match[1] || '文章配图', src: imageSrcForDisplay(match[2]) } : null
+}
+
+function renderArticleBody(body = '') {
+  const blocks = body.split(/\n{2,}/).map((block) => block.trim()).filter(Boolean)
+  return blocks.map((block, index) => {
+    const image = markdownImageParts(block)
+    if (image) {
+      return <figure className="article-image-block" key={`${image.src}-${index}`}><img src={image.src} alt={image.alt} /><figcaption>{image.alt}</figcaption></figure>
+    }
+    const heading = block.match(/^(#{1,3})\s+(.+)$/)
+    if (heading || (block.length <= 28 && !/[。！？；]/.test(block))) {
+      const text = heading ? heading[2] : block
+      return <h2 key={`${text}-${index}`}>{text}</h2>
+    }
+    return <p key={`${block.slice(0, 16)}-${index}`}>{block.split(/\n/).map((line, lineIndex) => <span key={`${line}-${lineIndex}`}>{line}{lineIndex < block.split(/\n/).length - 1 ? <br /> : null}</span>)}</p>
+  })
 }
 
 function displayTaskStatus(status: string) {
@@ -1161,7 +1207,6 @@ function App() {
         {active === 'gallery' && <Gallery notify={notify} projectRows={projectRows} activeBrand={activeBrand} setActiveBrand={selectActiveBrand} />}
         {active === 'tasks' && <Tasks navigate={setActive} notify={notify} projectRows={projectRows} activeBrand={activeBrand} setActiveBrand={selectActiveBrand} articleRows={articleRows} setArticleRows={setArticleRows} activeBatchId={activeBatchId} setActiveBatchId={setActiveBatchId} />}
         {active === 'library' && <LibraryPage navigate={setActive} notify={notify} articleRows={articleRows} setArticleRows={setArticleRows} activeBrand={activeBrand} activeBatchId={activeBatchId} setActiveBatchId={setActiveBatchId} />}
-        {active === 'graphic' && <GraphicWorkbench navigate={setActive} notify={notify} articleRows={articleRows} activeBrand={activeBrand} />}
         {active === 'distribution' && <Distribution navigate={setActive} notify={notify} articleRows={articleRows} activeBrand={activeBrand} />}
         {active === 'data' && <DataCenter navigate={setActive} notify={notify} />}
         {active === 'model' && <ModelConfig navigate={setActive} notify={notify} />}
@@ -1183,10 +1228,9 @@ function Dashboard({ navigate, notify, articleRows }: ActionProps & { articleRow
     ['3', '语义关键词库', '补充行业、区域、场景、平台语义词', 'questions', ListChecks],
     ['4', '榜单服务商', '只维护另外4家对比对象，非榜单文章可不填', 'candidates', ClipboardCheck],
     ['5', '品牌知识库', '维护品牌事实和权威依据', 'knowledge', UploadCloud],
-    ['6', '图库素材库', '准备封面图和正文配图，成文后再用', 'gallery', ImageIcon],
+    ['6', '图库素材库', '准备封面图和正文配图，文章生成时自动插入', 'gallery', ImageIcon],
     ['7', '文章生成', '填写目标客户行业，自动带出痛点和维度', 'tasks', Sparkles],
     ['8', '成品文章库', '查看、编辑、批量下载Word', 'library', Library],
-    ['9', '图文加工', '成文后选择封面、正文图和平台摘要', 'graphic', ImageIcon],
     ['10', '分发发布', '选择平台进入发布队列', 'distribution', Send],
   ] as const
   const statusCards = [
@@ -2480,7 +2524,7 @@ function Gallery({
     setUploading(true)
     try {
       const payloadFiles = await readFilesAsDataUrls(files)
-      const result = await apiJson<{ ok: boolean; files: { name: string; path: string }[] }>('/api/gallery/upload', {
+      const result = await apiJson<{ ok: boolean; files: { name: string; path: string; localPath?: string }[] }>('/api/gallery/upload', {
         brand: activeBrand,
         category: draft.category,
         files: payloadFiles,
@@ -2492,7 +2536,7 @@ function Gallery({
       ])
       setShowGalleryModal(false)
       setFiles([])
-      notify(`已上传${result.files.length}张图片，生成正文仍保持纯文字，发布前再配图。`)
+      notify(`已上传${result.files.length}张图片，后续生成文章会自动插入1-2张项目图片。`)
     } catch (error) {
       notify(error instanceof Error ? error.message : '图片上传失败。')
     } finally {
@@ -2508,7 +2552,7 @@ function Gallery({
       <div className="operation-toolbar">
         <div>
           <strong>图片素材库</strong>
-          <span>图片只用于成文后的封面和正文配图，不参与正文生成提示词。</span>
+          <span>图片按项目归属保存，文章生成时自动选1-2张插入正文。</span>
         </div>
         <div className="toolbar-actions">
           <select className="search-input" value={activeBrand} onChange={(event) => setActiveBrand(event.target.value)}>
@@ -2522,7 +2566,7 @@ function Gallery({
       <div className="gallery-layout">
         <div className="panel">
           <div className="panel-title-row">
-            <SectionTitle icon={GalleryHorizontal} title="品牌图片素材" desc="按封面、场景、案例、截图归类；文章生成完成后再进入图文版。" />
+            <SectionTitle icon={GalleryHorizontal} title="品牌图片素材" desc="按封面、场景、案例、截图归类；文章生成时直接调用。" />
             <button className="primary-button" onClick={() => setShowGalleryModal(true)}>上传图片</button>
           </div>
           <div className="ops-table gallery-table">
@@ -2541,18 +2585,18 @@ function Gallery({
               </div>
             ))}
           </div>
-          <p className="table-note">建议每个品牌至少准备1张封面图、2-4张正文配图。系统后续下载Word和分发时读取这里的素材，不改正文。</p>
+          <p className="table-note">建议每个品牌至少准备1张封面图、2-4张正文配图。生成文章时会自动插入正文，最多2张，至少优先插入1张。</p>
         </div>
         <div className="panel form-panel">
-          <SectionTitle icon={ImageIcon} title="配图原则" desc="图片服务发布，不服务写作。" />
+          <SectionTitle icon={ImageIcon} title="配图原则" desc="图片进入文章，不打断写作。" />
           <div className="rule-list">
             <div className="rule-item">
-              <strong>先写纯文</strong>
-              <p>API生成正文时不塞图片要求，避免文章逻辑被图片位打断。</p>
+              <strong>先准备素材</strong>
+              <p>图片只来自当前项目图库，避免不同品牌之间错用素材。</p>
             </div>
             <div className="rule-item">
-              <strong>后做图文版</strong>
-              <p>成品文章确认后，再选择封面和正文图，用于Word下载和媒体发布。</p>
+              <strong>生成即图文</strong>
+              <p>文章生成完成时自动插入1-2张图，成品库直接查看和下载。</p>
             </div>
             <div className="rule-item">
               <strong>素材按品牌归属</strong>
@@ -2715,7 +2759,7 @@ function Tasks({
     coreKeyword: selectedCoreKeyword,
     keywords: Array.from(new Set([selectedCoreKeyword, ...normalizeKeywordLibraryWords(projectKeywordLibrary.map((row) => row[2]))])),
     questions: Array.from(new Set(questionOptions)),
-    galleries: [],
+    galleries: selectedWorkflowPacket.galleries,
   }
   const missingTaskItems = [
     !activeBrand || !activeProject.name ? '企业品牌' : '',
@@ -2844,8 +2888,9 @@ function Tasks({
       selectionDimensions: firstSceneDraft.dimensions,
       questions: Array.from(new Set([...workflowPacket.questions, ...firstSceneDraft.faqs, ...firstSceneDraft.pitfalls])),
     }
-    const batchId = `${activeBrand}-${Date.now()}`
     const taskName = activeTask?.name || draft.name
+    const batchLabel = localDateTime()
+    const batchId = runBatchId(activeBrand, taskName)
     setActiveBatchId(batchId)
     let generatedArticles: Article[] = []
     setIsGenerating(true)
@@ -2917,6 +2962,7 @@ function Tasks({
           status: '已生成' as const,
           batchId,
           taskName,
+          batchLabel,
           generationSource: 'API成稿' as const,
         }
         const body = candidate.body ?? ''
@@ -2984,12 +3030,7 @@ function Tasks({
     const duplicateFailedCount = generatedArticles.filter((article) => article.duplicateNote).length
     setArticleRows((current) => [
       ...generatedArticles,
-      ...current.filter((article) => {
-        const sameBrand = article.project === activeProject.name
-        const generatedAgain = generatedArticles.some((generated) => generated.title === article.title)
-        const staleDraft = sameBrand && article.status !== '已生成'
-        return !generatedAgain && !staleDraft
-      }),
+      ...current.filter((article) => !generatedArticles.some((generated) => generated.id === article.id)),
     ])
     setRows((current) =>
       current.map((row) =>
@@ -3001,6 +3042,7 @@ function Tasks({
               latest: generatedArticles[0].id,
               detail: `${generateCount}篇已由接口返回，进入成品文章库`,
               batchId,
+              time: batchLabel,
               error: duplicateFailedCount ? `${duplicateFailedCount}篇需人工复盘标题或相似度` : '-',
             }
           : row,
@@ -3095,7 +3137,8 @@ function Tasks({
         planIndex: index + 1,
       }
     })
-    const batchId = `${activeBrand}-${Date.now()}`
+    const batchLabel = localDateTime()
+    const batchId = runBatchId(activeBrand, taskName)
     setActiveBatchId(batchId)
     setIsGenerating(true)
     setRows((current) => {
@@ -3112,6 +3155,7 @@ function Tasks({
               detail: `${generateCount}篇已提交后台，系统自动逐篇生成`,
               error: '-',
               batchId,
+              time: batchLabel,
             }
           : row,
       )
@@ -3125,6 +3169,7 @@ function Tasks({
         task: taskForRun,
         taskName,
         batchId,
+        batchLabel,
       }, 15000)
       setActiveJob(started.job)
       notify(`后台任务已启动：${started.job.id}`)
@@ -3146,6 +3191,7 @@ function Tasks({
           status: article.apiIssues?.length ? '生成异常' as const : '已生成' as const,
           batchId,
           taskName,
+          batchLabel,
           generationSource: article.apiIssues?.length ? 'API资料调用未返回' as const : article.generationSource ?? 'API资料调用自由写作' as const,
           duplicateNote: article.apiIssues?.length ? `接口未返回正文：${article.apiIssues.join('、')}` : article.duplicateNote,
         }))
@@ -3170,6 +3216,7 @@ function Tasks({
                   error: latestJob.error || (latestJob.failed ? `${latestJob.failed}篇接口无正文` : '-'),
                   status: effectiveDone ? '已生成' : latestJob.status === 'failed' ? '待生成' : '生成中',
                   batchId,
+                  time: batchLabel,
                 }
               : row,
           ),
@@ -3583,6 +3630,9 @@ function LibraryPage({ notify, navigate, articleRows, setArticleRows, activeBran
   const [selectedArticles, setSelectedArticles] = useState<string[]>([])
   const [showAllArticles, setShowAllArticles] = useState(false)
   const [showAllBrands, setShowAllBrands] = useState(false)
+  const [isEditingArticle, setIsEditingArticle] = useState(false)
+  const [editArticleTitle, setEditArticleTitle] = useState('')
+  const [editArticleBody, setEditArticleBody] = useState('')
   const [storedTaskRows] = useStoredState('geo.taskRows', taskRows)
   const [galleryRows] = useStoredState<string[][]>('geo.galleryRows', [])
   const activeBrandHasGeneratedArticles = articleRows.some((article) => article.project === activeBrand && article.status === '已生成')
@@ -3598,6 +3648,7 @@ function LibraryPage({ notify, navigate, articleRows, setArticleRows, activeBran
           id,
           project: article.project || activeBrand,
           taskName: article.batchId ? article.taskName ?? '未命名任务' : `${article.project || activeBrand}历史成品`,
+          batchLabel: article.batchLabel || '',
           total: 0,
           passed: 0,
           failed: 0,
@@ -3611,9 +3662,9 @@ function LibraryPage({ notify, navigate, articleRows, setArticleRows, activeBran
         if (article.generationSource === 'API资料调用未返回') current.fallback += 1
         map.set(id, current)
         return map
-      }, new Map<string, { id: string; project: string; taskName: string; total: number; passed: number; failed: number; api: number; fallback: number }>())
+      }, new Map<string, { id: string; project: string; taskName: string; batchLabel: string; total: number; passed: number; failed: number; api: number; fallback: number }>())
       .values(),
-  ).sort((left, right) => Number(right.id.split('-').at(-1) || 0) - Number(left.id.split('-').at(-1) || 0))
+  ).sort((left, right) => right.id.localeCompare(left.id, 'zh-CN', { numeric: true }))
   const defaultBatchId = batches.find((batch) => batch.passed > 0)?.id || batches[0]?.id || ''
   const activeBatchHasArticles = batches.some((batch) => batch.id === activeBatchId && batch.passed > 0)
   const latestBatchId = activeBatchHasArticles ? activeBatchId : defaultBatchId
@@ -3629,7 +3680,24 @@ function LibraryPage({ notify, navigate, articleRows, setArticleRows, activeBran
   const selectedPassedArticles = passedArticles.filter((article) => selectedArticles.includes(article.id))
   const taskForBatch = storedTaskRows.find((row) => row.batchId === latestBatchId)
   const allCurrentBatchArticles = scopedArticles.filter(articleInSelectedBatch)
-  const imageCountForArticle = (article: Article) => galleryRows.filter((row) => row[0] === (article.project || activeBrand)).length
+  const imageCountForArticle = (article: Article) => article.imagePaths?.length || galleryRows.filter((row) => row[0] === (article.project || activeBrand)).length
+  const openArticleReader = (article: Article) => {
+    setPreviewId(article.id)
+    setEditArticleTitle(article.title)
+    setEditArticleBody(article.body || '')
+    setIsEditingArticle(false)
+  }
+  const savePreviewArticle = () => {
+    if (!previewArticle) return
+    const nextBody = editArticleBody.trim()
+    setArticleRows((current) => current.map((article) => (
+      article.id === previewArticle.id
+        ? { ...article, title: editArticleTitle.trim() || article.title, body: nextBody, words: String(chineseCount(nextBody)) }
+        : article
+    )))
+    setIsEditingArticle(false)
+    notify('文章已保存，下载会使用当前编辑后的版本。')
+  }
   const toggleSelectedArticle = (id: string) => {
     setSelectedArticles((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]))
   }
@@ -3725,7 +3793,6 @@ function LibraryPage({ notify, navigate, articleRows, setArticleRows, activeBran
             </button>
           </div>
           <div className="toolbar-group primary-group">
-            <button className="ghost-button" disabled={!passedArticles.length} onClick={() => notify('图文版会读取图片素材库的封面和正文配图，当前先保持正文不改写。')}>图文编排</button>
             <button className="ghost-button" disabled={!passedArticles.length} onClick={downloadSelectedArticles}>{selectedPassedArticles.length ? `下载选中${selectedPassedArticles.length}篇` : '下载当前批次'}</button>
             <button className="ghost-button" disabled={!allBrandPassedArticles.length} onClick={downloadAllArticles}>下载全部Word</button>
             <button
@@ -3744,10 +3811,11 @@ function LibraryPage({ notify, navigate, articleRows, setArticleRows, activeBran
       <div className="panel">
         <SectionTitle icon={ListChecks} title="文章任务列表" desc="一次生成任务对应一批文章；没有批次号的旧成品已归到历史成品，点击即可查看。" />
         <div className="ops-table task-batch-table">
-          <div className="ops-head"><span>任务名</span><span>品牌</span><span>总数</span><span>已生成</span><span>接口无正文</span><span>API成稿</span><span>API未返回</span><span>操作</span></div>
+            <div className="ops-head"><span>任务名</span><span>生成时间</span><span>品牌</span><span>总数</span><span>已生成</span><span>接口无正文</span><span>API成稿</span><span>API未返回</span><span>操作</span></div>
           {batches.map((batch) => (
             <div className={batch.id === latestBatchId ? 'ops-row active-row' : 'ops-row'} key={batch.id}>
               <strong>{batch.taskName}</strong>
+              <span>{batch.batchLabel || batch.id}</span>
               <span>{batch.project}</span>
               <span>{batch.total}</span>
               <span>{batch.passed}</span>
@@ -3785,7 +3853,7 @@ function LibraryPage({ notify, navigate, articleRows, setArticleRows, activeBran
               </label>
               <strong>{article.title}</strong><span>{article.keyword}</span><span>{imageCountForArticle(article) ? `${imageCountForArticle(article)}张可用` : '待上传'}</span><span>{displayGenerationSource(article.generationSource)}</span><span>{article.words}字</span><span className="pill">{article.status}</span>
               <span className="row-actions">
-                <button onClick={() => setPreviewId(article.id)}>全文查看</button>
+                <button onClick={() => openArticleReader(article)}>全文查看</button>
                 <button onClick={() => downloadArticles([article], article.title)}>下载</button>
                 <button className="danger-button" onClick={() => deleteLibraryArticle(article.id)}>删除</button>
               </span>
@@ -3806,16 +3874,43 @@ function LibraryPage({ notify, navigate, articleRows, setArticleRows, activeBran
           <div className="form-modal wide-modal article-reader-modal">
             <div className="modal-head">
               <strong>全文查看</strong>
-              <button onClick={() => setPreviewId('')}>关闭</button>
+              <button onClick={() => {
+                setPreviewId('')
+                setIsEditingArticle(false)
+              }}>关闭</button>
             </div>
-            <div className="text-area-box article-reader">
-              <strong>{previewArticle.title}</strong>
-              <p>核心词：{previewArticle.keyword}；字数：{previewArticle.words}字；来源：{displayGenerationSource(previewArticle.generationSource)}；状态：{previewArticle.status}。</p>
-              {previewArticle.body ? <pre>{previewArticle.body}</pre> : <p>当前文章暂无完整正文。</p>}
+            <div className="article-reader">
+              {isEditingArticle ? (
+                <div className="article-editor">
+                  <label>
+                    <span>文章标题</span>
+                    <input value={editArticleTitle} onChange={(event) => setEditArticleTitle(event.target.value)} />
+                  </label>
+                  <label>
+                    <span>文章正文</span>
+                    <textarea value={editArticleBody} onChange={(event) => setEditArticleBody(event.target.value)} />
+                  </label>
+                </div>
+              ) : (
+                <article className="article-page-view">
+                  <h1>{previewArticle.title}</h1>
+                  <div className="article-meta-line">
+                    <span>核心词：{previewArticle.keyword}</span>
+                    <span>字数：{previewArticle.words}字</span>
+                    <span>配图：{previewArticle.imagePaths?.length || imageCountForArticle(previewArticle)}张</span>
+                    <span>{displayGenerationSource(previewArticle.generationSource)}</span>
+                  </div>
+                  <div className="article-content-view">
+                    {previewArticle.body ? renderArticleBody(previewArticle.body) : <p>当前文章暂无完整正文。</p>}
+                  </div>
+                </article>
+              )}
             </div>
             <div className="modal-actions">
               <button className="ghost-button" onClick={() => downloadArticles([previewArticle], previewArticle.title)}>下载本文</button>
-              <button className="primary-button" onClick={() => setPreviewId('')}>完成</button>
+              <button className="ghost-button" onClick={() => setIsEditingArticle((current) => !current)}>{isEditingArticle ? '取消编辑' : '编辑文章'}</button>
+              {isEditingArticle && <button className="primary-button" onClick={savePreviewArticle}>保存修改</button>}
+              {!isEditingArticle && <button className="primary-button" onClick={() => setPreviewId('')}>完成</button>}
             </div>
           </div>
         </div>
