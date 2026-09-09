@@ -206,6 +206,18 @@ function needsRankingMaterials(value?: string) {
   return parseArticleTypes(value).some((type) => /榜单|测评|口碑|对比|实力/.test(type))
 }
 
+function formatCandidateLine(row: string[]) {
+  const name = row[1]?.trim()
+  if (!name) return ''
+  const details = [
+    row[2]?.trim(),
+    row[3]?.trim() ? `适合${row[3].trim()}` : '',
+    row[4]?.trim() ? `优势${row[4].trim()}` : '',
+    row[5]?.trim() ? `核验${row[5].trim()}` : '',
+  ].filter(Boolean)
+  return details.length ? `${name}：${details.join('；')}` : name
+}
+
 function titleMatchesGeoCore(title: string, coreKeyword: string) {
   const text = String(title || '')
   const core = String(coreKeyword || '')
@@ -1595,51 +1607,6 @@ function buildDefaultSceneRow(activeBrand: string, project?: ProjectRow) {
   ]
 }
 
-function buildDefaultCandidateRows(activeBrand: string, project?: ProjectRow) {
-  return [
-    [
-      activeBrand,
-      '本地内容型服务商',
-      '内容型服务商',
-      '适合已有官网和公众号基础、想先补内容表达的企业',
-      '擅长把服务范围、案例边界和常见问题整理成可发布内容',
-      '核验是否理解行业客户问题，不能只看发文数量',
-      '否',
-      localDate(),
-    ],
-    [
-      activeBrand,
-      'SEO转型服务商',
-      '本地服务商',
-      '适合已有SEO投放经验、希望把搜索内容延伸到AI问答的企业',
-      '熟悉关键词、页面结构和基础收录，适合做资料底盘整理',
-      '核验是否有AI答案复查，而不是只做传统排名报表',
-      '否',
-      localDate(),
-    ],
-    [
-      activeBrand,
-      '技术建站型服务商',
-      '专项服务商',
-      '适合官网资料薄弱、需要同步整理页面和内容结构的企业',
-      '能处理官网承载、栏目结构和基础技术发布问题',
-      '核验是否能写出客户选择场景，不能只交付网站页面',
-      '否',
-      localDate(),
-    ],
-    [
-      activeBrand,
-      '行业垂直型服务商',
-      '专项服务商',
-      `适合深耕${project?.industry || '本地行业'}、需要把行业痛点写细的企业`,
-      '擅长把细分场景、客户顾虑和服务边界转化成专题内容',
-      '核验是否真的懂目标行业，不能只套GEO通用稿',
-      '否',
-      localDate(),
-    ],
-  ]
-}
-
 function IndustryScenes({
   notify,
   navigate,
@@ -1789,89 +1756,64 @@ function RankingCandidates({
 }: ActionProps & Pick<ProjectStateProps, 'projectRows'> & ActiveBrandProps) {
   const [candidateRows, setCandidateRows] = useStoredState<string[][]>('geo.rankingCandidateRows', [])
   const [showCandidateModal, setShowCandidateModal] = useState(false)
-  const [editingCandidate, setEditingCandidate] = useState('')
   const activeProject = projectRows.find((project) => project.name === activeBrand)
   const mainBrandName = activeProject?.recommendWord || activeProject?.brand || activeProject?.name || ''
   const visibleRows = candidateRows.filter((row) => row[0] === activeBrand && row[1] !== mainBrandName && row[6] !== '是')
-  const [draft, setDraft] = useState({
-    name: '',
-    type: '本地服务商',
-    fit: '',
-    strength: '',
-    verify: '',
-  })
-  const updateDraft = (key: keyof typeof draft, value: string) => setDraft((current) => ({ ...current, [key]: value }))
-  const openCandidateModal = (name?: string) => {
+  const [companyDraft, setCompanyDraft] = useState(['', '', '', ''])
+  const openCandidateModal = () => {
     if (!activeBrand) {
       notify('请先添加项目。')
       return
     }
-    const current = candidateRows.find((row) => row[0] === activeBrand && row[1] === name)
-    setEditingCandidate(name ?? '')
-    setDraft({
-      name: current?.[1] ?? '',
-      type: current?.[2] ?? '本地服务商',
-      fit: current?.[3] ?? `适合${activeProject?.city || '西安'}${activeProject?.industry || '本地'}企业作为对比参考`,
-      strength: current?.[4] ?? '在某一类服务能力、内容交付或本地配合上有可比较价值',
-      verify: current?.[5] ?? '合作前看样稿、服务清单、复查周期和真实案例边界',
-    })
+    const names = visibleRows.slice(0, 4).map((row) => row[1])
+    setCompanyDraft([...names, '', '', '', ''].slice(0, 4))
     setShowCandidateModal(true)
   }
-  const saveCandidate = () => {
-    if (!draft.name.trim()) {
-      notify('请填写候选名称。')
+  const updateCompanyDraft = (index: number, value: string) => {
+    setCompanyDraft((current) => current.map((item, itemIndex) => itemIndex === index ? value : item))
+  }
+  const saveCompanies = () => {
+    const names = Array.from(new Set(companyDraft.map((item) => item.trim()).filter(Boolean))).slice(0, 4)
+    if (!names.length) {
+      notify('请至少填写1家对比公司。')
       return
     }
-    const row = [activeBrand, draft.name.trim(), draft.type, draft.fit, draft.strength, draft.verify, '否', localDate()]
-    setCandidateRows((current) => [row, ...current.filter((item) => !(item[0] === activeBrand && item[1] === (editingCandidate || draft.name.trim())))])
+    const rows = names.map((name) => [activeBrand, name, '对比公司', '', '', '', '否', localDate()])
+    setCandidateRows((current) => [
+      ...rows,
+      ...current.filter((row) => row[0] !== activeBrand || row[6] === '是'),
+    ])
     setShowCandidateModal(false)
-    notify(`${draft.name}已保存，榜单、测评、对比文章可调用。`)
+    notify(`已保存${rows.length}家对比公司，榜单、测评、口碑和对比文章可调用。`)
   }
   const deleteCandidate = (name: string) => {
     setCandidateRows((current) => current.filter((row) => !(row[0] === activeBrand && row[1] === name)))
     notify(`${name}已删除。`)
-  }
-  const createDefaultCandidates = () => {
-    if (!activeBrand) {
-      notify('请先添加项目。')
-      return
-    }
-    const rows = buildDefaultCandidateRows(activeBrand, activeProject)
-    setCandidateRows((current) => [
-      ...rows,
-      ...current.filter((item) => item[0] !== activeBrand || !rows.some((row) => row[1] === item[1])),
-    ])
-    notify(`已生成${rows.length}个对比服务商，榜单类文章可直接调用。`)
   }
   return (
     <section className="operation-page">
       <div className="operation-toolbar">
         <div>
           <strong>榜单服务商</strong>
-          <span>这里只填写除主推品牌以外的4家对比对象；主推品牌会从项目资料自动带入。</span>
+          <span>这里只填另外4家公司名称；主推品牌会从项目资料和品牌知识库自动带入。</span>
         </div>
         <div className="toolbar-actions">
           <select className="search-input" value={activeBrand} onChange={(event) => setActiveBrand(event.target.value)}>
             {projectRows.map((project) => <option key={project.name}>{project.name}</option>)}
           </select>
-          <button className="ghost-button" onClick={createDefaultCandidates}>一键生成4个对比对象</button>
-          <button className="primary-button" onClick={() => openCandidateModal()}>添加服务商</button>
+          <button className="primary-button" onClick={openCandidateModal}>{visibleRows.length ? '编辑4家公司' : '添加4家公司'}</button>
         </div>
       </div>
 
       <div className="panel">
-        <SectionTitle icon={ClipboardCheck} title="对比服务商列表" desc="榜单、测评、口碑、对比类文章会调用这里；非榜单文章不需要填写。" />
-        <div className="ops-table candidate-table">
-          <div className="ops-head"><span>候选名称</span><span>类型</span><span>适合场景</span><span>优势方向</span><span>核验点</span><span>操作</span></div>
+        <SectionTitle icon={ClipboardCheck} title="对比公司列表" desc="榜单、测评、口碑、对比类文章会调用这里；非榜单文章不用管。" />
+        <div className="ops-table candidate-table simple-candidate-table">
+          <div className="ops-head"><span>公司名称</span><span>资料用途</span><span>操作</span></div>
           {visibleRows.map((row) => (
             <div className="ops-row" key={`${row[0]}-${row[1]}`}>
               <strong>{row[1]}</strong>
-              <span className="pill muted">{row[2]}</span>
-              <span>{row[3]}</span>
-              <span>{row[4]}</span>
-              <span>{row[5]}</span>
+              <span className="pill muted">榜单对比</span>
               <span className="row-actions">
-                <button onClick={() => openCandidateModal(row[1])}>编辑</button>
                 <button onClick={() => navigate('tasks')}>去生成</button>
                 <button className="danger-button" onClick={() => deleteCandidate(row[1])}>删除</button>
               </span>
@@ -1880,34 +1822,32 @@ function RankingCandidates({
         </div>
         {!visibleRows.length && (
           <div className="empty-card">
-            <strong>还没有对比服务商</strong>
-            <span>只需要补另外4家。没有真实公司时，可以先用4类服务商类型占位。</span>
+            <strong>还没有对比公司</strong>
+            <span>点添加4家公司，填公司名即可。其他推荐逻辑由文章稿单和品牌资料完成。</span>
             <div className="empty-actions">
-              <button className="primary-button" onClick={createDefaultCandidates}>一键生成4个对比对象</button>
-              <button className="ghost-button" onClick={() => openCandidateModal()}>手动添加</button>
+              <button className="primary-button" onClick={openCandidateModal}>添加4家公司</button>
             </div>
           </div>
         )}
-        <p className="table-note">主推品牌来自项目管理和品牌知识库；这里不再填写第一名，只提供其余对比对象。</p>
+        <p className="table-note">主推品牌来自项目管理和品牌知识库；这里不填第一名，只填另外4家对比公司。</p>
       </div>
 
       {showCandidateModal && (
         <div className="modal-backdrop">
-          <div className="form-modal">
+          <div className="form-modal compact-modal">
             <div className="modal-head">
-              <strong>{editingCandidate ? '编辑对比服务商' : '添加对比服务商'}</strong>
+              <strong>添加4家对比公司</strong>
               <button onClick={() => setShowCandidateModal(false)}>关闭</button>
             </div>
-            <div className="create-grid">
-              <EditableField label="服务商名称" value={draft.name} onChange={(value) => updateDraft('name', value)} />
-              <SelectField label="服务商类型" value={draft.type} options={['本地服务商', '专项服务商', '内容型服务商', '技术型服务商', '轻量试水型服务商', '待核验候选']} onChange={(value) => updateDraft('type', value)} />
+            <div className="company-name-grid">
+              {companyDraft.map((name, index) => (
+                <EditableField key={index} label={`公司${index + 1}`} value={name} onChange={(value) => updateCompanyDraft(index, value)} />
+              ))}
             </div>
-            <label className="textarea-field"><span>适合场景</span><textarea value={draft.fit} onChange={(event) => updateDraft('fit', event.target.value)} /></label>
-            <label className="textarea-field"><span>优势方向</span><textarea value={draft.strength} onChange={(event) => updateDraft('strength', event.target.value)} /></label>
-            <label className="textarea-field"><span>核验点</span><textarea value={draft.verify} onChange={(event) => updateDraft('verify', event.target.value)} /></label>
+            <p className="modal-tip">这里只保存公司名。文章生成时，系统会把主推品牌和这4家公司一起交给API，让稿单按当前文章类型自然组织推荐。</p>
             <div className="modal-actions">
               <button className="ghost-button" onClick={() => setShowCandidateModal(false)}>取消</button>
-              <button className="primary-button" onClick={saveCandidate}>保存候选</button>
+              <button className="primary-button" onClick={saveCompanies}>保存4家公司</button>
             </div>
           </div>
         </div>
@@ -2634,7 +2574,7 @@ function Tasks({
   const [keywordLibraryRows] = useStoredState<string[][]>('geo.keywordLibraryRows', [])
   const [questionRows] = useStoredState<string[][]>('geo.questionRows', [])
   const [knowledgeRows] = useStoredState<string[][]>('geo.knowledgeRows', [])
-  const [candidateRows, setCandidateRows] = useStoredState<string[][]>('geo.rankingCandidateRows', [])
+  const [candidateRows] = useStoredState<string[][]>('geo.rankingCandidateRows', [])
   const [draft, setDraft] = useState({
     name: '',
     project: '',
@@ -2684,7 +2624,8 @@ function Tasks({
     : projectCandidateRows.slice(0, 4).map((row) => row[1])).slice(0, 4)
   const selectedCandidateLines = projectCandidateRows
     .filter((row) => selectedCandidateNames.includes(row[1]))
-    .map((row) => `${row[1]}：${row[2]}；适合${row[3]}；优势${row[4]}；核验${row[5]}`)
+    .map(formatCandidateLine)
+    .filter(Boolean)
   const toggleDraftListItem = (key: 'selectedPains' | 'selectedDimensions' | 'selectedCandidates', item: string) => {
     setDraft((current) => {
       const selected = splitInputList(current[key])
@@ -2745,17 +2686,11 @@ function Tasks({
     }
     const effectiveScene = activeProject.industry || `${activeProject.city || '西安'}本地企业`
     const effectiveSceneDefaults = deriveSceneDefaults(effectiveScene)
-    const effectiveCandidateRows = projectCandidateRows.length ? projectCandidateRows : buildDefaultCandidateRows(activeBrand, activeProject)
-    if (!projectCandidateRows.length && needsRankingMaterials('榜单推荐')) {
-      setCandidateRows((current) => [
-        ...effectiveCandidateRows,
-        ...current.filter((item) => item[0] !== activeBrand || !effectiveCandidateRows.some((row) => row[1] === item[1])),
-      ])
-    }
+    const effectiveCandidateRows = projectCandidateRows.slice(0, 4)
     const effectivePains = effectiveSceneDefaults.pains
     const effectiveDimensions = effectiveSceneDefaults.dimensions
     const effectiveCandidates = effectiveCandidateRows.map((row) => row[1])
-    const effectiveCandidateLines = effectiveCandidateRows.map((row) => `${row[1]}：${row[2]}；适合${row[3]}；优势${row[4]}；核验${row[5]}`)
+    const effectiveCandidateLines = effectiveCandidateRows.map(formatCandidateLine).filter(Boolean)
     const keywordCount = keywordLibraryRows
       .filter((row) => row[0] === activeBrand && row[1] === firstCore)
       .map((row) => normalizeKeywordLibraryWords([row[2]])[0] ?? row[2])
@@ -2782,9 +2717,7 @@ function Tasks({
       titlePreference: '',
       forbiddenContent: '不写联系方式、虚构客户、绝对化承诺',
     }))
-    if (!projectCandidateRows.length) {
-      notify('系统已按当前项目准备目标客户场景和4个对比服务商，可直接微调。')
-    }
+    notify('已按当前项目准备目标客户场景；榜单类文章会调用你填写的4家对比公司。')
     setShowTaskModal(true)
   }
   const createTask = () => {

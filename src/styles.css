@@ -671,9 +671,9 @@ p {
 }
 
 .operation-toolbar {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
   gap: 18px;
   min-width: 0;
   padding: 18px 22px;
@@ -1051,6 +1051,7 @@ select.search-input {
   padding: 0 12px;
   color: #1f2a3d;
   background: #f8fafc;
+  font-size: 14px;
 }
 
 .status-line {
@@ -1413,6 +1414,13 @@ select.search-input {
   line-height: 1.45;
 }
 
+.ops-head span,
+.ops-row span,
+.ops-row strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .ops-row button {
   justify-self: start;
   min-height: 32px;
@@ -1434,6 +1442,7 @@ select.search-input {
 .row-actions {
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   gap: 7px;
   flex-wrap: wrap;
 }
@@ -1518,9 +1527,12 @@ select.search-input {
 }
 
 .scene-table,
-.candidate-table,
 .graphic-table {
   min-width: 960px;
+}
+
+.candidate-table {
+  min-width: 720px;
 }
 
 .scene-table .ops-head,
@@ -1533,6 +1545,16 @@ select.search-input {
 .candidate-table .ops-row {
   grid-template-columns: minmax(150px, 0.9fr) 116px minmax(190px, 1fr) minmax(210px, 1.2fr) minmax(190px, 1fr) 170px;
   gap: 8px;
+}
+
+.simple-candidate-table {
+  min-width: 620px;
+}
+
+.simple-candidate-table .ops-head,
+.simple-candidate-table .ops-row {
+  grid-template-columns: minmax(260px, 1fr) 130px 150px;
+  gap: 10px;
 }
 
 .graphic-table .ops-head,
@@ -1973,6 +1995,10 @@ select.search-input {
   box-shadow: 0 30px 80px rgba(15, 23, 42, 0.24);
 }
 
+.compact-modal {
+  width: min(620px, 100%);
+}
+
 .wide-modal {
   width: min(980px, 100%);
 }
@@ -2071,6 +2097,23 @@ select.search-input {
   padding: 0 22px;
   color: #fff;
   background: #2563eb;
+}
+
+.company-name-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.modal-tip {
+  margin: 14px 0 0;
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: #475569;
+  background: #f8fbff;
+  font-size: 13px;
+  line-height: 1.7;
 }
 
 .modal-head strong {
@@ -2801,5 +2844,25 @@ select.search-input {
 
   .inspector {
     display: none;
+  }
+}
+
+@media (max-width: 960px) {
+  .operation-toolbar {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .toolbar-actions,
+  .toolbar-group {
+    justify-content: flex-start;
+  }
+
+  .toolbar-actions .search-input {
+    flex-basis: 100%;
+  }
+
+  .company-name-grid {
+    grid-template-columns: 1fr;
   }
 }
