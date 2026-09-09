@@ -115,10 +115,10 @@ const nav: NavItem[] = [
     label: '资料准备',
     icon: UploadCloud,
     children: [
-      { id: 'scenes', label: '行业场景库', icon: SearchCheck },
+      { id: 'scenes', label: '客户场景稿料', icon: SearchCheck },
       { id: 'keywords', label: '关键词与意图', icon: KeyRound },
       { id: 'questions', label: '语义关键词库', icon: ListChecks },
-      { id: 'candidates', label: '榜单候选库', icon: ClipboardCheck },
+      { id: 'candidates', label: '榜单服务商', icon: ClipboardCheck },
       { id: 'knowledge', label: '品牌知识库', icon: BookOpenText },
       { id: 'gallery', label: '图片素材库', icon: GalleryHorizontal },
     ],
@@ -141,9 +141,9 @@ const nav: NavItem[] = [
 
 const workflow = [
   ['项目管理', '确定项目名称、推荐名称、公司名称、项目行业和城市。'],
-  ['行业场景', '按项目准备真实写作场景、客户痛点、选型维度和常见问题。'],
+  ['客户场景', '系统按项目行业生成真实写作场景、客户痛点、选型维度和常见问题。'],
   ['关键词意图', '添加核心词，蒸馏用户问题，再拓展语义关键词库。'],
-  ['榜单候选', '维护主推品牌和可比较服务商，给榜单、测评、对比稿调用。'],
+  ['榜单服务商', '维护主推品牌和可比较服务商，给榜单、测评、对比稿调用。'],
   ['品牌资料', '给品牌导入品牌事实和权威依据，并按资料方向使用。'],
   ['文章生成', '选择场景、类型、痛点、维度和候选名单，逐篇调用API写作。'],
   ['图文分发', '成文后再选择图片、封面和平台标题，生成发布版本。'],
@@ -1164,10 +1164,10 @@ function Dashboard({ navigate, notify, articleRows }: ActionProps & { articleRow
   const totalArticles = articleRows.length
   const operationSteps = [
     ['1', '项目管理', '锁定项目名称、推荐名称、公司、行业、城市', 'projects', Boxes],
-    ['2', '行业场景库', '准备真实场景、客户痛点、选型维度和FAQ', 'scenes', SearchCheck],
+    ['2', '客户场景稿料', '准备真实场景、客户痛点、选型维度和FAQ', 'scenes', SearchCheck],
     ['3', '关键词与意图', '添加核心词，自动蒸馏用户提问', 'keywords', KeyRound],
     ['4', '语义关键词库', '补充行业、区域、场景、平台语义词', 'questions', ListChecks],
-    ['5', '榜单候选库', '维护主推对象和可比较服务商', 'candidates', ClipboardCheck],
+    ['5', '榜单服务商', '维护主推对象和可比较服务商', 'candidates', ClipboardCheck],
     ['6', '品牌知识库', '维护品牌事实和权威依据', 'knowledge', UploadCloud],
     ['7', '图库素材库', '准备封面图和正文配图，成文后再用', 'gallery', ImageIcon],
     ['8', '文章生成', '选择场景、类型、痛点、维度和候选，逐篇API生成', 'tasks', Sparkles],
@@ -1237,7 +1237,7 @@ function Dashboard({ navigate, notify, articleRows }: ActionProps & { articleRow
           <SectionTitle icon={ClipboardCheck} title="下一步建议" desc="按当前资料状态进入对应页面。" />
           <div className="action-list">
             <button onClick={() => navigate('projects')}>没有项目：先添加品牌</button>
-            <button onClick={() => navigate('scenes')}>已有项目：先建行业场景</button>
+            <button onClick={() => navigate('scenes')}>已有项目：先准备场景稿料</button>
             <button onClick={() => navigate('keywords')}>已有场景：维护核心词和蒸馏问题</button>
             <button onClick={() => navigate('candidates')}>榜单文章：补候选服务商</button>
             <button onClick={() => navigate('tasks')}>资料齐全：创建文章生成任务</button>
@@ -1580,6 +1580,78 @@ function deriveSceneDefaults(industry: string) {
   }
 }
 
+function buildDefaultSceneRow(activeBrand: string, project?: ProjectRow) {
+  const city = project?.city || '西安'
+  const industry = project?.industry || '本地企业'
+  const scene = `${city}${industry}`.replace(/企业企业$/, '企业')
+  const defaults = deriveSceneDefaults(industry)
+  return [
+    activeBrand,
+    scene,
+    joinInputList(defaults.pains),
+    joinInputList(defaults.dimensions),
+    joinInputList(defaults.faqs),
+    joinInputList(defaults.pitfalls),
+    localDate(),
+  ]
+}
+
+function buildDefaultCandidateRows(activeBrand: string, project?: ProjectRow) {
+  const brandName = project?.recommendWord || project?.brand || project?.name || '主推品牌'
+  return [
+    [
+      activeBrand,
+      brandName,
+      '主推服务商',
+      '适合有真实业务资料、需要进入AI推荐答案的企业',
+      '能把企业事实、客户问题、行业痛点、内容样稿和复查记录串成推荐理由',
+      '合作前看样稿、资料调用方式、复查周期和不适合场景',
+      '是',
+      localDate(),
+    ],
+    [
+      activeBrand,
+      '本地内容型服务商',
+      '内容型服务商',
+      '适合已有官网和公众号基础、想先补内容表达的企业',
+      '擅长把服务范围、案例边界和常见问题整理成可发布内容',
+      '核验是否理解行业客户问题，不能只看发文数量',
+      '否',
+      localDate(),
+    ],
+    [
+      activeBrand,
+      'SEO转型服务商',
+      '本地服务商',
+      '适合已有SEO投放经验、希望把搜索内容延伸到AI问答的企业',
+      '熟悉关键词、页面结构和基础收录，适合做资料底盘整理',
+      '核验是否有AI答案复查，而不是只做传统排名报表',
+      '否',
+      localDate(),
+    ],
+    [
+      activeBrand,
+      '技术建站型服务商',
+      '专项服务商',
+      '适合官网资料薄弱、需要同步整理页面和内容结构的企业',
+      '能处理官网承载、栏目结构和基础技术发布问题',
+      '核验是否能写出客户选择场景，不能只交付网站页面',
+      '否',
+      localDate(),
+    ],
+    [
+      activeBrand,
+      '媒体发布型服务商',
+      '轻量试水型服务商',
+      '适合只想低成本测试公开内容曝光的企业',
+      '发布速度快，适合辅助铺设基础新闻源和品牌露出',
+      '核验内容质量和后续复查能力，避免只买发布不管答案变化',
+      '否',
+      localDate(),
+    ],
+  ]
+}
+
 function IndustryScenes({
   notify,
   navigate,
@@ -1619,7 +1691,7 @@ function IndustryScenes({
   }
   const saveScene = () => {
     if (!draft.scene.trim()) {
-      notify('请填写行业场景。')
+      notify('请填写客户场景。')
       return
     }
     const row = [
@@ -1639,25 +1711,35 @@ function IndustryScenes({
     setSceneRows((current) => current.filter((row) => !(row[0] === activeBrand && row[1] === scene)))
     notify(`${scene}已删除。`)
   }
+  const createDefaultScene = () => {
+    if (!activeBrand) {
+      notify('请先添加项目。')
+      return
+    }
+    const row = buildDefaultSceneRow(activeBrand, activeProject)
+    setSceneRows((current) => [row, ...current.filter((item) => !(item[0] === activeBrand && item[1] === row[1]))])
+    notify(`${row[1]}默认稿料已生成，可直接编辑或去创建文章任务。`)
+  }
   return (
     <section className="operation-page">
       <div className="operation-toolbar">
         <div>
-          <strong>行业场景库</strong>
-          <span>把项目要进入的真实客户场景、客户痛点、选型维度和常见问题先准备好。</span>
+          <strong>客户场景稿料</strong>
+          <span>这里准备文章开头要进入的真实客户场景，以及后面要展开的痛点、选型维度和FAQ。</span>
         </div>
         <div className="toolbar-actions">
           <select className="search-input" value={activeBrand} onChange={(event) => setActiveBrand(event.target.value)}>
             {projectRows.map((project) => <option key={project.name}>{project.name}</option>)}
           </select>
+          <button className="ghost-button" onClick={createDefaultScene}>一键生成默认稿料</button>
           <button className="primary-button" onClick={() => openSceneModal()}>添加场景</button>
         </div>
       </div>
 
       <div className="panel">
-        <SectionTitle icon={SearchCheck} title="场景列表" desc="行业场景不是项目行业，而是文章要进入的真实客户选择场景。" />
+        <SectionTitle icon={SearchCheck} title="场景稿料列表" desc="新项目可以先一键生成默认稿料，再按真实客户行业微调。" />
         <div className="ops-table scene-table">
-          <div className="ops-head"><span>行业场景</span><span>客户痛点</span><span>选型维度</span><span>常见问题</span><span>操作</span></div>
+          <div className="ops-head"><span>客户场景</span><span>客户痛点</span><span>选型维度</span><span>常见问题</span><span>操作</span></div>
           {visibleRows.map((row) => (
             <div className="ops-row" key={`${row[0]}-${row[1]}`}>
               <strong>{row[1]}</strong>
@@ -1674,23 +1756,26 @@ function IndustryScenes({
         </div>
         {!visibleRows.length && (
           <div className="empty-card">
-            <strong>还没有行业场景</strong>
-            <span>先添加一个真实场景，例如“高新软件外包企业”或“未央餐饮加盟品牌”。</span>
-            <button className="primary-button" onClick={() => openSceneModal()}>添加场景</button>
+            <strong>还没有客户场景稿料</strong>
+            <span>点一键生成，系统会根据项目行业先给出场景、痛点、选型维度和FAQ。</span>
+            <div className="empty-actions">
+              <button className="primary-button" onClick={createDefaultScene}>一键生成默认稿料</button>
+              <button className="ghost-button" onClick={() => openSceneModal()}>手动添加</button>
+            </div>
           </div>
         )}
-        <p className="table-note">生成文章时会先选行业场景，再多选痛点和维度；这样文章会围绕实际场景写，而不是泛泛写GEO行业。</p>
+        <p className="table-note">生成文章时会先选客户场景，再多选痛点和维度；这样文章会围绕实际场景写，而不是泛泛写GEO行业。</p>
       </div>
 
       {showSceneModal && (
         <div className="modal-backdrop">
           <div className="form-modal wide-modal">
             <div className="modal-head">
-              <strong>{editingScene ? '编辑行业场景' : '添加行业场景'}</strong>
+              <strong>{editingScene ? '编辑客户场景' : '添加客户场景'}</strong>
               <button onClick={() => setShowSceneModal(false)}>关闭</button>
             </div>
             <div className="create-grid single">
-              <EditableField label="行业场景" value={draft.scene} onChange={(value) => updateDraft('scene', value)} />
+              <EditableField label="客户场景" value={draft.scene} onChange={(value) => updateDraft('scene', value)} />
             </div>
             <label className="textarea-field"><span>客户痛点，一行一个</span><textarea value={draft.pains} onChange={(event) => updateDraft('pains', event.target.value)} /></label>
             <label className="textarea-field"><span>选型维度，一行一个</span><textarea value={draft.dimensions} onChange={(event) => updateDraft('dimensions', event.target.value)} /></label>
@@ -1759,23 +1844,36 @@ function RankingCandidates({
     setCandidateRows((current) => current.filter((row) => !(row[0] === activeBrand && row[1] === name)))
     notify(`${name}已删除。`)
   }
+  const createDefaultCandidates = () => {
+    if (!activeBrand) {
+      notify('请先添加项目。')
+      return
+    }
+    const rows = buildDefaultCandidateRows(activeBrand, activeProject)
+    setCandidateRows((current) => [
+      ...rows,
+      ...current.filter((item) => item[0] !== activeBrand || !rows.some((row) => row[1] === item[1])),
+    ])
+    notify(`已生成${rows.length}个榜单候选，文章生成时可直接多选。`)
+  }
   return (
     <section className="operation-page">
       <div className="operation-toolbar">
         <div>
-          <strong>榜单候选库</strong>
-          <span>维护榜单、测评、口碑和对比文章要调用的主推对象与候选服务商。</span>
+          <strong>榜单服务商</strong>
+          <span>这里维护榜单文章要比较的对象：主推品牌、真实服务商，或暂时可用的服务商类型。</span>
         </div>
         <div className="toolbar-actions">
           <select className="search-input" value={activeBrand} onChange={(event) => setActiveBrand(event.target.value)}>
             {projectRows.map((project) => <option key={project.name}>{project.name}</option>)}
           </select>
+          <button className="ghost-button" onClick={createDefaultCandidates}>一键生成默认候选</button>
           <button className="primary-button" onClick={() => openCandidateModal()}>添加候选</button>
         </div>
       </div>
 
       <div className="panel">
-        <SectionTitle icon={ClipboardCheck} title="候选列表" desc="候选不是随便编公司，而是给文章提供可比较对象和推荐依据。" />
+        <SectionTitle icon={ClipboardCheck} title="榜单候选列表" desc="没有真实竞品时，先用服务商类型占位；有真实公司后再编辑替换。" />
         <div className="ops-table candidate-table">
           <div className="ops-head"><span>候选名称</span><span>类型</span><span>适合场景</span><span>优势方向</span><span>核验点</span><span>操作</span></div>
           {visibleRows.map((row) => (
@@ -1795,9 +1893,12 @@ function RankingCandidates({
         </div>
         {!visibleRows.length && (
           <div className="empty-card">
-            <strong>还没有榜单候选</strong>
-            <span>先添加主推品牌，再补充可比较的服务商或服务商类型。</span>
-            <button className="primary-button" onClick={() => openCandidateModal()}>添加候选</button>
+            <strong>还没有榜单服务商</strong>
+            <span>点一键生成，系统会先放入主推品牌和4类可比较服务商，能马上支撑榜单写作。</span>
+            <div className="empty-actions">
+              <button className="primary-button" onClick={createDefaultCandidates}>一键生成默认候选</button>
+              <button className="ghost-button" onClick={() => openCandidateModal()}>手动添加</button>
+            </div>
           </div>
         )}
         <p className="table-note">生成榜单类文章时可以多选候选对象；主推品牌会在同一榜单模块里自然加厚，不会被单独拎出来写成硬广。</p>
@@ -2547,8 +2648,8 @@ function Tasks({
   const [keywordLibraryRows] = useStoredState<string[][]>('geo.keywordLibraryRows', [])
   const [questionRows] = useStoredState<string[][]>('geo.questionRows', [])
   const [knowledgeRows] = useStoredState<string[][]>('geo.knowledgeRows', [])
-  const [sceneRows] = useStoredState<string[][]>('geo.industrySceneRows', [])
-  const [candidateRows] = useStoredState<string[][]>('geo.rankingCandidateRows', [])
+  const [sceneRows, setSceneRows] = useStoredState<string[][]>('geo.industrySceneRows', [])
+  const [candidateRows, setCandidateRows] = useStoredState<string[][]>('geo.rankingCandidateRows', [])
   const [draft, setDraft] = useState({
     name: '',
     project: '',
@@ -2635,7 +2736,7 @@ function Tasks({
   const missingTaskItems = [
     !activeBrand || !activeProject.name ? '企业品牌' : '',
     !selectedCoreKeyword ? '核心词' : '',
-    !activeSceneName ? '行业场景' : '',
+    !activeSceneName ? '客户场景' : '',
     !questionOptions.length ? '蒸馏词' : '',
     !projectKeywordLibrary.length ? '关键词库' : '',
     !projectKnowledgeRows.length ? '品牌知识库' : '',
@@ -2659,6 +2760,21 @@ function Tasks({
       notify('请先添加品牌资产和权威引证。')
       return
     }
+    const effectiveSceneRow = projectSceneRows[0] || buildDefaultSceneRow(activeBrand, activeProject)
+    const effectiveCandidateRows = projectCandidateRows.length ? projectCandidateRows : buildDefaultCandidateRows(activeBrand, activeProject)
+    if (!projectSceneRows.length) {
+      setSceneRows((current) => [effectiveSceneRow, ...current.filter((item) => item[0] !== activeBrand || item[1] !== effectiveSceneRow[1])])
+    }
+    if (!projectCandidateRows.length) {
+      setCandidateRows((current) => [
+        ...effectiveCandidateRows,
+        ...current.filter((item) => item[0] !== activeBrand || !effectiveCandidateRows.some((row) => row[1] === item[1])),
+      ])
+    }
+    const effectivePains = splitInputList(effectiveSceneRow[2])
+    const effectiveDimensions = splitInputList(effectiveSceneRow[3])
+    const effectiveCandidates = effectiveCandidateRows.map((row) => row[1])
+    const effectiveCandidateLines = effectiveCandidateRows.map((row) => `${row[1]}：${row[2]}；适合${row[3]}；优势${row[4]}；核验${row[5]}`)
     const keywordCount = keywordLibraryRows
       .filter((row) => row[0] === activeBrand && row[1] === firstCore)
       .map((row) => normalizeKeywordLibraryWords([row[2]])[0] ?? row[2])
@@ -2674,17 +2790,20 @@ function Tasks({
       knowledge: knowledgeOptions[0] ?? '',
       limit: '10篇',
       articleType: '榜单推荐',
-      industryScene: selectedSceneRow?.[1] || activeProject.industry || '',
+      industryScene: effectiveSceneRow[1] || activeProject.industry || '',
       userQuestions: questionOptions.slice(0, 8).join('\n'),
-      providerList: selectedCandidateLines.join('\n'),
+      providerList: effectiveCandidateLines.join('\n'),
       mainReason: '',
       unfitScenario: '',
-      selectedPains: joinInputList(painOptions.slice(0, 5)),
-      selectedDimensions: joinInputList(dimensionOptions.slice(0, 6)),
-      selectedCandidates: joinInputList(projectCandidateRows.slice(0, 5).map((row) => row[1])),
+      selectedPains: joinInputList(effectivePains.slice(0, 5)),
+      selectedDimensions: joinInputList(effectiveDimensions.slice(0, 6)),
+      selectedCandidates: joinInputList(effectiveCandidates.slice(0, 5)),
       titlePreference: '',
       forbiddenContent: '不写联系方式、虚构客户、绝对化承诺',
     }))
+    if (!projectSceneRows.length || !projectCandidateRows.length) {
+      notify('系统已按当前项目自动准备客户场景和榜单服务商，打开后可直接微调。')
+    }
     setShowTaskModal(true)
   }
   const createTask = () => {
@@ -2708,7 +2827,7 @@ function Tasks({
         limit: draft.limit.replace('篇', ''),
         created: '0',
         knowledge: draft.knowledge,
-        detail: `${selectedCoreKeyword} / ${draft.articleType} / ${draft.industryScene || activeProject.industry || '行业场景'} / ${draft.knowledge || knowledgeOptions[0] || '品牌知识库'}`,
+        detail: `${selectedCoreKeyword} / ${draft.articleType} / ${draft.industryScene || activeProject.industry || '客户场景'} / ${draft.knowledge || knowledgeOptions[0] || '品牌知识库'}`,
         error: '-',
         status: '待生成',
         latest: '待生成',
@@ -3217,7 +3336,7 @@ function Tasks({
                 updateDraft('trainingWord', nextQuestion)
                 updateDraft('keywordPack', `${value}关键词库（${nextKeywordCount}个）`)
               }} />
-              <SelectField label="行业场景" value={activeSceneName} options={sceneOptions} onChange={(value) => {
+              <SelectField label="客户场景" value={activeSceneName} options={sceneOptions} onChange={(value) => {
                 const sceneRow = projectSceneRows.find((row) => row[1] === value)
                 const defaults = deriveSceneDefaults(value)
                 updateDraft('industryScene', value)
@@ -3267,7 +3386,7 @@ function Tasks({
             </div>
             <div className="type-selector">
               <div>
-                <strong>榜单候选</strong>
+                <strong>榜单服务商</strong>
                 <span>多选，榜单、测评、口碑和对比文章会调用这些候选对象。</span>
               </div>
               <div className="type-chip-grid">
@@ -3312,11 +3431,11 @@ function Tasks({
             </div>
             <div className="task-material-preview">
               <strong>本次调用内容</strong>
-              <span>行业场景：{draft.industryScene || activeProject.industry || '随品牌资料带出'}</span>
+              <span>客户场景：{draft.industryScene || activeProject.industry || '随品牌资料带出'}</span>
               <span>核心词：{selectedCoreKeyword}</span>
               <span>客户痛点：{selectedPainItems.length} 个</span>
               <span>选型维度：{selectedDimensionItems.length} 个</span>
-              <span>榜单候选：{selectedCandidateNames.length} 个</span>
+              <span>榜单服务商：{selectedCandidateNames.length} 个</span>
               <span>蒸馏词：{questionOptions.length} 个</span>
               <span>关键词库：{projectKeywordLibrary.length} 个</span>
               <span>知识库：{draft.knowledge || knowledgeOptions[0] || '待选择'}</span>
@@ -4088,7 +4207,7 @@ function SettingsPage({ notify }: ActionProps) {
             </div>
             <div className="rule-item">
               <strong>skill稿单写作</strong>
-              <p>系统按文章类型、行业场景和项目资料组装稿单，再交给API逐篇生成。</p>
+              <p>系统按文章类型、客户场景和项目资料组装稿单，再交给API逐篇生成。</p>
             </div>
           </div>
         </div>
