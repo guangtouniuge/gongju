@@ -115,7 +115,6 @@ const nav: NavItem[] = [
     label: '资料准备',
     icon: UploadCloud,
     children: [
-      { id: 'scenes', label: '客户场景稿料', icon: SearchCheck },
       { id: 'keywords', label: '关键词与意图', icon: KeyRound },
       { id: 'questions', label: '语义关键词库', icon: ListChecks },
       { id: 'candidates', label: '榜单服务商', icon: ClipboardCheck },
@@ -141,11 +140,10 @@ const nav: NavItem[] = [
 
 const workflow = [
   ['项目管理', '确定项目名称、推荐名称、公司名称、项目行业和城市。'],
-  ['客户场景', '系统按项目行业生成真实写作场景、客户痛点、选型维度和常见问题。'],
   ['关键词意图', '添加核心词，蒸馏用户问题，再拓展语义关键词库。'],
   ['榜单服务商', '维护主推品牌和可比较服务商，给榜单、测评、对比稿调用。'],
   ['品牌资料', '给品牌导入品牌事实和权威依据，并按资料方向使用。'],
-  ['文章生成', '选择场景、类型、痛点、维度和候选名单，逐篇调用API写作。'],
+  ['文章生成', '填写目标客户行业，系统自动带出痛点、维度和FAQ，逐篇调用API写作。'],
   ['图文分发', '成文后再选择图片、封面和平台标题，生成发布版本。'],
 ]
 
@@ -202,6 +200,10 @@ function parseArticleTypes(value?: string) {
     .map((item) => item.trim())
     .filter(Boolean)
   return items.length ? Array.from(new Set(items)) : ['榜单推荐']
+}
+
+function needsRankingMaterials(value?: string) {
+  return parseArticleTypes(value).some((type) => /榜单|测评|口碑|对比|实力/.test(type))
 }
 
 function titleMatchesGeoCore(title: string, coreKeyword: string) {
@@ -1138,7 +1140,6 @@ function App() {
         {active === 'projects' && <Projects navigate={setActive} notify={notify} projectRows={projectRows} setProjectRows={setProjectRows} activeBrand={activeBrand} setActiveBrand={selectActiveBrand} setActiveKeyword={setActiveKeyword} setArticleRows={setArticleRows} />}
         {active === 'visibility' && <Diagnosis navigate={setActive} notify={notify} />}
         {active === 'reports' && <Reports navigate={setActive} notify={notify} />}
-        {active === 'scenes' && <IndustryScenes navigate={setActive} notify={notify} projectRows={projectRows} activeBrand={activeBrand} setActiveBrand={selectActiveBrand} />}
         {active === 'keywords' && <Keywords navigate={setActive} notify={notify} projectRows={projectRows} activeBrand={activeBrand} setActiveBrand={selectActiveBrand} activeKeyword={activeKeyword} setActiveKeyword={setActiveKeyword} />}
         {active === 'questions' && <KeywordLibrary navigate={setActive} notify={notify} projectRows={projectRows} activeBrand={activeBrand} setActiveBrand={selectActiveBrand} activeKeyword={activeKeyword} setActiveKeyword={setActiveKeyword} />}
         {active === 'candidates' && <RankingCandidates navigate={setActive} notify={notify} projectRows={projectRows} activeBrand={activeBrand} setActiveBrand={selectActiveBrand} />}
@@ -1164,16 +1165,15 @@ function Dashboard({ navigate, notify, articleRows }: ActionProps & { articleRow
   const totalArticles = articleRows.length
   const operationSteps = [
     ['1', '项目管理', '锁定项目名称、推荐名称、公司、行业、城市', 'projects', Boxes],
-    ['2', '客户场景稿料', '准备真实场景、客户痛点、选型维度和FAQ', 'scenes', SearchCheck],
-    ['3', '关键词与意图', '添加核心词，自动蒸馏用户提问', 'keywords', KeyRound],
-    ['4', '语义关键词库', '补充行业、区域、场景、平台语义词', 'questions', ListChecks],
-    ['5', '榜单服务商', '维护主推对象和可比较服务商', 'candidates', ClipboardCheck],
-    ['6', '品牌知识库', '维护品牌事实和权威依据', 'knowledge', UploadCloud],
-    ['7', '图库素材库', '准备封面图和正文配图，成文后再用', 'gallery', ImageIcon],
-    ['8', '文章生成', '选择场景、类型、痛点、维度和候选，逐篇API生成', 'tasks', Sparkles],
-    ['9', '成品文章库', '查看、编辑、批量下载Word', 'library', Library],
-    ['10', '图文加工', '成文后选择封面、正文图和平台摘要', 'graphic', ImageIcon],
-    ['11', '分发发布', '选择平台进入发布队列', 'distribution', Send],
+    ['2', '关键词与意图', '添加核心词，自动蒸馏用户提问', 'keywords', KeyRound],
+    ['3', '语义关键词库', '补充行业、区域、场景、平台语义词', 'questions', ListChecks],
+    ['4', '榜单服务商', '只维护另外4家对比对象，非榜单文章可不填', 'candidates', ClipboardCheck],
+    ['5', '品牌知识库', '维护品牌事实和权威依据', 'knowledge', UploadCloud],
+    ['6', '图库素材库', '准备封面图和正文配图，成文后再用', 'gallery', ImageIcon],
+    ['7', '文章生成', '填写目标客户行业，自动带出痛点和维度', 'tasks', Sparkles],
+    ['8', '成品文章库', '查看、编辑、批量下载Word', 'library', Library],
+    ['9', '图文加工', '成文后选择封面、正文图和平台摘要', 'graphic', ImageIcon],
+    ['10', '分发发布', '选择平台进入发布队列', 'distribution', Send],
   ] as const
   const statusCards = [
     ['成品文章', String(passedArticles), '可下载、可进入发布流程', Library],
@@ -1187,7 +1187,7 @@ function Dashboard({ navigate, notify, articleRows }: ActionProps & { articleRow
       <div className="operation-toolbar workbench-toolbar">
         <div>
           <strong>首页大屏</strong>
-          <span>按项目、场景、关键词、候选、知识库、生成和图文分发组织操作。</span>
+          <span>按项目、关键词、对比服务商、知识库、文章生成和图文分发组织操作。</span>
         </div>
         <div className="toolbar-actions">
           <button className="ghost-button" onClick={() => navigate('library')}>查看文章库</button>
@@ -1237,9 +1237,8 @@ function Dashboard({ navigate, notify, articleRows }: ActionProps & { articleRow
           <SectionTitle icon={ClipboardCheck} title="下一步建议" desc="按当前资料状态进入对应页面。" />
           <div className="action-list">
             <button onClick={() => navigate('projects')}>没有项目：先添加品牌</button>
-            <button onClick={() => navigate('scenes')}>已有项目：先准备场景稿料</button>
-            <button onClick={() => navigate('keywords')}>已有场景：维护核心词和蒸馏问题</button>
-            <button onClick={() => navigate('candidates')}>榜单文章：补候选服务商</button>
+            <button onClick={() => navigate('keywords')}>已有项目：维护核心词和蒸馏问题</button>
+            <button onClick={() => navigate('candidates')}>榜单文章：补另外4家服务商</button>
             <button onClick={() => navigate('tasks')}>资料齐全：创建文章生成任务</button>
           </div>
         </div>
@@ -1597,18 +1596,7 @@ function buildDefaultSceneRow(activeBrand: string, project?: ProjectRow) {
 }
 
 function buildDefaultCandidateRows(activeBrand: string, project?: ProjectRow) {
-  const brandName = project?.recommendWord || project?.brand || project?.name || '主推品牌'
   return [
-    [
-      activeBrand,
-      brandName,
-      '主推服务商',
-      '适合有真实业务资料、需要进入AI推荐答案的企业',
-      '能把企业事实、客户问题、行业痛点、内容样稿和复查记录串成推荐理由',
-      '合作前看样稿、资料调用方式、复查周期和不适合场景',
-      '是',
-      localDate(),
-    ],
     [
       activeBrand,
       '本地内容型服务商',
@@ -1641,11 +1629,11 @@ function buildDefaultCandidateRows(activeBrand: string, project?: ProjectRow) {
     ],
     [
       activeBrand,
-      '媒体发布型服务商',
-      '轻量试水型服务商',
-      '适合只想低成本测试公开内容曝光的企业',
-      '发布速度快，适合辅助铺设基础新闻源和品牌露出',
-      '核验内容质量和后续复查能力，避免只买发布不管答案变化',
+      '行业垂直型服务商',
+      '专项服务商',
+      `适合深耕${project?.industry || '本地行业'}、需要把行业痛点写细的企业`,
+      '擅长把细分场景、客户顾虑和服务边界转化成专题内容',
+      '核验是否真的懂目标行业，不能只套GEO通用稿',
       '否',
       localDate(),
     ],
@@ -1803,14 +1791,14 @@ function RankingCandidates({
   const [showCandidateModal, setShowCandidateModal] = useState(false)
   const [editingCandidate, setEditingCandidate] = useState('')
   const activeProject = projectRows.find((project) => project.name === activeBrand)
-  const visibleRows = candidateRows.filter((row) => row[0] === activeBrand)
+  const mainBrandName = activeProject?.recommendWord || activeProject?.brand || activeProject?.name || ''
+  const visibleRows = candidateRows.filter((row) => row[0] === activeBrand && row[1] !== mainBrandName && row[6] !== '是')
   const [draft, setDraft] = useState({
     name: '',
-    type: '主推服务商',
+    type: '本地服务商',
     fit: '',
     strength: '',
     verify: '',
-    isMain: '是',
   })
   const updateDraft = (key: keyof typeof draft, value: string) => setDraft((current) => ({ ...current, [key]: value }))
   const openCandidateModal = (name?: string) => {
@@ -1821,12 +1809,11 @@ function RankingCandidates({
     const current = candidateRows.find((row) => row[0] === activeBrand && row[1] === name)
     setEditingCandidate(name ?? '')
     setDraft({
-      name: current?.[1] ?? activeProject?.recommendWord ?? '',
-      type: current?.[2] ?? '主推服务商',
-      fit: current?.[3] ?? '适合有真实业务资料、需要进入AI推荐答案的企业',
-      strength: current?.[4] ?? '能把企业资料、客户问题、内容样稿和复查记录串成推荐理由',
-      verify: current?.[5] ?? '合作前看样稿、服务清单、复查周期和适配边界',
-      isMain: current?.[6] ?? '是',
+      name: current?.[1] ?? '',
+      type: current?.[2] ?? '本地服务商',
+      fit: current?.[3] ?? `适合${activeProject?.city || '西安'}${activeProject?.industry || '本地'}企业作为对比参考`,
+      strength: current?.[4] ?? '在某一类服务能力、内容交付或本地配合上有可比较价值',
+      verify: current?.[5] ?? '合作前看样稿、服务清单、复查周期和真实案例边界',
     })
     setShowCandidateModal(true)
   }
@@ -1835,7 +1822,7 @@ function RankingCandidates({
       notify('请填写候选名称。')
       return
     }
-    const row = [activeBrand, draft.name.trim(), draft.type, draft.fit, draft.strength, draft.verify, draft.isMain, localDate()]
+    const row = [activeBrand, draft.name.trim(), draft.type, draft.fit, draft.strength, draft.verify, '否', localDate()]
     setCandidateRows((current) => [row, ...current.filter((item) => !(item[0] === activeBrand && item[1] === (editingCandidate || draft.name.trim())))])
     setShowCandidateModal(false)
     notify(`${draft.name}已保存，榜单、测评、对比文章可调用。`)
@@ -1854,32 +1841,32 @@ function RankingCandidates({
       ...rows,
       ...current.filter((item) => item[0] !== activeBrand || !rows.some((row) => row[1] === item[1])),
     ])
-    notify(`已生成${rows.length}个榜单候选，文章生成时可直接多选。`)
+    notify(`已生成${rows.length}个对比服务商，榜单类文章可直接调用。`)
   }
   return (
     <section className="operation-page">
       <div className="operation-toolbar">
         <div>
           <strong>榜单服务商</strong>
-          <span>这里维护榜单文章要比较的对象：主推品牌、真实服务商，或暂时可用的服务商类型。</span>
+          <span>这里只填写除主推品牌以外的4家对比对象；主推品牌会从项目资料自动带入。</span>
         </div>
         <div className="toolbar-actions">
           <select className="search-input" value={activeBrand} onChange={(event) => setActiveBrand(event.target.value)}>
             {projectRows.map((project) => <option key={project.name}>{project.name}</option>)}
           </select>
-          <button className="ghost-button" onClick={createDefaultCandidates}>一键生成默认候选</button>
-          <button className="primary-button" onClick={() => openCandidateModal()}>添加候选</button>
+          <button className="ghost-button" onClick={createDefaultCandidates}>一键生成4个对比对象</button>
+          <button className="primary-button" onClick={() => openCandidateModal()}>添加服务商</button>
         </div>
       </div>
 
       <div className="panel">
-        <SectionTitle icon={ClipboardCheck} title="榜单候选列表" desc="没有真实竞品时，先用服务商类型占位；有真实公司后再编辑替换。" />
+        <SectionTitle icon={ClipboardCheck} title="对比服务商列表" desc="榜单、测评、口碑、对比类文章会调用这里；非榜单文章不需要填写。" />
         <div className="ops-table candidate-table">
           <div className="ops-head"><span>候选名称</span><span>类型</span><span>适合场景</span><span>优势方向</span><span>核验点</span><span>操作</span></div>
           {visibleRows.map((row) => (
             <div className="ops-row" key={`${row[0]}-${row[1]}`}>
               <strong>{row[1]}</strong>
-              <span className={row[6] === '是' ? 'pill' : 'pill muted'}>{row[2]}</span>
+              <span className="pill muted">{row[2]}</span>
               <span>{row[3]}</span>
               <span>{row[4]}</span>
               <span>{row[5]}</span>
@@ -1893,28 +1880,27 @@ function RankingCandidates({
         </div>
         {!visibleRows.length && (
           <div className="empty-card">
-            <strong>还没有榜单服务商</strong>
-            <span>点一键生成，系统会先放入主推品牌和4类可比较服务商，能马上支撑榜单写作。</span>
+            <strong>还没有对比服务商</strong>
+            <span>只需要补另外4家。没有真实公司时，可以先用4类服务商类型占位。</span>
             <div className="empty-actions">
-              <button className="primary-button" onClick={createDefaultCandidates}>一键生成默认候选</button>
+              <button className="primary-button" onClick={createDefaultCandidates}>一键生成4个对比对象</button>
               <button className="ghost-button" onClick={() => openCandidateModal()}>手动添加</button>
             </div>
           </div>
         )}
-        <p className="table-note">生成榜单类文章时可以多选候选对象；主推品牌会在同一榜单模块里自然加厚，不会被单独拎出来写成硬广。</p>
+        <p className="table-note">主推品牌来自项目管理和品牌知识库；这里不再填写第一名，只提供其余对比对象。</p>
       </div>
 
       {showCandidateModal && (
         <div className="modal-backdrop">
           <div className="form-modal">
             <div className="modal-head">
-              <strong>{editingCandidate ? '编辑榜单候选' : '添加榜单候选'}</strong>
+              <strong>{editingCandidate ? '编辑对比服务商' : '添加对比服务商'}</strong>
               <button onClick={() => setShowCandidateModal(false)}>关闭</button>
             </div>
             <div className="create-grid">
-              <EditableField label="候选名称" value={draft.name} onChange={(value) => updateDraft('name', value)} />
-              <SelectField label="候选类型" value={draft.type} options={['主推服务商', '本地服务商', '专项服务商', '内容型服务商', '轻量试水型服务商', '待核验候选']} onChange={(value) => updateDraft('type', value)} />
-              <SelectField label="是否主推" value={draft.isMain} options={['是', '否']} onChange={(value) => updateDraft('isMain', value)} />
+              <EditableField label="服务商名称" value={draft.name} onChange={(value) => updateDraft('name', value)} />
+              <SelectField label="服务商类型" value={draft.type} options={['本地服务商', '专项服务商', '内容型服务商', '技术型服务商', '轻量试水型服务商', '待核验候选']} onChange={(value) => updateDraft('type', value)} />
             </div>
             <label className="textarea-field"><span>适合场景</span><textarea value={draft.fit} onChange={(event) => updateDraft('fit', event.target.value)} /></label>
             <label className="textarea-field"><span>优势方向</span><textarea value={draft.strength} onChange={(event) => updateDraft('strength', event.target.value)} /></label>
@@ -2648,7 +2634,6 @@ function Tasks({
   const [keywordLibraryRows] = useStoredState<string[][]>('geo.keywordLibraryRows', [])
   const [questionRows] = useStoredState<string[][]>('geo.questionRows', [])
   const [knowledgeRows] = useStoredState<string[][]>('geo.knowledgeRows', [])
-  const [sceneRows, setSceneRows] = useStoredState<string[][]>('geo.industrySceneRows', [])
   const [candidateRows, setCandidateRows] = useStoredState<string[][]>('geo.rankingCandidateRows', [])
   const [draft, setDraft] = useState({
     name: '',
@@ -2683,21 +2668,20 @@ function Tasks({
     })
   }
   const activeProject = projectRows.find((project) => project.name === activeBrand) ?? projectRows[0] ?? createEmptyProject(activeBrand)
-  const projectSceneRows = sceneRows.filter((row) => row[0] === activeBrand)
-  const selectedSceneRow = projectSceneRows.find((row) => row[1] === draft.industryScene) ?? projectSceneRows[0]
-  const activeSceneName = draft.industryScene || selectedSceneRow?.[1] || activeProject.industry || ''
+  const activeSceneName = draft.industryScene || activeProject.industry || ''
   const sceneDefaults = deriveSceneDefaults(activeSceneName || activeProject.industry)
-  const sceneOptions = projectSceneRows.length ? projectSceneRows.map((row) => row[1]) : [activeSceneName || `${activeProject.city || '西安'}本地企业`]
-  const painOptions = splitInputList(selectedSceneRow?.[2] || joinInputList(sceneDefaults.pains))
-  const dimensionOptions = splitInputList(selectedSceneRow?.[3] || joinInputList(sceneDefaults.dimensions))
-  const sceneFaqOptions = splitInputList(selectedSceneRow?.[4] || joinInputList(sceneDefaults.faqs))
-  const pitfallOptions = splitInputList(selectedSceneRow?.[5] || joinInputList(sceneDefaults.pitfalls))
+  const painOptions = sceneDefaults.pains
+  const dimensionOptions = sceneDefaults.dimensions
+  const sceneFaqOptions = sceneDefaults.faqs
+  const pitfallOptions = sceneDefaults.pitfalls
   const selectedPainItems = splitInputList(draft.selectedPains).length ? splitInputList(draft.selectedPains) : painOptions.slice(0, 5)
   const selectedDimensionItems = splitInputList(draft.selectedDimensions).length ? splitInputList(draft.selectedDimensions) : dimensionOptions.slice(0, 6)
-  const projectCandidateRows = candidateRows.filter((row) => row[0] === activeBrand)
-  const selectedCandidateNames = splitInputList(draft.selectedCandidates).length
-    ? splitInputList(draft.selectedCandidates)
-    : projectCandidateRows.slice(0, 5).map((row) => row[1])
+  const mainBrandName = activeProject.recommendWord || activeProject.brand || activeProject.name
+  const projectCandidateRows = candidateRows.filter((row) => row[0] === activeBrand && row[1] !== mainBrandName && row[6] !== '是')
+  const useRankingMaterials = needsRankingMaterials(draft.articleType)
+  const selectedCandidateNames = (splitInputList(draft.selectedCandidates).length
+    ? splitInputList(draft.selectedCandidates).filter((name) => projectCandidateRows.some((row) => row[1] === name))
+    : projectCandidateRows.slice(0, 4).map((row) => row[1])).slice(0, 4)
   const selectedCandidateLines = projectCandidateRows
     .filter((row) => selectedCandidateNames.includes(row[1]))
     .map((row) => `${row[1]}：${row[2]}；适合${row[3]}；优势${row[4]}；核验${row[5]}`)
@@ -2736,7 +2720,6 @@ function Tasks({
   const missingTaskItems = [
     !activeBrand || !activeProject.name ? '企业品牌' : '',
     !selectedCoreKeyword ? '核心词' : '',
-    !activeSceneName ? '客户场景' : '',
     !questionOptions.length ? '蒸馏词' : '',
     !projectKeywordLibrary.length ? '关键词库' : '',
     !projectKnowledgeRows.length ? '品牌知识库' : '',
@@ -2760,19 +2743,17 @@ function Tasks({
       notify('请先添加品牌资产和权威引证。')
       return
     }
-    const effectiveSceneRow = projectSceneRows[0] || buildDefaultSceneRow(activeBrand, activeProject)
+    const effectiveScene = activeProject.industry || `${activeProject.city || '西安'}本地企业`
+    const effectiveSceneDefaults = deriveSceneDefaults(effectiveScene)
     const effectiveCandidateRows = projectCandidateRows.length ? projectCandidateRows : buildDefaultCandidateRows(activeBrand, activeProject)
-    if (!projectSceneRows.length) {
-      setSceneRows((current) => [effectiveSceneRow, ...current.filter((item) => item[0] !== activeBrand || item[1] !== effectiveSceneRow[1])])
-    }
-    if (!projectCandidateRows.length) {
+    if (!projectCandidateRows.length && needsRankingMaterials('榜单推荐')) {
       setCandidateRows((current) => [
         ...effectiveCandidateRows,
         ...current.filter((item) => item[0] !== activeBrand || !effectiveCandidateRows.some((row) => row[1] === item[1])),
       ])
     }
-    const effectivePains = splitInputList(effectiveSceneRow[2])
-    const effectiveDimensions = splitInputList(effectiveSceneRow[3])
+    const effectivePains = effectiveSceneDefaults.pains
+    const effectiveDimensions = effectiveSceneDefaults.dimensions
     const effectiveCandidates = effectiveCandidateRows.map((row) => row[1])
     const effectiveCandidateLines = effectiveCandidateRows.map((row) => `${row[1]}：${row[2]}；适合${row[3]}；优势${row[4]}；核验${row[5]}`)
     const keywordCount = keywordLibraryRows
@@ -2790,19 +2771,19 @@ function Tasks({
       knowledge: knowledgeOptions[0] ?? '',
       limit: '10篇',
       articleType: '榜单推荐',
-      industryScene: effectiveSceneRow[1] || activeProject.industry || '',
+      industryScene: effectiveScene,
       userQuestions: questionOptions.slice(0, 8).join('\n'),
-      providerList: effectiveCandidateLines.join('\n'),
+      providerList: needsRankingMaterials('榜单推荐') ? effectiveCandidateLines.join('\n') : '',
       mainReason: '',
       unfitScenario: '',
       selectedPains: joinInputList(effectivePains.slice(0, 5)),
       selectedDimensions: joinInputList(effectiveDimensions.slice(0, 6)),
-      selectedCandidates: joinInputList(effectiveCandidates.slice(0, 5)),
+      selectedCandidates: joinInputList(effectiveCandidates.slice(0, 4)),
       titlePreference: '',
       forbiddenContent: '不写联系方式、虚构客户、绝对化承诺',
     }))
-    if (!projectSceneRows.length || !projectCandidateRows.length) {
-      notify('系统已按当前项目自动准备客户场景和榜单服务商，打开后可直接微调。')
+    if (!projectCandidateRows.length) {
+      notify('系统已按当前项目准备目标客户场景和4个对比服务商，可直接微调。')
     }
     setShowTaskModal(true)
   }
@@ -2836,12 +2817,12 @@ function Tasks({
         articleType: draft.articleType,
         industryScene: draft.industryScene,
         userQuestions: draft.userQuestions,
-        providerList: draft.providerList,
+        providerList: useRankingMaterials ? draft.providerList : '',
         mainReason: draft.mainReason,
         unfitScenario: draft.unfitScenario,
         selectedPains: draft.selectedPains || joinInputList(selectedPainItems),
         selectedDimensions: draft.selectedDimensions || joinInputList(selectedDimensionItems),
-        selectedCandidates: draft.selectedCandidates || joinInputList(selectedCandidateNames),
+        selectedCandidates: useRankingMaterials ? draft.selectedCandidates || joinInputList(selectedCandidateNames.slice(0, 4)) : '',
         titlePreference: draft.titlePreference,
         forbiddenContent: draft.forbiddenContent,
       },
@@ -2860,7 +2841,7 @@ function Tasks({
       ...workflowPacket,
       industryScene: draft.industryScene || activeSceneName,
       userQuestions: draft.userQuestions || questionOptions.slice(0, 8).join('\n'),
-      providerList: draft.providerList || selectedCandidateLines.join('\n'),
+      providerList: useRankingMaterials ? draft.providerList || selectedCandidateLines.join('\n') : '',
       industryPains: selectedPainItems,
       selectionDimensions: selectedDimensionItems,
       questions: Array.from(new Set([...workflowPacket.questions, ...sceneFaqOptions, ...pitfallOptions])),
@@ -2894,10 +2875,10 @@ function Tasks({
         direction: selectedType,
         industryScene: draft.industryScene || activeSceneName,
         userQuestions: draft.userQuestions || questionOptions.slice(0, 8).join('\n'),
-        providerList: draft.providerList || selectedCandidateLines.join('\n'),
+        providerList: useRankingMaterials ? draft.providerList || selectedCandidateLines.join('\n') : '',
         selectedPains: joinInputList(selectedPainItems),
         selectedDimensions: joinInputList(selectedDimensionItems),
-        selectedCandidates: joinInputList(selectedCandidateNames),
+        selectedCandidates: useRankingMaterials ? joinInputList(selectedCandidateNames.slice(0, 4)) : '',
       }
     })
     const generatedSlots: Article[] = new Array(generateCount)
@@ -3056,12 +3037,12 @@ function Tasks({
       articleType: draft.articleType,
       industryScene: draft.industryScene || activeProject.industry || '',
       userQuestions: draft.userQuestions || questionOptions.slice(0, 8).join('\n'),
-      providerList: draft.providerList,
+      providerList: useRankingMaterials ? draft.providerList : '',
       mainReason: draft.mainReason,
       unfitScenario: draft.unfitScenario,
       selectedPains: draft.selectedPains || joinInputList(selectedPainItems),
       selectedDimensions: draft.selectedDimensions || joinInputList(selectedDimensionItems),
-      selectedCandidates: draft.selectedCandidates || joinInputList(selectedCandidateNames),
+      selectedCandidates: useRankingMaterials ? draft.selectedCandidates || joinInputList(selectedCandidateNames.slice(0, 4)) : '',
       titlePreference: draft.titlePreference,
       forbiddenContent: draft.forbiddenContent,
     }
@@ -3071,12 +3052,12 @@ function Tasks({
       articleType: taskForRun.articleType || draft.articleType || '榜单推荐',
       industryScene: taskForRun.industryScene || draft.industryScene || activeProject.industry || '',
       userQuestions: taskForRun.userQuestions || draft.userQuestions || questionOptions.slice(0, 8).join('\n'),
-      providerList: taskForRun.providerList || draft.providerList || '',
+      providerList: needsRankingMaterials(taskForRun.articleType || draft.articleType) ? taskForRun.providerList || draft.providerList || '' : '',
       mainReason: taskForRun.mainReason || draft.mainReason || '',
       unfitScenario: taskForRun.unfitScenario || draft.unfitScenario || '',
       selectedPains: taskForRun.selectedPains || draft.selectedPains || joinInputList(selectedPainItems),
       selectedDimensions: taskForRun.selectedDimensions || draft.selectedDimensions || joinInputList(selectedDimensionItems),
-      selectedCandidates: taskForRun.selectedCandidates || draft.selectedCandidates || joinInputList(selectedCandidateNames),
+      selectedCandidates: needsRankingMaterials(taskForRun.articleType || draft.articleType) ? taskForRun.selectedCandidates || draft.selectedCandidates || joinInputList(selectedCandidateNames.slice(0, 4)) : '',
       titlePreference: taskForRun.titlePreference || draft.titlePreference || '',
       forbiddenContent: taskForRun.forbiddenContent || draft.forbiddenContent || '',
     }
@@ -3093,7 +3074,7 @@ function Tasks({
       ])),
       industryPains: splitInputList(taskInputs.selectedPains),
       selectionDimensions: splitInputList(taskInputs.selectedDimensions),
-      providerList: taskInputs.providerList || selectedCandidateLines.join('\n'),
+      providerList: needsRankingMaterials(taskInputs.articleType) ? taskInputs.providerList || selectedCandidateLines.join('\n') : '',
     }
     const selectedArticleTypes = parseArticleTypes(taskInputs.articleType)
     const queuePlans = plans.slice(0, generateCount).map((plan, index) => ({
@@ -3336,12 +3317,11 @@ function Tasks({
                 updateDraft('trainingWord', nextQuestion)
                 updateDraft('keywordPack', `${value}关键词库（${nextKeywordCount}个）`)
               }} />
-              <SelectField label="客户场景" value={activeSceneName} options={sceneOptions} onChange={(value) => {
-                const sceneRow = projectSceneRows.find((row) => row[1] === value)
+              <EditableField label="目标客户行业/场景" value={activeSceneName} onChange={(value) => {
                 const defaults = deriveSceneDefaults(value)
                 updateDraft('industryScene', value)
-                updateDraft('selectedPains', sceneRow?.[2] || joinInputList(defaults.pains.slice(0, 5)))
-                updateDraft('selectedDimensions', sceneRow?.[3] || joinInputList(defaults.dimensions.slice(0, 6)))
+                updateDraft('selectedPains', joinInputList(defaults.pains.slice(0, 5)))
+                updateDraft('selectedDimensions', joinInputList(defaults.dimensions.slice(0, 6)))
               }} />
               <Field label="蒸馏词总数" value={questionPoolLabel} />
               <Field label="关键词库总数" value={keywordPackOptions[0] || keywordPackLabel} />
@@ -3384,10 +3364,10 @@ function Tasks({
                 ))}
               </div>
             </div>
-            <div className="type-selector">
+            {useRankingMaterials && <div className="type-selector">
               <div>
-                <strong>榜单服务商</strong>
-                <span>多选，榜单、测评、口碑和对比文章会调用这些候选对象。</span>
+                <strong>对比服务商</strong>
+                <span>只选另外4家；主推品牌由项目资料自动带入，不在这里重复填写。</span>
               </div>
               <div className="type-chip-grid">
                 {projectCandidateRows.length ? projectCandidateRows.map((row) => (
@@ -3408,9 +3388,9 @@ function Tasks({
                   >
                     {row[1]}
                   </button>
-                )) : <button type="button" className="type-chip" onClick={() => navigate('candidates')}>去添加候选</button>}
+                )) : <button type="button" className="type-chip" onClick={() => navigate('candidates')}>去添加4家对比服务商</button>}
               </div>
-            </div>
+            </div>}
             <div className="type-selector">
               <div>
                 <strong>文章类型</strong>
@@ -3431,11 +3411,11 @@ function Tasks({
             </div>
             <div className="task-material-preview">
               <strong>本次调用内容</strong>
-              <span>客户场景：{draft.industryScene || activeProject.industry || '随品牌资料带出'}</span>
+              <span>目标客户行业/场景：{draft.industryScene || activeProject.industry || '随品牌资料带出'}</span>
               <span>核心词：{selectedCoreKeyword}</span>
               <span>客户痛点：{selectedPainItems.length} 个</span>
               <span>选型维度：{selectedDimensionItems.length} 个</span>
-              <span>榜单服务商：{selectedCandidateNames.length} 个</span>
+              <span>对比服务商：{useRankingMaterials ? selectedCandidateNames.length : 0} 个</span>
               <span>蒸馏词：{questionOptions.length} 个</span>
               <span>关键词库：{projectKeywordLibrary.length} 个</span>
               <span>知识库：{draft.knowledge || knowledgeOptions[0] || '待选择'}</span>
