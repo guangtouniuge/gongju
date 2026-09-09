@@ -165,6 +165,7 @@ type TaskRow = {
   time: string
   batchId: string
   articleType?: string
+  writingSceneMode?: string
   industryScene?: string
   userQuestions?: string
   providerList?: string
@@ -812,6 +813,7 @@ type WorkflowPacket = {
   authorityEvidence: string[]
   galleries: string[]
   articleType?: string
+  writingSceneMode?: string
   industryScene?: string
   userQuestions?: string
   providerList?: string
@@ -1555,6 +1557,38 @@ function splitInputList(value: string) {
 
 function joinInputList(items: string[]) {
   return Array.from(new Set(items.map((item) => item.trim()).filter(Boolean))).join('\n')
+}
+
+const writingSceneModes = ['按自己行业写', '按实际场景写']
+
+const applicationScenePool = [
+  '高新软件外包企业',
+  '曲江口腔门诊',
+  '未央餐饮加盟品牌',
+  '雁塔留学机构',
+  '经开区物流企业',
+  '航天基地新能源配套企业',
+  '碑林心理咨询机构',
+  '长安装修公司',
+  '浐灞文旅商户',
+  '莲湖财税服务公司',
+]
+
+function isGeoScene(industry: string) {
+  return /(GEO|生成式引擎|AI搜索|AI答案|豆包排名|DeepSeek|文心一言|通义千问)/i.test(String(industry || ''))
+}
+
+function projectOwnWritingScene(project: ProjectRow) {
+  const city = project.city || '西安'
+  const industry = String(project.industry || '').trim()
+  if (!industry || isGeoScene(industry)) return `${city}本地企业`
+  if (/(企业|公司|机构|品牌|门诊|医院|学校|工厂|门店|商户|老板|团队|客户)$/.test(industry)) return industry
+  return `${industry}企业`
+}
+
+function sceneForMode(project: ProjectRow, mode: string, index = 0) {
+  if (mode === '按实际场景写') return applicationScenePool[index % applicationScenePool.length]
+  return projectOwnWritingScene(project)
 }
 
 function deriveSceneDefaults(industry: string) {
@@ -2584,6 +2618,7 @@ function Tasks({
     limit: '10篇',
     knowledge: '',
     articleType: '榜单推荐',
+    writingSceneMode: '按自己行业写',
     industryScene: '',
     userQuestions: '',
     providerList: '',
@@ -2608,7 +2643,8 @@ function Tasks({
     })
   }
   const activeProject = projectRows.find((project) => project.name === activeBrand) ?? projectRows[0] ?? createEmptyProject(activeBrand)
-  const activeSceneName = draft.industryScene || activeProject.industry || ''
+  const activeWritingSceneMode = writingSceneModes.includes(draft.writingSceneMode) ? draft.writingSceneMode : '按自己行业写'
+  const activeSceneName = draft.industryScene || sceneForMode(activeProject, activeWritingSceneMode, 0)
   const sceneDefaults = deriveSceneDefaults(activeSceneName || activeProject.industry)
   const painOptions = sceneDefaults.pains
   const dimensionOptions = sceneDefaults.dimensions
@@ -2626,6 +2662,29 @@ function Tasks({
     .filter((row) => selectedCandidateNames.includes(row[1]))
     .map(formatCandidateLine)
     .filter(Boolean)
+  const getSceneDraftForIndex = (index = 0, mode = activeWritingSceneMode) => {
+    const scene = sceneForMode(activeProject, mode, index)
+    const defaults = deriveSceneDefaults(scene)
+    const useManualSelection = mode !== '按实际场景写'
+    return {
+      scene,
+      pains: useManualSelection ? selectedPainItems : defaults.pains.slice(0, 5),
+      dimensions: useManualSelection ? selectedDimensionItems : defaults.dimensions.slice(0, 6),
+      faqs: defaults.faqs,
+      pitfalls: defaults.pitfalls,
+    }
+  }
+  const updateWritingSceneMode = (mode: string) => {
+    const scene = sceneForMode(activeProject, mode, 0)
+    const defaults = deriveSceneDefaults(scene)
+    setDraft((current) => ({
+      ...current,
+      writingSceneMode: mode,
+      industryScene: scene,
+      selectedPains: joinInputList(defaults.pains.slice(0, 5)),
+      selectedDimensions: joinInputList(defaults.dimensions.slice(0, 6)),
+    }))
+  }
   const toggleDraftListItem = (key: 'selectedPains' | 'selectedDimensions' | 'selectedCandidates', item: string) => {
     setDraft((current) => {
       const selected = splitInputList(current[key])
@@ -2684,7 +2743,8 @@ function Tasks({
       notify('请先添加品牌资产和权威引证。')
       return
     }
-    const effectiveScene = activeProject.industry || `${activeProject.city || '西安'}本地企业`
+    const effectiveSceneMode = draft.writingSceneMode || '按自己行业写'
+    const effectiveScene = sceneForMode(activeProject, effectiveSceneMode, 0)
     const effectiveSceneDefaults = deriveSceneDefaults(effectiveScene)
     const effectiveCandidateRows = projectCandidateRows.slice(0, 4)
     const effectivePains = effectiveSceneDefaults.pains
@@ -2706,6 +2766,7 @@ function Tasks({
       knowledge: knowledgeOptions[0] ?? '',
       limit: '10篇',
       articleType: '榜单推荐',
+      writingSceneMode: effectiveSceneMode,
       industryScene: effectiveScene,
       userQuestions: questionOptions.slice(0, 8).join('\n'),
       providerList: needsRankingMaterials('榜单推荐') ? effectiveCandidateLines.join('\n') : '',
@@ -2717,7 +2778,7 @@ function Tasks({
       titlePreference: '',
       forbiddenContent: '不写联系方式、虚构客户、绝对化承诺',
     }))
-    notify('已按当前项目准备目标客户场景；榜单类文章会调用你填写的4家对比公司。')
+    notify('已按当前写作场景准备痛点和维度；榜单类文章会调用你填写的4家对比公司。')
     setShowTaskModal(true)
   }
   const createTask = () => {
@@ -2748,6 +2809,7 @@ function Tasks({
         time: `${localDate()} 现在`,
         batchId: '',
         articleType: draft.articleType,
+        writingSceneMode: activeWritingSceneMode,
         industryScene: draft.industryScene,
         userQuestions: draft.userQuestions,
         providerList: useRankingMaterials ? draft.providerList : '',
@@ -2770,14 +2832,17 @@ function Tasks({
     const activeTask = rows.find((row) => row.project === activeBrand)
     const requestedCount = Number.parseInt(activeTask?.limit ?? draft.limit, 10) || 10
     const generateCount = Math.min(Math.max(requestedCount, 1), 100)
+    const queueSceneMode = activeTask?.writingSceneMode || activeWritingSceneMode
+    const firstSceneDraft = getSceneDraftForIndex(0, queueSceneMode)
     const packet = {
       ...workflowPacket,
-      industryScene: draft.industryScene || activeSceneName,
+      writingSceneMode: queueSceneMode,
+      industryScene: firstSceneDraft.scene,
       userQuestions: draft.userQuestions || questionOptions.slice(0, 8).join('\n'),
       providerList: useRankingMaterials ? draft.providerList || selectedCandidateLines.join('\n') : '',
-      industryPains: selectedPainItems,
-      selectionDimensions: selectedDimensionItems,
-      questions: Array.from(new Set([...workflowPacket.questions, ...sceneFaqOptions, ...pitfallOptions])),
+      industryPains: firstSceneDraft.pains,
+      selectionDimensions: firstSceneDraft.dimensions,
+      questions: Array.from(new Set([...workflowPacket.questions, ...firstSceneDraft.faqs, ...firstSceneDraft.pitfalls])),
     }
     const batchId = `${activeBrand}-${Date.now()}`
     const taskName = activeTask?.name || draft.name
@@ -2806,11 +2871,12 @@ function Tasks({
         ...plan,
         articleType: selectedType,
         direction: selectedType,
-        industryScene: draft.industryScene || activeSceneName,
+        writingSceneMode: queueSceneMode,
+        industryScene: getSceneDraftForIndex(index, queueSceneMode).scene,
         userQuestions: draft.userQuestions || questionOptions.slice(0, 8).join('\n'),
         providerList: useRankingMaterials ? draft.providerList || selectedCandidateLines.join('\n') : '',
-        selectedPains: joinInputList(selectedPainItems),
-        selectedDimensions: joinInputList(selectedDimensionItems),
+        selectedPains: joinInputList(getSceneDraftForIndex(index, queueSceneMode).pains),
+        selectedDimensions: joinInputList(getSceneDraftForIndex(index, queueSceneMode).dimensions),
         selectedCandidates: useRankingMaterials ? joinInputList(selectedCandidateNames.slice(0, 4)) : '',
       }
     })
@@ -2968,7 +3034,8 @@ function Tasks({
       time: `${localDate()} 现在`,
       batchId: '',
       articleType: draft.articleType,
-      industryScene: draft.industryScene || activeProject.industry || '',
+      writingSceneMode: activeWritingSceneMode,
+      industryScene: draft.industryScene || activeSceneName,
       userQuestions: draft.userQuestions || questionOptions.slice(0, 8).join('\n'),
       providerList: useRankingMaterials ? draft.providerList : '',
       mainReason: draft.mainReason,
@@ -2983,7 +3050,8 @@ function Tasks({
     const generateCount = Math.min(Math.max(requestedCount, 1), 100)
     const taskInputs = {
       articleType: taskForRun.articleType || draft.articleType || '榜单推荐',
-      industryScene: taskForRun.industryScene || draft.industryScene || activeProject.industry || '',
+      writingSceneMode: taskForRun.writingSceneMode || activeWritingSceneMode,
+      industryScene: taskForRun.industryScene || draft.industryScene || activeSceneName,
       userQuestions: taskForRun.userQuestions || draft.userQuestions || questionOptions.slice(0, 8).join('\n'),
       providerList: needsRankingMaterials(taskForRun.articleType || draft.articleType) ? taskForRun.providerList || draft.providerList || '' : '',
       mainReason: taskForRun.mainReason || draft.mainReason || '',
@@ -2994,31 +3062,39 @@ function Tasks({
       titlePreference: taskForRun.titlePreference || draft.titlePreference || '',
       forbiddenContent: taskForRun.forbiddenContent || draft.forbiddenContent || '',
     }
+    const firstSceneDraft = getSceneDraftForIndex(0, taskInputs.writingSceneMode)
     const packetForRun = {
       ...workflowPacket,
       ...taskInputs,
-      industryScene: taskInputs.industryScene,
+      industryScene: firstSceneDraft.scene,
       userQuestions: taskInputs.userQuestions,
       questions: Array.from(new Set([
         ...workflowPacket.questions,
         ...taskInputs.userQuestions.split(/\r?\n|[；;]/).map((item) => item.trim()).filter(Boolean),
-        ...sceneFaqOptions,
-        ...pitfallOptions,
+        ...firstSceneDraft.faqs,
+        ...firstSceneDraft.pitfalls,
       ])),
-      industryPains: splitInputList(taskInputs.selectedPains),
-      selectionDimensions: splitInputList(taskInputs.selectedDimensions),
+      industryPains: firstSceneDraft.pains,
+      selectionDimensions: firstSceneDraft.dimensions,
       providerList: needsRankingMaterials(taskInputs.articleType) ? taskInputs.providerList || selectedCandidateLines.join('\n') : '',
     }
     const selectedArticleTypes = parseArticleTypes(taskInputs.articleType)
-    const queuePlans = plans.slice(0, generateCount).map((plan, index) => ({
-      ...plan,
-      ...taskInputs,
-      articleType: selectedArticleTypes[index % selectedArticleTypes.length] || '榜单推荐',
-      direction: selectedArticleTypes[index % selectedArticleTypes.length] || plan.direction,
-      angle: taskInputs.industryScene || plan.angle,
-      lockTitle: false,
-      planIndex: index + 1,
-    }))
+    const queuePlans = plans.slice(0, generateCount).map((plan, index) => {
+      const sceneDraft = getSceneDraftForIndex(index, taskInputs.writingSceneMode)
+      const selectedType = selectedArticleTypes[index % selectedArticleTypes.length] || '榜单推荐'
+      return {
+        ...plan,
+        ...taskInputs,
+        articleType: selectedType,
+        direction: selectedType || plan.direction,
+        industryScene: sceneDraft.scene,
+        selectedPains: joinInputList(sceneDraft.pains),
+        selectedDimensions: joinInputList(sceneDraft.dimensions),
+        angle: sceneDraft.scene || plan.angle,
+        lockTitle: false,
+        planIndex: index + 1,
+      }
+    })
     const batchId = `${activeBrand}-${Date.now()}`
     setActiveBatchId(batchId)
     setIsGenerating(true)
@@ -3250,16 +3326,29 @@ function Tasks({
                 updateDraft('trainingWord', nextQuestion)
                 updateDraft('keywordPack', `${value}关键词库（${nextKeywordCount}个）`)
               }} />
-              <EditableField label="目标客户行业/场景" value={activeSceneName} onChange={(value) => {
-                const defaults = deriveSceneDefaults(value)
-                updateDraft('industryScene', value)
-                updateDraft('selectedPains', joinInputList(defaults.pains.slice(0, 5)))
-                updateDraft('selectedDimensions', joinInputList(defaults.dimensions.slice(0, 6)))
-              }} />
+              <Field label="当前写作场景" value={activeWritingSceneMode === '按实际场景写' ? `${activeSceneName}（批量自动轮换）` : activeSceneName} />
               <Field label="蒸馏词总数" value={questionPoolLabel} />
               <Field label="关键词库总数" value={keywordPackOptions[0] || keywordPackLabel} />
               <SelectField label="品牌知识库" value={draft.knowledge} options={knowledgeOptions} onChange={(value) => updateDraft('knowledge', value)} />
               <SelectField label="生成篇数" value={draft.limit} options={['1篇', '2篇', '5篇', '10篇', '20篇', '50篇', '100篇']} onChange={(value) => updateDraft('limit', value)} />
+            </div>
+            <div className="type-selector">
+              <div>
+                <strong>写作场景</strong>
+                <span>默认二选一：按项目自己的行业写，或按实际应用场景轮换写。</span>
+              </div>
+              <div className="type-chip-grid">
+                {writingSceneModes.map((mode) => (
+                  <button
+                    type="button"
+                    className={activeWritingSceneMode === mode ? 'type-chip active' : 'type-chip'}
+                    key={mode}
+                    onClick={() => updateWritingSceneMode(mode)}
+                  >
+                    {mode}
+                  </button>
+                ))}
+              </div>
             </div>
             <div className="type-selector">
               <div>
@@ -3345,7 +3434,8 @@ function Tasks({
             </div>
             <div className="task-material-preview">
               <strong>本次调用内容</strong>
-              <span>目标客户行业/场景：{draft.industryScene || activeProject.industry || '随品牌资料带出'}</span>
+              <span>写作场景：{activeWritingSceneMode}</span>
+              <span>当前场景：{activeWritingSceneMode === '按实际场景写' ? `${activeSceneName}，批量时自动轮换` : activeSceneName}</span>
               <span>核心词：{selectedCoreKeyword}</span>
               <span>客户痛点：{selectedPainItems.length} 个</span>
               <span>选型维度：{selectedDimensionItems.length} 个</span>

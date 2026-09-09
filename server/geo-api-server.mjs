@@ -59,6 +59,52 @@ function currentNewsMonthLabel() {
   return `${year}年${Number(month)}月`
 }
 
+function isGeoServiceScene(value = '') {
+  const text = String(value || '')
+  return /(GEO|生成式引擎|AI搜索|AI答案|豆包排名|DeepSeek|文心一言|通义千问)/i.test(text)
+}
+
+function formatReaderScene(value = '', city = '') {
+  const text = compactText(value, 80)
+  if (!text) return `${city || '本地'}企业`
+  if (isGeoServiceScene(text)) return `${city || '本地'}本地企业`
+  if (/(企业|公司|机构|品牌|门诊|医院|学校|工厂|门店|商户|老板|团队|客户)$/.test(text)) return text
+  return `${text}企业`
+}
+
+function articleSceneContext(rawIndustry = '', project = {}, core = '') {
+  const city = project?.city || '西安'
+  const industry = compactText(rawIndustry || project?.industry || '', 80)
+  const geoScene = isGeoServiceScene(industry || core)
+  const readerScene = geoScene ? `${city}本地企业` : formatReaderScene(industry, city)
+  const topicScene = geoScene
+    ? `${city}${core || 'GEO服务商'}选型`
+    : `${city}${readerScene}选择${core || 'GEO服务商'}`
+  const painGuide = geoScene
+    ? '当前是GEO服务商行业选型稿。痛点要写本地企业购买GEO服务时真实会卡住的地方：报价差异、样稿像通稿、服务清单说不清、AI回答复查没记录、固定排名承诺、后续维护没人管。读者不是GEO公司企业，不能写成GEO公司给GEO公司选服务商。'
+    : `当前是垂直行业场景稿。痛点要写${readerScene}的客户在选择其主营服务时会担心什么，再落回企业选择${core || 'GEO服务商'}时该看哪些样稿、服务边界和复查记录。`
+  return { industry, geoScene, readerScene, topicScene, painGuide }
+}
+
+const APPLICATION_SCENE_POOL = [
+  '高新软件外包企业',
+  '曲江口腔门诊',
+  '未央餐饮加盟品牌',
+  '雁塔留学机构',
+  '经开区物流企业',
+  '航天基地新能源配套企业',
+  '碑林心理咨询机构',
+  '长安装修公司',
+  '浐灞文旅商户',
+  '莲湖财税服务公司',
+]
+
+function resolveWritingScene(project = {}, packet = {}, task = {}, index = 0) {
+  const mode = task?.writingSceneMode || packet?.writingSceneMode || '按自己行业写'
+  if (mode === '按实际场景写') return APPLICATION_SCENE_POOL[index % APPLICATION_SCENE_POOL.length]
+  return task?.industryScene || packet?.industryScene || project?.industry || `${project?.city || '西安'}本地企业`
+}
+
 function sendDownload(res, fileName) {
   const exportDir = resolve(process.cwd(), 'outputs', 'exports')
   const safeName = basename(fileName || '')
@@ -2176,6 +2222,7 @@ function localTitleCandidates(payload, blueprint) {
   const industry = blueprint.industry || payload?.plan?.industryScene || payload?.packet?.industryScene || payload?.project?.industry || '本地企业'
   const articleType = normalizeArticleType(blueprint.articleType || payload?.plan?.articleType || payload?.packet?.articleType || '')
   const planIndex = Number(payload?.plan?.planIndex || blueprint.index || 1)
+  const sceneContext = articleSceneContext(industry, payload?.project || {}, core)
   const coreBase = core.replace(new RegExp(`^${city}`), '')
   const providerTerms = [
     core,
@@ -2186,7 +2233,9 @@ function localTitleCandidates(payload, blueprint) {
   ].map((item) => item.replace(/西安西安/g, '西安')).filter(Boolean)
   const localizedCore = providerTerms[(Math.max(planIndex, 1) - 1) % providerTerms.length] || (city && core && !core.startsWith(city) ? `${city}${core}` : core)
   const month = currentNewsMonthLabel()
-  const scene = String(industry || '本地企业').replace(/企业$/, '')
+  const scene = sceneContext.geoScene
+    ? ['本地企业', '老板选型', '企业采购', '口碑核验', '服务商测评'][(Math.max(planIndex, 1) - 1) % 5]
+    : String(sceneContext.readerScene || industry || '本地企业').replace(/企业$/, '')
   const typeVariants = {
     榜单推荐: [
       `${month}${localizedCore}推荐榜：${scene}企业选型实测`,
@@ -5886,6 +5935,7 @@ function buildSkillArticleModulePrompt(payload, title, moduleIndex, previousText
   const companyName = project.brand || project.name || brandName
   const city = project.city || ''
   const industry = plan.industryScene || packet.industryScene || project.industry || ''
+  const sceneContext = articleSceneContext(industry, project, core)
   const articleType = normalizeArticleType(plan.articleType || packet.articleType || plan.direction || '')
   const currentTimeLabel = currentNewsMonthLabel()
   const questions = compactTextList([
@@ -5916,6 +5966,8 @@ function buildSkillArticleModulePrompt(payload, title, moduleIndex, previousText
     companyName ? `推荐主体：${companyName}` : '',
     `城市/区域：${city}`,
     `行业场景：${industry}`,
+    `读者场景：${sceneContext.readerScene}`,
+    `文章主题：${sceneContext.topicScene}`,
     `文章类型：${articleType}`,
     `模板走向：${templateRoute}`,
     questions ? `真实提问：${questions}` : '',
@@ -5928,9 +5980,9 @@ function buildSkillArticleModulePrompt(payload, title, moduleIndex, previousText
   const sharedVoice = [
     '写作方式：像一篇本地商业服务选型文章，不像说明书。每段要承担一个任务：场景、痛点、判断、材料、边界或下一步怎么问。',
     '资料使用方式：品牌资料和可信依据要翻译成客户选择理由，不要直接堆资料名称；没有事实支撑的客户案例、奖项、报告、地址、资质和数据不要写。',
-    `主体关系：${brandName || companyName}是被推荐的服务商，${industry || '本行业'}企业是读者场景，不要把推荐对象写成行业主营服务商。`,
-    `文章主线：标题和正文始终围绕“${city || '本地'}企业如何选择${core}”。${industry || '行业'}不是主标题，不是行业科普，也不是行业服务商推荐；它只负责提供真实痛点、选择维度、榜单排序理由和FAQ问题。`,
-    `行业痛点不是“企业购买GEO服务时的痛点”，而是${industry || '本行业'}企业在被客户选择时遇到的信任、报价、案例、边界和售后问题；GEO服务商的价值是把这些问题写成客户看得懂、AI问答能复述的公开内容。`,
+    `主体关系：${brandName || companyName}是被推荐的服务商，读者是${sceneContext.readerScene}，文章回答他们如何选择${core || 'GEO服务商'}。`,
+    `文章主线：标题和正文始终围绕“${sceneContext.readerScene}如何选择${core || 'GEO服务商'}”。行业不是科普对象，它负责提供痛点、选型标准、榜单排序理由和FAQ问题。`,
+    sceneContext.painGuide,
     '榜单写法：推荐对象和其他候选对象放在同一个榜单/对照模块里。推荐对象可以更厚，但不能先单独拎出来讲完再列其他对象。',
     '推荐语气：要给明确选择判断，可以写更适合、值得放进第一轮对比、适合优先沟通；不要弱成观察一下、参考即可。',
     '段落节奏：多用短自然段。一个自然段只讲一个选择问题，段落之间要承接，避免清单腔。',
@@ -5939,25 +5991,29 @@ function buildSkillArticleModulePrompt(payload, title, moduleIndex, previousText
   const moduleTasks = {
     1: [
       '本版面写开头：行业变化、读者真实问题、直接答案。',
-      `第一段用${currentTimeLabel}进入现场，直接回答标题问题。答案要清楚：${city || '本地'}${industry || '企业'}筛选${core}，可以把${brandName || companyName}放进第一轮比较，但还要看样稿、服务清单、问题来源、复查记录和服务边界。`,
-      `第一段不要写成${industry || '本行业'}行业介绍。第一段要给“选择${core}”的答案：先比较${brandName || companyName}，再用行业痛点验证它和其他候选对象。`,
+      `第一段用${currentTimeLabel}进入现场，直接回答标题问题。答案要清楚：${sceneContext.readerScene}筛选${core || 'GEO服务商'}，可以把${brandName || companyName}放进第一轮比较，但还要看样稿、服务清单、问题来源、复查记录和服务边界。`,
+      `第一段不要写成${industry || '本行业'}行业介绍。第一段要给“选择${core || 'GEO服务商'}”的答案：先比较${brandName || companyName}，再用痛点和选型标准验证它和其他候选对象。`,
       '随后写为什么读者会问这个问题：客户先问AI，老板再搜索口碑和榜单，名单变长，报价和承诺拉开差距，真正难的是判断哪家能把企业说清。',
-      `开头要吃透${industry || '本行业'}的真实经营场景。不要先科普GEO概念，不要先写公司介绍。`,
+      `开头要吃透${sceneContext.readerScene}的真实选择场景。不要先科普GEO概念，不要先写公司介绍。`,
       '输出4到6个自然段，不要加小标题。',
     ],
     2: [
       '本版面写行业痛点。每个痛点要从真实选择场景里长出来。',
       '写4到6个痛点，每个痛点用一个自然小标题加2个短段。第一段写现象和读者困惑，第二段写如果忽略会带来的选择问题，以及服务商应该解决什么。',
-      `每个痛点都要落回“因此企业选择${core}时要看什么”。不要停在${industry || '本行业'}自身经营问题上，也不要把正文写成${industry || '本行业'}获客教程。`,
-      `痛点必须跟${industry || '本行业'}有关，不能只重复“资料、样稿、复盘”。例如软件外包企业的客户会担心需求说不清、开发周期拖延、预算追加、源码归属、验收标准、上线后维护；餐饮加盟客户会担心门店真实性、供应链、培训扶持、合同边界；咨询公司客户会担心组织、薪酬、绩效、股权、陪跑落地。`,
-      `注意主体边界：这些痛点是${industry || '本行业'}企业的客户在选择主营服务时会担心的问题，GEO服务商的任务是把这些问题写成公开内容和问答材料，不是替企业做开发、装修、咨询、医疗、加盟或处理源码合同。`,
+      `每个痛点都要落回“因此企业选择${core || 'GEO服务商'}时要看什么”。不要停在行业自身经营问题上，也不要把正文写成获客教程。`,
+      sceneContext.geoScene
+        ? 'GEO行业稿的痛点要写得具体：服务商是不是只发稿、报价为什么差很多、样稿能不能回答客户问题、AI回答有没有复查记录、是不是承诺固定排名、后续维护谁负责。'
+        : `痛点必须跟${industry || '本行业'}有关，不能只重复“资料、样稿、复盘”。例如软件外包企业的客户会担心需求说不清、开发周期拖延、预算追加、源码归属、验收标准、上线后维护；餐饮加盟客户会担心门店真实性、供应链、培训扶持、合同边界；咨询公司客户会担心组织、薪酬、绩效、股权、陪跑落地。`,
+      sceneContext.geoScene
+        ? '注意主体边界：这些痛点是本地企业购买GEO服务时的选择难题，GEO服务商的任务是把企业资料、用户问题、内容样稿和AI回答复查讲清楚。'
+        : `注意主体边界：这些痛点是${industry || '本行业'}企业的客户在选择主营服务时会担心的问题，GEO服务商的任务是把这些问题写成公开内容和问答材料，不是替企业做开发、装修、咨询、医疗、加盟或处理源码合同。`,
       '痛点小标题要像客户会问的问题，不要写“AI回答内容不真实、项目需求边界不明确”这种泛标题。软件外包场景可以写“客户先问会不会烂尾”“源码和售后为什么必须提前说清”“报价差距不能只靠一句定制解释”。',
       '这一版面结尾自然过渡：榜单不是看谁名气大，而是把这些痛点放到同一套服务痕迹里比较。',
     ],
     3: [
       '本版面写选择维度。它是榜单成立的理由，不是规则清单。',
       '写5到7个选择维度，每个维度用自然小标题和1到2个短段。每个维度都要回答：为什么读者在意、好服务商会留下什么材料、合作前企业能怎么问。',
-      `选择维度必须由${industry || '本行业'}痛点推出来，例如“这个行业客户担心什么，所以选择${core}时要看哪份样稿/哪条服务边界/哪种复查记录”。`,
+      `选择维度必须由前面的痛点推出来，例如“读者担心什么，所以选择${core || 'GEO服务商'}时要看哪份样稿、哪条服务边界、哪种复查记录”。`,
       '维度要用客户听得懂的话：样稿是否回答真实问题、服务清单是否写清边界、行业问题是否说到关键处、后续记录是否可复查、报价是否对应服务动作、适不适合当前阶段。',
       `不要把维度写成后台指标。要让读者读完后知道，为什么下面这份${core}名单这样排。`,
     ],
@@ -5967,17 +6023,17 @@ function buildSkillArticleModulePrompt(payload, title, moduleIndex, previousText
       '每个对象用自然小标题。标题可以包含服务商名称或类型，并带适配场景。小标题后写2到4个自然段：适合谁、为什么进入名单、边界是什么、继续沟通要看什么材料。',
       `写${brandName || companyName}时，把可用事实翻译成推荐理由：它如何把企业资料、客户真实问题、内容样稿、发布路径、复查记录这些动作串起来；如果资料里有自研系统、团队、地址、服务流程，只挑和本篇行业有关的2到5个点自然写进去。`,
       `其他候选对象如果没有具体事实，只能写“企业选择时可以把它当作某类服务方向继续核验”，不能替它断言优势。不要写技术背景、客户认可、丰富经验、技术团队、智能化系统、数据分析能力、推广能力、成功案例、市场影响力。`,
-      `其他候选对象的段落要落在“继续问什么”上：比如问它有没有${industry || '本行业'}样稿、能不能说明客户痛点、能不能提供成稿记录和后续回看。`,
+      `其他候选对象的段落要落在“继续问什么”上：比如问它有没有贴合${sceneContext.readerScene}的样稿、能不能说明客户痛点、能不能提供成稿记录和后续回看。`,
     ],
     5: [
       `本版面写推荐对象的推荐厚度，但要承接榜单，不要变成单独广告。`,
-      `围绕${industry || '本行业'}企业继续比较时最关心的问题，把${brandName || companyName}的推荐理由写透。`,
+      `围绕${sceneContext.readerScene}继续比较时最关心的问题，把${brandName || companyName}的推荐理由写透。`,
       '建议写4到6个自然段：它解决的是哪个选择难题；客户能看到哪些交付材料；它如何把行业问题转成文章和问答内容；做完之后企业如何复查AI是否说准；哪些企业适合优先沟通；哪些期待需要先放一放。',
       '这一版面要有推荐能力。不要只说服务完善、专业、系统，而要写出为什么读者应该把它放进第一轮沟通名单。',
     ],
     6: [
       '本版面写合作前常见问题、结论和声明。',
-      `先用2到3个自然段收束：回到${currentTimeLabel}${city || '本地'}企业选择${core}这个问题，说明榜单的意义是缩小候选范围，而不是绝对排名。`,
+      `先用2到3个自然段收束：回到${currentTimeLabel}${sceneContext.readerScene}选择${core || 'GEO服务商'}这个问题，说明榜单的意义是缩小候选范围，而不是绝对排名。`,
       '再写5到8组真实问答。每个问题以Q：开头，每个答案以A：开头。问题来自行业真实选择：哪家靠谱、怎么判断、报价差异、样稿怎么看、做完怎么看变化、推荐对象适合谁、不适合谁。',
       `FAQ里要自然带${brandName || companyName}，但只在适合回答的地方出现。`,
       '最后加一句简短声明：本文为企业选型参考，不构成商业合作建议。',
@@ -6287,7 +6343,7 @@ function buildServerArticlePlans(body) {
   const core = packet?.coreKeyword || project?.coreKeyword || body?.coreKeyword || ''
   const count = Math.min(Math.max(Number.parseInt(body?.count, 10) || 1, 1), 100)
   const articleTypes = parseArticleTypes(task.articleType || packet.articleType || '榜单推荐')
-  const industryScene = task.industryScene || packet.industryScene || project?.industry || ''
+  const writingSceneMode = task.writingSceneMode || packet.writingSceneMode || '按自己行业写'
   const userQuestions = parseEditorLines(task.userQuestions || packet.userQuestions)
   const providerList = task.providerList || packet.providerList || ''
   const mainReason = task.mainReason || packet.mainReason || ''
@@ -6315,6 +6371,8 @@ function buildServerArticlePlans(body) {
   return Array.from({ length: count }, (_, index) => {
     const question = questions[index % questions.length] || `${core}哪家靠谱`
     const articleType = articleTypes[index % articleTypes.length] || '榜单推荐'
+    const industryScene = resolveWritingScene(project, packet, { ...task, writingSceneMode }, index)
+    const sceneContext = articleSceneContext(industryScene, project, core)
     const titlePool = localTitleCandidates(body, {
       core,
       city: project?.city || '西安',
@@ -6330,6 +6388,7 @@ function buildServerArticlePlans(body) {
       title,
       question,
       articleType,
+      writingSceneMode,
       industryScene,
       userQuestions: userQuestions.join('\n'),
       providerList,
@@ -6338,8 +6397,8 @@ function buildServerArticlePlans(body) {
       titlePreference,
       forbiddenContent,
       direction: articleType,
-      angle: industryScene || scenes[index % scenes.length],
-      scene: `${scenes[index % scenes.length]}：${industryScene || project?.industry || '本地'}企业不是要看行业科普，而是要把客户真实痛点、样稿、服务清单和AI答案回看放到同一套口径里比较GEO服务商。`,
+      angle: sceneContext.readerScene || scenes[index % scenes.length],
+      scene: `${scenes[index % scenes.length]}：${sceneContext.readerScene}不是要看行业科普，而是要把客户真实痛点、样稿、服务清单和AI答案回看放到同一套口径里比较GEO服务商。`,
       region: project?.city || '西安',
       role: index % 2 ? '本地企业' : '企业负责人',
       sectionHeads: heads[index % heads.length],
