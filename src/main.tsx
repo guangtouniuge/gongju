@@ -3315,7 +3315,8 @@ function Tasks({
                         : [...selectedCandidateNames, row[1]]
                       const nextLines = projectCandidateRows
                         .filter((candidate) => nextSelected.includes(candidate[1]))
-                        .map((candidate) => `${candidate[1]}：${candidate[2]}；适合${candidate[3]}；优势${candidate[4]}；核验${candidate[5]}`)
+                        .map(formatCandidateLine)
+                        .filter(Boolean)
                       updateDraft('providerList', nextLines.join('\n'))
                     }}
                   >

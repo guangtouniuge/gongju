@@ -1803,43 +1803,46 @@ select.search-input {
 
 .type-selector {
   display: grid;
-  gap: 12px;
-  margin-top: 14px;
+  gap: 9px;
+  margin-top: 10px;
   border: 1px solid #dbe7f7;
-  border-radius: 10px;
-  padding: 14px;
+  border-radius: 8px;
+  padding: 10px 12px;
   background: #fff;
 }
 
 .type-selector > div:first-child {
   display: grid;
-  gap: 4px;
+  gap: 2px;
 }
 
 .type-selector strong {
   color: #172033;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .type-selector span {
   color: #64748b;
-  font-size: 12px;
+  font-size: 11px;
+  line-height: 1.45;
 }
 
 .type-chip-grid {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
 }
 
 .type-chip {
-  min-height: 34px;
+  min-height: 28px;
   border: 1px solid #d9e2ee;
-  border-radius: 8px;
-  padding: 0 12px;
+  border-radius: 7px;
+  padding: 0 10px;
   color: #334155;
   background: #f8fafc;
+  font-size: 13px;
   font-weight: 800;
+  line-height: 1.2;
   cursor: pointer;
 }
 
@@ -1847,7 +1850,7 @@ select.search-input {
   border-color: #2563eb;
   color: #fff;
   background: #2563eb;
-  box-shadow: 0 8px 18px rgba(37, 99, 235, .18);
+  box-shadow: 0 5px 12px rgba(37, 99, 235, .14);
 }
 
 .textarea-field {
