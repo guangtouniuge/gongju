@@ -33,7 +33,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import './styles.css'
-import { AgencyDirectory, ConsoleOverview, EmptyState, consoleNames, type ConsoleKind } from './console-ui'
+import { AgencyDirectory, ConsoleOverview, EmptyState, ProjectAccountDirectory, consoleNames, type ConsoleKind } from './console-ui'
 import './console.css'
 
 type NavItem = {
@@ -154,6 +154,7 @@ const consoleNav: Record<ConsoleKind, NavItem[]> = {
   ],
   agency: [
     { id: 'overview', label: '代理工作台', icon: LayoutDashboard },
+    { id: 'accounts', label: '项目账户', icon: ShieldCheck },
     { id: 'projects', label: '客户品牌库', icon: Boxes },
   ],
 }
@@ -467,6 +468,7 @@ function buildPlanTitleFromIntent(
     .replace(/[。！!？?]+$/g, '')
     .replace(/如何正确选择|全面解析|完整解析|攻略|干货|一文看懂|依据怎么核验|核验名单怎么查|测评看什么|企业怎么判/g, '')
     .trim()
+  const year = localNewsYear()
   const length = (value: string) => Array.from(value).length
   const intentText = normalize(question || '')
   const questionSignals = [
@@ -474,12 +476,12 @@ function buildPlanTitleFromIntent(
     /测评|评估|对比/.test(intentText) ? `${coreKeyword}实测榜出炉：本地服务商到底怎么比` : '',
     /防坑|避坑|低价|风险|靠谱吗/.test(intentText) ? `${coreKeyword}靠谱吗？低价服务商实测避坑指南` : '',
     /怎么选|服务商/.test(intentText) ? `${coreKeyword}服务商怎么选？本地测评拆解优势短板` : '',
-    /推荐|哪家好|哪家公司/.test(intentText) ? `2026${coreKeyword}推荐榜：本地服务商测评与避坑` : '',
+    /推荐|哪家好|哪家公司/.test(intentText) ? `${year}${coreKeyword}推荐榜：本地服务商测评与避坑` : '',
   ]
   const candidates = [
     ...direction.titleTemplates.map((template) => template(coreKeyword)),
     ...questionSignals,
-    `2026${coreKeyword}推荐榜：本地服务商测评与避坑`,
+    `${year}${coreKeyword}推荐榜：本地服务商测评与避坑`,
     `${coreKeyword}推荐哪家？本地服务商实测给出线索`,
     `${coreKeyword}口碑榜怎么排？服务商选择看哪些细节`,
     `${coreKeyword}实测榜出炉：本地服务商到底怎么比`,
@@ -488,6 +490,7 @@ function buildPlanTitleFromIntent(
     seed.title,
   ].filter(Boolean)
   return candidates
+    .map((candidate) => candidate.replace(/^2026/, year))
     .map((candidate) => ensureTitleHasCoreKeyword(candidate, coreKeyword))
     .find((candidate) => length(candidate) >= 18 && length(candidate) <= 46) || `${coreKeyword}推荐哪家？本地服务商实测给出线索`
 }
@@ -751,6 +754,10 @@ function localChineseDate() {
   return `${year}年${Number(month)}月${Number(day)}日`
 }
 
+function localNewsYear() {
+  return localDate().split('-')[0] || '2026'
+}
+
 function localDateTime() {
   return new Intl.DateTimeFormat('zh-CN', {
     timeZone: 'Asia/Shanghai',
@@ -804,6 +811,7 @@ function normalizeKeywordLibraryWords(words: string[]) {
 
 function ensureTitleHasCoreKeyword(title: string, coreKeyword: string) {
   const titleLength = (value: string) => Array.from(value).length
+  const year = localNewsYear()
   const clean = (value: string) => value
     .replace(/[《》#*"'“”]/g, '')
     .replace(/揭示.*真相|揭示.*关键点|揭晓.*答案|告诉你答案|告诉你真相|曝光推荐|曝光交付|推荐要点|交付细节|完整解析|全面解析|攻略|干货|一文看懂/g, '')
@@ -819,7 +827,7 @@ function ensureTitleHasCoreKeyword(title: string, coreKeyword: string) {
       .replace(/服务商怎么选择/g, '怎么选')
     if (titleMatchesGeoCore(compact, coreKeyword) && titleLength(compact) >= 18 && titleLength(compact) <= 56) return compact
     const fallbackTitles = [
-      `2026${coreKeyword}推荐榜：本地测评、交付复盘与避坑指南`,
+      `${year}${coreKeyword}推荐榜：本地测评、交付复盘与避坑指南`,
       `${coreKeyword}哪家值得进候选？从口碑、资料到交付复盘`,
       `${coreKeyword}服务商对比：本地口碑、优势短板与核验清单`,
       `${coreKeyword}实测推荐名单：企业采购前要核验哪些细节`,
@@ -838,7 +846,7 @@ function ensureTitleHasCoreKeyword(title: string, coreKeyword: string) {
     if (normalizedTitle.includes('AI搜索')) return makeSafe(`${coreKeyword}服务商对比：AI答案回看与交付记录怎么核验`)
     if (normalizedTitle.includes('资料')) return makeSafe(`${coreKeyword}推荐榜：资料能力、问题库与复盘记录怎么比`)
     if (normalizedTitle.includes('口碑')) return makeSafe(`${coreKeyword}口碑榜怎么筛？本地服务商测评与核验清单`)
-    return makeSafe(`2026${coreKeyword}推荐榜：本地测评、交付复盘与避坑指南`)
+    return makeSafe(`${year}${coreKeyword}推荐榜：本地测评、交付复盘与避坑指南`)
   }
   if (normalizedTitle.includes('西安豆包GEO公司靠谱吗')) return makeSafe(`${coreKeyword}豆包测评榜：服务商口碑与交付复盘怎么核验`)
   if (normalizedTitle.includes('西安AI获客公司怎么选')) return makeSafe(`${coreKeyword}哪家值得进候选？企业采购前看交付复盘`)
@@ -1262,6 +1270,7 @@ function App() {
         <header className="console-topbar"><div><span>{consoleNames[route.kind]}</span><ChevronRight size={14} /><strong>{currentNav.flatMap(item => item.children || [item]).find(item => item.id === active)?.label}</strong></div>{route.kind === 'project' && <label>当前品牌<select aria-label="当前品牌" value={activeBrand} onChange={e => selectActiveBrand(e.target.value)}><option value="">请选择品牌</option>{projectRows.map(project => <option key={project.name} value={project.name}>{project.name}</option>)}</select></label>}</header>
         {active === 'overview' && <ConsoleOverview kind={route.kind} projectCount={projectRows.length} articleCount={articleRows.length} onProjects={() => setActive('projects')} />}
         {active === 'agencies' && <AgencyDirectory />}
+        {active === 'accounts' && <ProjectAccountDirectory />}
         {active === 'dashboard' && <Dashboard navigate={setActive} notify={notify} articleRows={articleRows} />}
         {active === 'projects' && <Projects navigate={setActive} notify={notify} projectRows={projectRows} setProjectRows={setProjectRows} activeBrand={activeBrand} setActiveBrand={selectActiveBrand} setActiveKeyword={setActiveKeyword} setArticleRows={setArticleRows} />}
         {active === 'visibility' && <Diagnosis navigate={setActive} notify={notify} />}
@@ -2876,7 +2885,7 @@ function Tasks({
       .length
     setDraft((current) => ({
       ...current,
-      name: `${firstCore}新闻任务`,
+      name: `${firstCore}新闻任务-${localDateTime()}`,
       project: activeBrand,
       coreKeyword: firstCore,
       trainingWord: '',
@@ -2951,13 +2960,20 @@ function Tasks({
     const requestedCount = Number.parseInt(activeTask?.limit ?? draft.limit, 10) || 10
     const generateCount = Math.min(Math.max(requestedCount, 1), 100)
     const queueSceneMode = activeTask?.writingSceneMode || activeWritingSceneMode
+    const taskArticleType = activeTask?.articleType || draft.articleType || '榜单推荐'
+    const taskNeedsRanking = needsRankingMaterials(taskArticleType)
+    const taskProviderList = taskNeedsRanking
+      ? activeTask?.providerList || draft.providerList || selectedCandidateLines.join('\n')
+      : ''
+    const taskUserQuestions = activeTask?.userQuestions || draft.userQuestions || questionOptions.slice(0, 8).join('\n')
     const firstSceneDraft = getSceneDraftForIndex(0, queueSceneMode)
     const packet = {
       ...workflowPacket,
       writingSceneMode: queueSceneMode,
       industryScene: firstSceneDraft.scene,
-      userQuestions: draft.userQuestions || questionOptions.slice(0, 8).join('\n'),
-      providerList: useRankingMaterials ? draft.providerList || selectedCandidateLines.join('\n') : '',
+      articleType: taskArticleType,
+      userQuestions: taskUserQuestions,
+      providerList: taskProviderList,
       industryPains: firstSceneDraft.pains,
       selectionDimensions: firstSceneDraft.dimensions,
       questions: Array.from(new Set([...workflowPacket.questions, ...firstSceneDraft.faqs, ...firstSceneDraft.pitfalls])),
@@ -2983,20 +2999,21 @@ function Tasks({
           : row,
       ),
     )
-    const selectedArticleTypes = parseArticleTypes(activeTask?.articleType || draft.articleType || '榜单推荐')
+    const selectedArticleTypes = parseArticleTypes(taskArticleType)
     const queuePlans = plans.slice(0, generateCount).map((plan, index) => {
       const selectedType = selectedArticleTypes[index % selectedArticleTypes.length] || '榜单推荐'
+      const planNeedsRanking = needsRankingMaterials(selectedType)
       return {
         ...plan,
         articleType: selectedType,
         direction: selectedType,
         writingSceneMode: queueSceneMode,
         industryScene: getSceneDraftForIndex(index, queueSceneMode).scene,
-        userQuestions: draft.userQuestions || questionOptions.slice(0, 8).join('\n'),
-        providerList: useRankingMaterials ? draft.providerList || selectedCandidateLines.join('\n') : '',
+        userQuestions: taskUserQuestions,
+        providerList: planNeedsRanking ? taskProviderList : '',
         selectedPains: joinInputList(getSceneDraftForIndex(index, queueSceneMode).pains),
         selectedDimensions: joinInputList(getSceneDraftForIndex(index, queueSceneMode).dimensions),
-        selectedCandidates: useRankingMaterials ? joinInputList(selectedCandidateNames.slice(0, 4)) : '',
+        selectedCandidates: planNeedsRanking ? activeTask?.selectedCandidates || joinInputList(selectedCandidateNames.slice(0, 4)) : '',
       }
     })
     const generatedSlots: Article[] = new Array(generateCount)
@@ -3877,17 +3894,16 @@ function LibraryPage({ notify, navigate, articleRows, setArticleRows, activeBran
       <div className="panel">
         <SectionTitle icon={ListChecks} title="文章任务列表" desc="一次生成任务对应一批文章；没有批次号的旧成品已归到历史成品，点击即可查看。" />
         <div className="ops-table task-batch-table">
-            <div className="ops-head"><span>任务名</span><span>生成时间</span><span>品牌</span><span>总数</span><span>已生成</span><span>接口无正文</span><span>API成稿</span><span>API未返回</span><span>操作</span></div>
+          <div className="ops-head"><span>任务信息</span><span>品牌</span><span>生成统计</span><span>接口状态</span><span>操作</span></div>
           {batches.map((batch) => (
             <div className={batch.id === latestBatchId ? 'ops-row active-row' : 'ops-row'} key={batch.id}>
-              <strong>{batch.taskName}</strong>
-              <span>{batch.batchLabel || batch.id}</span>
+              <div className="table-main-cell">
+                <strong>{batch.taskName}</strong>
+                <small>{batch.batchLabel || batch.id}</small>
+              </div>
               <span>{batch.project}</span>
-              <span>{batch.total}</span>
-              <span>{batch.passed}</span>
-              <span>{batch.failed}</span>
-              <span>{batch.api}</span>
-              <span>{batch.fallback}</span>
+              <span className="table-metric-line">总数 {batch.total} · 已生成 {batch.passed}</span>
+              <span className="table-metric-line">无正文 {batch.failed} · API成稿 {batch.api} · 未返回 {batch.fallback}</span>
               <span className="row-actions">
                 <button onClick={() => {
                   setActiveBatchId(batch.id)
@@ -3911,13 +3927,19 @@ function LibraryPage({ notify, navigate, articleRows, setArticleRows, activeBran
       <div className="panel">
         <SectionTitle icon={Newspaper} title={showAllArticles ? '全部成品文章列表' : '当前任务文章列表'} desc={showAllArticles ? '显示当前品牌全部已生成文章，可全选或批量下载Word。' : '默认显示最新任务里已生成的文章，避免旧文章混入当前下载。'} />
         <div className="ops-table library-table">
-          <div className="ops-head"><span>选择</span><span>标题</span><span>核心词</span><span>配图</span><span>来源</span><span>字数</span><span>状态</span><span>操作</span></div>
+          <div className="ops-head"><span>选择</span><span>文章信息</span><span>生成信息</span><span>配图</span><span>状态</span><span>操作</span></div>
           {passedArticles.map((article) => (
             <div className="ops-row" key={article.id}>
               <label className="row-check">
                 <input type="checkbox" checked={selectedArticles.includes(article.id)} onChange={() => toggleSelectedArticle(article.id)} />
               </label>
-              <strong>{article.title}</strong><span>{article.keyword}</span><span>{imageCountForArticle(article) ? `${imageCountForArticle(article)}张可用` : '待上传'}</span><span>{displayGenerationSource(article.generationSource)}</span><span>{article.words}字</span><span className="pill">{article.status}</span>
+              <div className="table-main-cell">
+                <strong>{article.title}</strong>
+                <small>核心词：{article.keyword || '未记录'}</small>
+              </div>
+              <span className="table-metric-line">{displayGenerationSource(article.generationSource)} · {article.words}字</span>
+              <span>{imageCountForArticle(article) ? `${imageCountForArticle(article)}张可用` : '待上传'}</span>
+              <span className="pill">{article.status}</span>
               <span className="row-actions">
                 <button onClick={() => openArticleReader(article)}>全文查看</button>
                 <button onClick={() => downloadArticles([article], article.title)}>下载</button>
@@ -3939,7 +3961,7 @@ function LibraryPage({ notify, navigate, articleRows, setArticleRows, activeBran
         <div className="modal-backdrop">
           <div className="form-modal wide-modal article-reader-modal">
             <div className="modal-head">
-              <strong>全文查看</strong>
+              <strong>{isEditingArticle ? '编辑文章' : '全文查看'}</strong>
               <button onClick={() => {
                 setPreviewId('')
                 setIsEditingArticle(false)
@@ -3947,19 +3969,38 @@ function LibraryPage({ notify, navigate, articleRows, setArticleRows, activeBran
             </div>
             <div className="article-reader">
               {isEditingArticle ? (
-                <div className="article-editor">
-                  <label>
-                    <span>文章标题</span>
-                    <input value={editArticleTitle} onChange={(event) => setEditArticleTitle(event.target.value)} />
-                  </label>
-                  <label>
-                    <span>文章正文</span>
-                    <textarea aria-label="文章正文" ref={bodyEditorRef} value={editArticleBody} onChange={(event) => setEditArticleBody(event.target.value)} />
-                  </label>
-                  <label><span>插入当前品牌图片</span><select aria-label="插入当前品牌图片" value="" onChange={event => {
-                    const row = editorImages.find(image => image[5] === event.target.value)
-                    if (row) insertImage(row)
-                  }}><option value="">选择图片插入光标位置</option>{editorImages.map(row => <option key={row[5]} value={row[5]}>{row[6] || row[1]}</option>)}</select></label>
+                <div className="article-editor-layout">
+                  <div className="article-editor">
+                    <label>
+                      <span>文章标题</span>
+                      <input value={editArticleTitle} onChange={(event) => setEditArticleTitle(event.target.value)} />
+                    </label>
+                    <label>
+                      <span>文章正文</span>
+                      <textarea aria-label="文章正文" ref={bodyEditorRef} value={editArticleBody} onChange={(event) => setEditArticleBody(event.target.value)} />
+                    </label>
+                    <label>
+                      <span>插入当前品牌图片</span>
+                      <select aria-label="插入当前品牌图片" value="" disabled={!editorImages.length} onChange={event => {
+                        const row = editorImages.find(image => image[5] === event.target.value)
+                        if (row) insertImage(row)
+                      }}>
+                        <option value="">{editorImages.length ? '选择图片插入光标位置' : '当前项目图库暂无图片'}</option>
+                        {editorImages.map(row => <option key={row[5]} value={row[5]}>{row[6] || row[1]}</option>)}
+                      </select>
+                    </label>
+                  </div>
+                  <article className="article-page-view editor-preview">
+                    <h1>{editArticleTitle || previewArticle.title}</h1>
+                    <div className="article-meta-line">
+                      <span>核心词：{previewArticle.keyword}</span>
+                      <span>预估字数：{chineseCount(editArticleBody)}字</span>
+                      <span>配图：{imageCountForArticle({ ...previewArticle, body: editArticleBody })}张</span>
+                    </div>
+                    <div className="article-content-view">
+                      {editArticleBody ? renderArticleBody(editArticleBody) : <p>当前文章暂无完整正文。</p>}
+                    </div>
+                  </article>
                 </div>
               ) : (
                 <article className="article-page-view">

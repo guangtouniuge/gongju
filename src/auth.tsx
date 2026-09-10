@@ -1,7 +1,19 @@
 import { useEffect, useState, type ReactNode, type FormEvent } from 'react'
 import './auth.css'
 
-type User = { id: string; username: string; displayName: string; role: string; status: string; workspaceId: string; permissions: string[] }
+type User = {
+  id: string
+  username: string
+  displayName: string
+  role: string
+  status: string
+  workspaceId: string
+  agentId?: string
+  projectId?: string
+  projectName?: string
+  parentId?: string
+  permissions: string[]
+}
 const labels: Record<string, string> = { super_admin: '总后台管理员', agent: '代理商', project_admin: '项目管理员', project_operator: '项目操作员' }
 let scope = ''
 export const accountStorage = {
@@ -24,12 +36,12 @@ export function AuthGate({ children }: { children: ReactNode }) {
   const [busy, setBusy] = useState(false)
   const [users, setUsers] = useState<User[]>([])
   const accept = (next: User | null) => {
-    scope = next?.workspaceId || ''
+    scope = next?.projectId || next?.workspaceId || ''
     window.__geoIdentity = next ? {
       userId: next.id,
       role: next.role as 'super_admin' | 'agent' | 'project_admin' | 'project_operator',
-      agentId: next.workspaceId,
-      projectId: next.workspaceId,
+      agentId: next.agentId || '',
+      projectId: next.projectId || next.workspaceId,
     } : undefined
     window.dispatchEvent(new Event('geo:identity-changed'))
     setUser(next)
@@ -44,6 +56,8 @@ export function AuthGate({ children }: { children: ReactNode }) {
         role: identity.role,
         status: 'active',
         workspaceId: identity.projectId,
+        agentId: identity.agentId || '',
+        projectId: identity.projectId,
         permissions: identity.role === 'super_admin'
           ? ['users:manage', 'system:manage', 'media:publish']
           : identity.role === 'project_operator'

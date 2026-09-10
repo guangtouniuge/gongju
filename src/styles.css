@@ -1448,6 +1448,30 @@ select.search-input {
   flex-wrap: wrap;
 }
 
+.table-main-cell {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.table-main-cell strong,
+.table-main-cell small {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.table-main-cell small {
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.table-metric-line {
+  color: #475569;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
 .empty-state {
   display: grid;
   justify-items: start;
@@ -1590,13 +1614,13 @@ select.search-input {
 }
 
 .task-batch-table {
-  min-width: 1120px;
+  min-width: 860px;
 }
 
 .task-batch-table .ops-head,
 .task-batch-table .ops-row {
-  grid-template-columns: minmax(230px, 1fr) 148px minmax(130px, .65fr) 48px 58px 76px 66px 76px 154px;
-  gap: 8px;
+  grid-template-columns: minmax(240px, 1.1fr) minmax(140px, .75fr) minmax(140px, .75fr) minmax(220px, 1fr) 156px;
+  gap: 10px;
 }
 
 .score-good {
@@ -1625,17 +1649,18 @@ select.search-input {
 }
 
 .library-table {
-  min-width: 1120px;
+  min-width: 900px;
 }
 
 .library-table .ops-head,
 .library-table .ops-row {
-  grid-template-columns: 44px minmax(360px, 1fr) 140px 74px 84px 70px 76px 168px;
-  gap: 8px;
+  grid-template-columns: 44px minmax(360px, 1fr) minmax(150px, .65fr) 74px 78px 176px;
+  gap: 10px;
 }
 
 .library-table .row-actions {
   gap: 6px;
+  justify-content: flex-end;
 }
 
 .library-table .ops-row button,
@@ -2545,12 +2570,27 @@ select.search-input {
   background: #f8fbff;
 }
 
+.article-editor-layout {
+  display: grid;
+  grid-template-columns: minmax(360px, 0.86fr) minmax(460px, 1.14fr);
+  gap: 0;
+  align-items: stretch;
+  background: #fff;
+}
+
 .article-page-view {
   max-width: 860px;
   margin: 0 auto;
   padding: 34px 44px 46px;
   background: #fff;
   color: #172033;
+}
+
+.article-page-view.editor-preview {
+  max-width: none;
+  margin: 0;
+  border-left: 1px solid #e6edf5;
+  background: #fff;
 }
 
 .article-page-view h1 {
@@ -2610,8 +2650,9 @@ select.search-input {
 .article-editor {
   display: grid;
   gap: 14px;
-  padding: 18px;
-  background: #fff;
+  align-content: start;
+  padding: 22px;
+  background: #f8fbff;
 }
 
 .article-editor label,
@@ -2640,7 +2681,7 @@ select.search-input {
 }
 
 .article-editor textarea {
-  min-height: 560px;
+  min-height: 520px;
   resize: vertical;
 }
 

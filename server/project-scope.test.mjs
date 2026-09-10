@@ -47,7 +47,7 @@ test('HTTP isolation: state, summaries, generation jobs, gallery, export and ano
     { projectId: 'b', agentId: 'agent-b', projectName: 'Project B', status: 'active' },
   ]))
   const port = 19000 + Math.floor(Math.random() * 10000)
-  const child = spawn(process.execPath, [apiFile], { cwd: dir, env: { ...process.env, GEO_API_PORT: String(port), GEO_ALLOW_LEGACY_ANONYMOUS: 'false', QWEN_API_KEY: '', DASHSCOPE_API_KEY: '' }, stdio: ['ignore', 'pipe', 'pipe'] })
+  const child = spawn(process.execPath, [apiFile], { cwd: dir, env: { ...process.env, GEO_API_PORT: String(port), GEO_ALLOW_HEADER_IDENTITY: 'true', GEO_ALLOW_LEGACY_ANONYMOUS: 'false', QWEN_API_KEY: '', DASHSCOPE_API_KEY: '' }, stdio: ['ignore', 'pipe', 'pipe'] })
   const exit = once(child, 'exit')
   try {
     await Promise.race([once(child.stdout, 'data'), delay(8000).then(() => { throw new Error('API startup timed out') })])

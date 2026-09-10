@@ -51,10 +51,15 @@ test('账号全流程、权限与工作空间隔离', async () => {
     const agent = (await call('/api/auth/login', { username: 'agent', password: 'Safe-agent-password' })).cookie
     assert.equal((await call('/api/admin/users', { username: 'escalation', password: 'Safe-agent-password', role: 'super_admin' }, agent)).status, 403)
     assert.equal((await call('/api/admin/users/update', { id: registration.data.user.id, status: 'disabled' }, agent)).status, 403)
-    const managerUser = await call('/api/admin/users', { username: 'manager', password: 'Safe-manager-password', role: 'project_admin' }, agent)
-    assert.equal(managerUser.data.user.workspaceId, agentUser.data.user.workspaceId)
+    const managerUser = await call('/api/admin/users', { username: 'manager', password: 'Safe-manager-password', role: 'project_admin', projectName: '代理客户A' }, agent)
+    assert.equal(managerUser.data.user.agentId, agentUser.data.user.agentId)
+    assert.notEqual(managerUser.data.user.projectId, agentUser.data.user.agentId)
+    assert.equal(managerUser.data.user.workspaceId, managerUser.data.user.projectId)
     const manager = (await call('/api/auth/login', { username: 'manager', password: 'Safe-manager-password' })).cookie
-    assert.equal((await call('/api/admin/users', { username: 'teammate', password: 'Safe-teammate-password', role: 'project_operator' }, manager)).status, 201)
+    const teammateUser = await call('/api/admin/users', { username: 'teammate', password: 'Safe-teammate-password', role: 'project_operator' }, manager)
+    assert.equal(teammateUser.status, 201)
+    assert.equal(teammateUser.data.user.projectId, managerUser.data.user.projectId)
+    assert.equal(teammateUser.data.user.agentId, managerUser.data.user.agentId)
     assert.equal((await call('/api/admin/users', { username: 'escalation', password: 'Safe-manager-password', role: 'agent' }, manager)).status, 403)
     assert.equal((await call('/api/admin/users/update', { id: login.data.user.id, status: 'disabled' }, admin)).status, 403)
     assert.equal((await call('/api/auth/password', { currentPassword: 'wrong', newPassword: 'New-operator-password' }, operator)).status, 400)

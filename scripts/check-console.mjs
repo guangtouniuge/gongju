@@ -5,35 +5,44 @@ import { mkdir } from 'node:fs/promises'
 const browser = await chromium.launch({ headless: true, channel: process.env.PLAYWRIGHT_CHANNEL || 'msedge' })
 const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } })
 const errors = []
+const users = []
 await mkdir('output', { recursive: true })
 page.on('pageerror', error => { errors.push(error.message); console.log(error.message) })
 // Isolated UI check: no shared project storage or generation calls.
-await page.route('**/api/**', route => route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"value":null}' }))
-const base = process.env.CONSOLE_TEST_URL || 'http://127.0.0.1:5173/gongju/'
+await page.addInitScript(() => { window.__geoIdentity = { userId: 'console-admin', role: 'super_admin', projectId: 'platform' } })
+await page.route('**/api/**', async route => {
+  const request = route.request()
+  const url = new URL(request.url())
+  if (url.pathname === '/api/admin/users' && request.method() === 'GET') {
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, users }) })
+  }
+  if (url.pathname === '/api/admin/users' && request.method() === 'POST') {
+    const body = request.postDataJSON()
+    users.push({ id: `u-${users.length + 1}`, username: body.username, displayName: body.displayName || body.username, role: body.role, status: 'active', workspaceId: body.workspaceId || `workspace-${users.length + 1}` })
+    return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ ok: true, user: users.at(-1) }) })
+  }
+  if (url.pathname === '/api/admin/users/update' && request.method() === 'POST') {
+    const body = request.postDataJSON()
+    const user = users.find(row => row.id === body.id)
+    if (user) Object.assign(user, body)
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, user }) })
+  }
+  return route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"value":null}' })
+})
+  const base = process.env.CONSOLE_TEST_URL || 'http://127.0.0.1:5173/gongju/'
 try {
   await page.goto(`${base}#/platform/agencies`)
-  await page.getByRole('button', { name: '添加代理', exact: true }).click()
-  await page.getByRole('button', { name: '保存', exact: true }).click()
-  await page.getByRole('alert').waitFor()
-  await page.getByLabel('代理名称', { exact: true }).fill('UI验收代理')
-  await page.getByLabel('联系人', { exact: true }).fill('验收联系人')
-  await page.getByRole('button', { name: '保存', exact: true }).click()
+  await page.getByRole('button', { name: '添加代理账号', exact: true }).click()
+  await page.getByLabel('登录账号', { exact: true }).fill('ui-agent')
+  await page.getByLabel('显示名称', { exact: true }).fill('UI验收代理')
+  await page.getByLabel('初始密码', { exact: true }).fill('Safe-ui-agent-password')
+  await page.getByRole('button', { name: '保存账号', exact: true }).click()
   await page.reload()
-  await page.getByRole('cell', { name: 'UI验收代理', exact: true }).waitFor()
-  await page.getByRole('button', { name: '编辑', exact: true }).click()
-  await page.getByLabel('代理名称', { exact: true }).fill('修改后的代理')
-  await page.getByRole('button', { name: '保存', exact: true }).click()
   await page.getByRole('button', { name: '停用', exact: true }).click()
-  await page.getByLabel('代理状态', { exact: true }).selectOption('启用')
-  await page.getByText('没有匹配的代理', { exact: true }).waitFor()
-  await page.getByLabel('代理状态', { exact: true }).selectOption('全部状态')
+  await page.getByRole('button', { name: '启用', exact: true }).waitFor()
   await page.getByLabel('全选当前列表').check()
-  await page.getByRole('button', { name: '删除选中' }).click()
-  await page.getByRole('button', { name: '取消', exact: true }).click()
-  await page.getByRole('cell', { name: '修改后的代理', exact: true }).waitFor()
-  await page.getByRole('button', { name: '删除选中' }).click()
-  await page.getByRole('button', { name: '确认删除' }).click()
-  await page.getByText('还没有代理记录', { exact: true }).waitFor()
+  await page.getByRole('button', { name: '取消选择' }).click()
+  await page.getByText('UI验收代理').waitFor()
   await page.getByLabel('后台入口', { exact: true }).selectOption('agency')
   await page.getByRole('button', { name: '查看项目' }).click()
   await page.getByRole('button', { name: '添加品牌', exact: true }).click()

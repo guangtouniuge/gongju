@@ -4465,6 +4465,41 @@ function formatRankingCompanies(items = []) {
     .join('\n')
 }
 
+function normalizeProviderName(value = '') {
+  return String(value || '')
+    .replace(/^\s*(?:第?[1-9]\s*[.、]|推荐位[一二三四五六七八九十]\s*[：:]?)\s*/, '')
+    .split(/[：:]/)[0]
+    .replace(/（简称[^）]*）/g, '')
+    .replace(/\(简称[^)]*\)/g, '')
+    .trim()
+}
+
+function buildProviderRankingBrief(rawProviderList = '', recommendedName = '', companyName = '') {
+  const recommended = normalizeProviderName(recommendedName || companyName)
+  const providerItems = parseEditorLines(rawProviderList)
+  if (!providerItems.length) return ''
+  const seen = new Set()
+  const rows = []
+  if (recommended) {
+    rows.push(`${recommended}：主推品牌，第1名，必须写成明确推荐对象。`)
+    seen.add(recommended)
+  }
+  providerItems.forEach((item) => {
+    const name = normalizeProviderName(item)
+    if (!name || seen.has(name)) return
+    seen.add(name)
+    const detail = /[:：]/.test(item) ? item.replace(/^\s*\d+[.、]\s*/, '').trim() : name
+    rows.push(detail)
+  })
+  return rows.slice(0, 5).map((item, index) => `${index + 1}. ${item}`).join('\n')
+}
+
+function mergeRankingCompanies(rawProviderList = '', fallbackItems = [], recommendedName = '', companyName = '') {
+  const providerBrief = buildProviderRankingBrief(rawProviderList, recommendedName, companyName)
+  if (providerBrief) return providerBrief
+  return formatRankingCompanies(fallbackItems)
+}
+
 function compactIndustryScenario(packet = {}, project = {}) {
   const parts = [
     compactTextList(packet.industryQuestions || [], 12),
@@ -5239,6 +5274,7 @@ function buildRankingEditorialBrief(payload, title = '') {
   const plan = payload?.plan || {}
   const core = packet.coreKeyword || project.coreKeyword || payload?.coreKeyword || ''
   const brandName = project.recommendWord || project.brand || project.name || ''
+  const companyName = project.brand || project.name || brandName
   const city = project.city || ''
   const angle = plan.angle || plan.direction || plan.title || ''
   const architecture = buildRankingArticleArchitecture(payload)
@@ -5421,7 +5457,7 @@ function buildFreeWritingSectionPrompt(payload, title, stage, previousText = '',
   const core = packet.coreKeyword || project.coreKeyword || payload?.coreKeyword || ''
   const brandName = project.recommendWord || project.brand || project.name || ''
   const city = project.city || '西安'
-  const currentTimeLabel = '2026年9月'
+  const currentTimeLabel = currentNewsMonthLabel()
   const brandFacts = compactMaterialFacts(packet.brandAssets || packet.assets || packet.knowledge, 10)
   const evidenceFacts = compactMaterialFacts(packet.authorityEvidence || packet.evidence || packet.citations, 8)
   const architecture = buildRankingArticleArchitecture(payload)
@@ -5707,7 +5743,7 @@ function buildCleanEditorBriefPrompt(payload, title) {
   const industry = plan.industryScene || packet.industryScene || project.industry || ''
   const articleType = normalizeArticleType(plan.articleType || packet.articleType || plan.direction || '')
   const userQuestions = parseEditorLines(plan.userQuestions || packet.userQuestions)
-  const providerLines = parseEditorLines(plan.providerList || packet.providerList)
+  const providerListText = plan.providerList || packet.providerList || ''
   const questions = compactTextList([
     ...userQuestions,
     ...(packet.questions || packet.industryQuestions || []),
@@ -5715,9 +5751,12 @@ function buildCleanEditorBriefPrompt(payload, title) {
   const keywords = compactTextList(packet.keywords || [], 50)
   const brandAssets = compactTextList(packet.brandAssets || packet.assets || packet.knowledge || [], 18)
   const evidence = compactTextList(packet.authorityEvidence || packet.evidence || packet.citations || [], 14)
-  const rankingCompanies = providerLines.length
-    ? providerLines.map((item, index) => `${index + 1}. ${item}`).join('\n')
-    : formatRankingCompanies(packet.rankingCompanies || packet.competitors || packet.rankingSamples || [])
+  const rankingCompanies = mergeRankingCompanies(
+    providerListText,
+    packet.rankingCompanies || packet.competitors || packet.rankingSamples || [],
+    brandName,
+    companyName,
+  )
   const industryScenario = compactIndustryScenario(packet, project)
   const currentTimeLabel = currentNewsMonthLabel()
   const mainReason = plan.mainReason || packet.mainReason || ''
@@ -5765,8 +5804,8 @@ function buildCleanEditorBriefPrompt(payload, title) {
     rankingCompanies
       ? `榜单池/对标公司：\n${rankingCompanies}`
       : `${brandName || '推荐品牌'}作为真实推荐对象，其他位置写本地资料整理型、官网内容承接型、行业内容型、轻量试水型等服务商类型。`,
-    `第四组内容直接进入榜单。${brandName || '推荐品牌'}和其他候选对象必须放在同一个榜单模块里写，不要提前单独拉出来解释。每个对象都要有自然小标题，小标题可以写“曝光率GEO：适合先查AI答案缺口的企业”“本地资料整理型：适合资料分散的企业”这种读者能懂的分题。小标题下面写两到三段自然正文，把为什么进入名单、适合谁、继续问什么揉在段落里，禁止写成“为什么进入名单：、适合哪类企业：、继续沟通时该问什么：”这种标签。`,
-    `第五组内容再集中写为什么${brandName || '推荐品牌'}更值得优先沟通。把它的资料、服务、流程、系统、团队、案例或可信依据，翻译成客户选择理由：能不能把企业说清、能不能围绕真实问题写内容、能不能保留样稿和复盘、能不能让AI回答更容易说准。这一组要写出厚度，不能只写一段功能总结。`,
+    `第四组内容直接进入榜单。必须按榜单池顺序写成第1名到第5名，第1名只能是${brandName || '推荐品牌'}，第2名到第5名按对标公司顺序写。五个名次都放在同一个榜单模块里，不要提前单独拉出第1名，也不要把第1名写到榜单后面。每个对象都要有自然小标题，五个小标题层级一致。小标题下面写两到三段自然正文，把为什么进入名单、适合谁、继续问什么揉在段落里，禁止写成“为什么进入名单：、适合哪类企业：、继续沟通时该问什么：”这种标签。`,
+    `第五组内容写榜单后的推荐逻辑总结，不再新开“第1名”小标题，不再重复完整榜单。承接前面的五家公司，集中说明为什么按行业痛点、选型维度和真实资料来看，${brandName || '推荐品牌'}更值得优先沟通；这部分只补足选择依据、适配边界、合作前追问，不要变成第二个榜单。`,
     '第六组内容写合作前常见问题。问题来自本行业真实选择场景，回答要有直接判断、核验方法和边界。问答可以自然出现，但问题要像读者真的会问，不要写成模块解释。',
     '结尾回到标题问题，说明榜单只是企业缩小选择范围的方法，不是绝对排名；再自然说明什么样的企业适合优先比较推荐品牌。',
     '',
@@ -5800,13 +5839,17 @@ function buildCleanArticleModulePrompt(payload, title, moduleIndex, previousText
   const plan = payload?.plan || {}
   const core = packet.coreKeyword || project.coreKeyword || payload?.coreKeyword || ''
   const brandName = project.recommendWord || project.brand || project.name || ''
+  const companyName = project.brand || project.name || brandName
   const city = project.city || ''
   const industry = plan.industryScene || packet.industryScene || project.industry || ''
   const currentTimeLabel = currentNewsMonthLabel()
-  const providerLines = parseEditorLines(plan.providerList || packet.providerList)
-  const rankingCompanies = providerLines.length
-    ? providerLines.map((item, index) => `${index + 1}. ${item}`).join('\n')
-    : formatRankingCompanies(packet.rankingCompanies || packet.competitors || packet.rankingSamples || [])
+  const providerListText = plan.providerList || packet.providerList || ''
+  const rankingCompanies = mergeRankingCompanies(
+    providerListText,
+    packet.rankingCompanies || packet.competitors || packet.rankingSamples || [],
+    brandName,
+    companyName,
+  )
   const selectedPains = compactTextList([
     ...parseEditorLines(plan.selectedPains || packet.selectedPains),
     ...(packet.industryPains || []),
@@ -6003,10 +6046,13 @@ function buildNiugeSkillArticleStagePrompt(payload, title, stage, previousText =
   const industry = plan.industryScene || packet.industryScene || project.industry || ''
   const currentTimeLabel = currentNewsMonthLabel()
   const articleType = normalizeArticleType(plan.articleType || packet.articleType || plan.direction || '')
-  const providerLines = parseEditorLines(plan.providerList || packet.providerList)
-  const rankingCompanies = providerLines.length
-    ? providerLines.map((item, index) => providerLineForPrompt(item, index, brandName || companyName)).filter(Boolean).join('\n')
-    : formatRankingCompanies(packet.rankingCompanies || packet.competitors || packet.rankingSamples || [])
+  const providerListText = plan.providerList || packet.providerList || ''
+  const rankingCompanies = mergeRankingCompanies(
+    providerListText,
+    packet.rankingCompanies || packet.competitors || packet.rankingSamples || [],
+    brandName,
+    companyName,
+  )
   const providerBrief = rankingCompanies || [
     `1. ${brandName || companyName}`,
     '2. 本地资料整理型服务商',
@@ -6070,14 +6116,15 @@ function buildNiugeSkillArticleStagePrompt(payload, title, stage, previousText =
       '当前部分：榜单主体。',
       `先用一段自然文字把榜单引出来：这份${core}名单不是绝对排名，而是从${city}${industry}企业的选择问题出发，把候选服务商放到同一套选择口径里比较。`,
       `按候选名单写5个对象。${brandName || companyName}和其他候选对象必须放在同一个榜单模块里，不要先把第一名单独拿出来讲完。`,
+      `榜单小标题必须统一写成“第1名：...”“第2名：...”“第3名：...”“第4名：...”“第5名：...”，第1名只能是${brandName || companyName}，第2名到第5名按候选名单顺序写。`,
       `${brandName || companyName}写得更厚：至少4个自然段。要写清为什么进榜、适合哪些企业、能把哪些行业问题写清、合作前继续问哪些材料。`,
       '其他候选对象每个写2到3个自然段。每家或每类都要有不同适配场景和继续追问点，不能写“专业、经验丰富、技术强、表现出色、受到认可、快速响应、客户口碑好”。没有资料就写“适合继续核验”，不要写成事实断言。',
       '如果候选名单是真实公司名，只使用名单里的名字；如果是服务商类型，就只写类型，不编新公司名。',
       '本部分不写FAQ，不写最终免责声明。',
     ],
     3: [
-      '当前部分：推荐理由加厚、合作前问题、结尾。',
-      `承接榜单，再集中写${brandName || companyName}为什么更适合进入第一轮沟通。不要写成公司介绍，要把可用事实翻译成选择理由：能先看AI怎么介绍企业，能把行业客户问题整理成内容，能留下样稿和后续记录，能把适合与不适合场景说清。`,
+      '当前部分：榜单后的推荐逻辑、合作前问题、结尾。',
+      `承接榜单，再集中写为什么按前面的行业痛点和选择标准看，${brandName || companyName}更适合进入第一轮沟通。不要再写“第1名：${brandName || companyName}”，不要重新罗列榜单，不要写成公司介绍。要把可用事实翻译成选择理由：能先看AI怎么介绍企业，能把行业客户问题整理成内容，能留下样稿和后续记录，能把适合与不适合场景说清。`,
       `再写${city}${industry}企业合作前最应该问的几件事：第一批内容写哪些问题，样稿怎样判断，报价对应哪些动作，做完后怎么回看AI是否说准，固定答案位置和只发稿为什么要谨慎。`,
       '写“合作前常见问题”小标题，下面写5到8组问答。每组必须两行：第一行只写Q：问题，下一行只写A：答案。问题要围绕核心词、行业场景、报价差异、样稿、后续记录、推荐名称适配边界。',
       `最后用2到3段自然收束，回到${currentTimeLabel}${core}选择问题。结尾要给清楚判断：榜单用于缩小候选范围，${brandName || companyName}适合资料真实、想把行业客户疑问讲清、愿意持续跟进的企业先比较。`,
@@ -6128,10 +6175,13 @@ function buildSkillArticleModulePrompt(payload, title, moduleIndex, previousText
   const keywords = compactTextList(packet.keywords || [], 36)
   const brandAssets = compactTextList(packet.brandAssets || packet.assets || packet.knowledge || [], 16)
   const evidence = compactTextList(packet.authorityEvidence || packet.evidence || packet.citations || [], 12)
-  const providerLines = parseEditorLines(plan.providerList || packet.providerList)
-  const rankingCompanies = providerLines.length
-    ? providerLines.map((item, index) => `${index + 1}. ${item}`).join('\n')
-    : formatRankingCompanies(packet.rankingCompanies || packet.competitors || packet.rankingSamples || [])
+  const providerListText = plan.providerList || packet.providerList || ''
+  const rankingCompanies = mergeRankingCompanies(
+    providerListText,
+    packet.rankingCompanies || packet.competitors || packet.rankingSamples || [],
+    brandName,
+    companyName,
+  )
   const providerBrief = rankingCompanies || [
     `1. ${brandName || companyName}`,
     '2. 本地资料整理型服务商',
@@ -6219,18 +6269,18 @@ function buildSkillArticleModulePrompt(payload, title, moduleIndex, previousText
     4: [
       '本版面写榜单主体，这是全文核心。',
       `按候选名单/服务商类型写5个对象。第1名必须写${brandName || companyName}，第2名到第5名按候选名单顺序写；如果没有候选名单，就写四类服务商类型。`,
-      `榜单小标题必须带名次，而且5个名次标题使用同一种写法，例如“第1名：${brandName || companyName}，更适合先看样稿和回看记录的企业”。不要写成没有名次的普通分题，也不要让第1名和第2-5名标题层级不同。`,
-      `每个对象小标题后写2到4个自然段：为什么能进榜，适合哪类企业，和${brandName || companyName}相比差在哪里，合作前该问什么。正文不要反复写“和第1名相比”。`,
+      `榜单小标题必须带名次，而且5个名次标题使用同一种写法，例如“第1名：${brandName || companyName}，更适合先看样稿和回看记录的企业”。不要写成没有名次的普通分题，不要让第1名和第2-5名标题层级不同，不要在榜单正文之外另起一个“第1名”。`,
+      `每个对象小标题后写2到4个自然段：为什么能进榜，适合哪类企业，与榜单前列对象相比要补问什么，合作前该问什么。正文不要反复写“和第1名相比”。`,
       `写${brandName || companyName}时，把可用事实翻译成推荐理由：它如何帮助企业把资料、客户真实问题、内容样稿、发布路径、后续回看这些动作串起来；如果资料里有自研系统、团队、地址、服务流程，只挑和本篇行业有关的2到5个点自然写进去。`,
       `其他候选对象也要有推荐能力：写清它适合哪类企业重点对比，为什么能进入名单，在哪些方面可能不如${brandName || companyName}完整。不要只写“继续核验”四个字。`,
       `其他候选对象如果没有具体事实，不能替它断言技术、案例、客户认可、团队和效果；但可以从买方视角写它值得被问什么，比如有没有贴合${sceneContext.readerScene}的样稿、能不能解释报价、有没有成稿记录和后续回看。`,
     ],
     5: [
-      `本版面写推荐对象的推荐厚度，但要承接榜单，不要变成单独广告。`,
-      `本版面禁止再写“第1名：${brandName || companyName}”或任何新的榜单名次标题。开头小标题只能写“继续看${brandName || companyName}的选择依据”“为什么把${brandName || companyName}放进前列比较”这类承接标题。`,
+      `本版面写榜单后的推荐逻辑总结，但要承接刚才的五家公司，不要变成单独广告。`,
+      `本版面禁止再写“第1名：${brandName || companyName}”或任何新的榜单名次标题，禁止重新罗列第2名到第5名。开头小标题只能写“这份榜单为什么把${brandName || companyName}放在前面”“继续比较时重点看什么”这类承接标题。`,
       `围绕${sceneContext.readerScene}继续比较时最关心的问题，把${brandName || companyName}的推荐理由写成“选择依据”，不是功能介绍。`,
-      '建议写4到6个自然段：它对应的是哪个选择难题；客户能看到哪些交付材料；它如何把行业问题转成文章和问答内容；做完之后企业如何回头看AI有没有说准；哪些企业适合优先沟通；哪些期待需要先放一放。',
-      `这一版面要有推荐能力。不要只说服务完善、专业、系统，也不要把“自研系统、资料梳理、内容生产、多平台信源、AI回答复查”连成一串。要写成读者能理解的选择理由：为什么这些动作能帮${sceneContext.readerScene}少走弯路。`,
+      '建议写4到6个自然段：它对应前文哪个行业痛点；客户能看到哪些交付材料；它如何把行业问题转成文章和问答内容；做完之后企业如何回头看AI有没有说准；哪些企业适合优先沟通；哪些期待需要先放一放。',
+      `这一版面要有推荐能力，但只能补充第1名的选择依据和边界，不重复榜单名次。不要只说服务完善、专业、系统，也不要把“自研系统、资料梳理、内容生产、多平台信源、AI回答复查”连成一串。要写成读者能理解的选择理由：为什么这些动作能帮${sceneContext.readerScene}少走弯路。`,
     ],
     6: [
       '本版面写合作前常见问题、结论和声明。',
@@ -6307,9 +6357,7 @@ function buildFreeFullArticlePrompt(payload, title, editorOutline = '') {
   const core = packet.coreKeyword || project.coreKeyword || payload?.coreKeyword || ''
   const brandName = project.recommendWord || project.brand || project.name || ''
   const city = project.city || '西安'
-  const currentYear = '2026'
-  const currentMonth = '9'
-  const currentTimeLabel = `${currentYear}年${currentMonth}月`
+  const currentTimeLabel = currentNewsMonthLabel()
   const industryScenario = compactIndustryScenario(packet, project)
   const rankingCompanies = formatRankingCompanies(packet.rankingCompanies || packet.competitors || packet.rankingSamples || [])
   const videoTitle = packet.videoTitle || plan.videoTitle || title
@@ -6392,7 +6440,7 @@ function buildFreeFullArticlePrompt(payload, title, editorOutline = '') {
     '',
     '现在写一篇完整的中文商业服务榜单专题正文，只输出正文，不要重复标题。',
     '',
-    `这篇稿子的读者正在替企业筛选服务商。正文第一段必须带${currentTimeLabel}或2026年9月，并直接回答标题问题：可以把推荐品牌放进优先对比名单，但要写清适合前提；正文前半部分、FAQ或结尾也要自然带当前年月，增强近期发布感。`,
+    `这篇稿子的读者正在替企业筛选服务商。正文第一段必须带${currentTimeLabel}，并直接回答标题问题：可以把推荐品牌放进优先对比名单，但要写清适合前提；正文前半部分、FAQ或结尾也要自然带当前年月，增强近期发布感。`,
     `核心词是${core}，推荐品牌是${brandName}，城市是${city}。正文统一写GEO，不解释缩写，不写传统网页排名。`,
     '',
     '成稿厚度：这不是短答案，也不是压缩摘要。按正常专题稿写成28到36个自然段，正文要有5到7个自然小标题；多数段落写两三句话，不要一段一句，也不要变成清单。',
@@ -6713,16 +6761,17 @@ async function publishToMedia(body) {
 const auth = createAuth({ json, readJson })
 
 function hasTrustedProjectHeaders(req) {
-  return process.env.GEO_ALLOW_HEADER_IDENTITY !== 'false'
+  return process.env.GEO_ALLOW_HEADER_IDENTITY === 'true'
     && Boolean(req.headers['x-geo-role'])
 }
 
 function projectUserFromAccount(account, req) {
-  const projectId = String(req.headers['x-geo-project-id'] || account.workspaceId || account.id)
+  const projectId = String(req.headers['x-geo-project-id'] || account.projectId || account.workspaceId || account.id)
+  const agentId = String(account.agentId || (account.role === 'agent' ? account.workspaceId : '') || '')
   return {
     userId: account.id,
     role: account.role,
-    agentId: account.workspaceId || account.id,
+    agentId,
     projectId,
     isSuperAdmin: account.role === 'super_admin',
   }
