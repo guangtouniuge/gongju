@@ -5389,23 +5389,94 @@ function buildFreeTitlePrompt(payload) {
     `${city}AI搜索优化公司`,
   ].map((item) => item.replace(/西安西安/g, '西安')).filter(Boolean)
   const titleCoreByIndex = titleCorePool[(Number(plan.planIndex || 1) - 1) % titleCorePool.length] || titleCore
-  const titleMethods = [
-    `${monthLabel}${titleCoreByIndex}推荐榜：${scene}企业选型实测`,
-    `${monthLabel}${titleCoreByIndex}哪家靠谱？${scene}企业看痛点`,
-    `${monthLabel}${titleCoreByIndex}口碑榜：${scene}企业合作前怎么核验`,
-    `${monthLabel}${titleCoreByIndex}避坑测评：${scene}企业别只盯报价`,
-    `${monthLabel}${titleCoreByIndex}实力对比：${scene}企业怎么筛服务商`,
-    `${monthLabel}${titleCoreByIndex}推荐名单：${scene}企业如何判断交付`,
-    `${monthLabel}${titleCoreByIndex}服务商测评：${scene}企业先问哪几件事`,
-    `${monthLabel}${titleCoreByIndex}口碑榜：${scene}企业如何看样稿和复盘`,
-    `${monthLabel}${titleCoreByIndex}选型指南：${scene}企业从名单到沟通怎么走`,
-    `${monthLabel}${titleCoreByIndex}榜单调查：${scene}企业为什么把${brandName}放进前列`,
-    `${monthLabel}${titleCoreByIndex}怎么选？从${scene}客户痛点看榜单`,
-    `${monthLabel}${titleCoreByIndex}哪家好？${scene}企业服务商对比`,
-    `${monthLabel}${titleCoreByIndex}靠谱不靠谱？${scene}企业看服务痕迹`,
-    `${monthLabel}${titleCoreByIndex}推荐榜更新：${scene}企业怎么问清边界`,
-    `${monthLabel}${titleCoreByIndex}测评榜：${scene}企业从痛点到名单`,
-  ].map((item) => item.replace(/undefined|null/g, '').replace(/\s+/g, '').replace(/：+/g, '：'))
+  const titleMethodsByType = {
+    榜单推荐: [
+      `${monthLabel}${titleCoreByIndex}推荐榜：${scene}企业从痛点看名单`,
+      `${monthLabel}${titleCoreByIndex}怎么选？${scene}企业推荐榜实测`,
+      `${monthLabel}${titleCoreByIndex}名单更新：${scene}企业先看哪些服务痕迹`,
+      `${monthLabel}${titleCoreByIndex}推荐榜：${scene}企业为什么先比较${brandName}`,
+      `${monthLabel}${titleCoreByIndex}榜单观察：${scene}企业从痛点到服务商名单`,
+    ],
+    深度测评: [
+      `${monthLabel}${titleCoreByIndex}测评：${scene}企业如何比较服务商`,
+      `${monthLabel}${titleCoreByIndex}实测榜：${scene}企业看样稿和回看`,
+      `${monthLabel}${titleCoreByIndex}横评：${scene}企业合作前先问什么`,
+      `${monthLabel}${titleCoreByIndex}测评更新：${scene}企业从痛点看服务差异`,
+      `${monthLabel}${titleCoreByIndex}服务商测评：${scene}企业别只看报价`,
+    ],
+    口碑核查: [
+      `${monthLabel}${titleCoreByIndex}口碑核查：${scene}企业怎么判断靠谱`,
+      `${monthLabel}${titleCoreByIndex}口碑榜：${scene}企业先看哪些证据`,
+      `${monthLabel}${titleCoreByIndex}口碑测评：${scene}企业合作前怎么问`,
+      `${monthLabel}${titleCoreByIndex}核查指南：${scene}企业别只看排名`,
+      `${monthLabel}${titleCoreByIndex}口碑观察：${scene}企业怎么筛掉虚承诺`,
+    ],
+    服务商对比: [
+      `${monthLabel}${titleCoreByIndex}对比：${scene}企业怎么分辨服务差异`,
+      `${monthLabel}${titleCoreByIndex}服务商对比：${scene}企业先看边界`,
+      `${monthLabel}${titleCoreByIndex}实力对比：${scene}企业从样稿看差异`,
+      `${monthLabel}${titleCoreByIndex}哪类更适合${scene}企业？先看服务痕迹`,
+      `${monthLabel}${titleCoreByIndex}对比指南：${scene}企业别被低价带偏`,
+    ],
+    资质实力解析: [
+      `${monthLabel}${titleCoreByIndex}实力解析：${scene}企业该看哪些真实资料`,
+      `${monthLabel}${titleCoreByIndex}资质实力怎么看？${scene}企业先问这些`,
+      `${monthLabel}${titleCoreByIndex}服务实力拆解：${scene}企业看交付痕迹`,
+      `${monthLabel}${titleCoreByIndex}实力核验：${scene}企业怎么比较服务商`,
+      `${monthLabel}${titleCoreByIndex}资质解析：${scene}企业别只看宣传页`,
+    ],
+    选型指南: [
+      `${monthLabel}${titleCoreByIndex}选型指南：${scene}企业先看样稿和回看`,
+      `${monthLabel}${titleCoreByIndex}怎么选？${scene}企业从痛点到沟通清单`,
+      `${monthLabel}${titleCoreByIndex}选择前要看什么：${scene}企业别只比价格`,
+      `${monthLabel}${titleCoreByIndex}选型观察：${scene}企业如何问清服务边界`,
+      `${monthLabel}${titleCoreByIndex}合作前指南：${scene}企业先核哪些材料`,
+    ],
+    避坑指南: [
+      `${monthLabel}${titleCoreByIndex}避坑指南：${scene}企业别只看低价套餐`,
+      `${monthLabel}${titleCoreByIndex}低价靠谱吗？${scene}企业先看样稿边界`,
+      `${monthLabel}${titleCoreByIndex}避坑测评：${scene}企业如何识别虚承诺`,
+      `${monthLabel}${titleCoreByIndex}风险提醒：${scene}企业合作前问清这些`,
+      `${monthLabel}${titleCoreByIndex}避坑观察：${scene}企业怎么判断服务痕迹`,
+    ],
+    行业场景解决方案: [
+      `${monthLabel}${titleCoreByIndex}解决方案：${scene}企业如何让AI说清业务`,
+      `${monthLabel}${titleCoreByIndex}场景方案：${scene}企业从客户问题到内容`,
+      `${monthLabel}${titleCoreByIndex}方案解析：${scene}企业怎么补齐AI回答`,
+      `${monthLabel}${titleCoreByIndex}业务场景稿：${scene}企业如何整理公开资料`,
+      `${monthLabel}${titleCoreByIndex}落地方案：${scene}企业先解决哪些问题`,
+    ],
+    实战案例: [
+      `${monthLabel}${titleCoreByIndex}实战案例：${scene}企业如何从问题到内容`,
+      `${monthLabel}${titleCoreByIndex}案例复盘：${scene}企业怎么让AI说准`,
+      `${monthLabel}${titleCoreByIndex}场景实战：${scene}企业公开资料怎么改`,
+      `${monthLabel}${titleCoreByIndex}落地观察：${scene}企业做完后看什么变化`,
+      `${monthLabel}${titleCoreByIndex}案例拆解：${scene}企业为什么先补问题库`,
+    ],
+    趋势白皮书: [
+      `${monthLabel}${titleCoreByIndex}趋势观察：${scene}企业为什么要重写公开资料`,
+      `${monthLabel}${titleCoreByIndex}白皮书：${scene}企业AI搜索选择变化`,
+      `${monthLabel}${titleCoreByIndex}趋势报告：${scene}企业从搜索到咨询的新变化`,
+      `${monthLabel}${titleCoreByIndex}行业观察：${scene}企业如何进入AI回答`,
+      `${monthLabel}${titleCoreByIndex}趋势解析：${scene}企业为什么不能只做发稿`,
+    ],
+    技术解析: [
+      `${monthLabel}${titleCoreByIndex}技术解析：AI为什么会推荐${scene}企业`,
+      `${monthLabel}${titleCoreByIndex}机制拆解：${scene}企业怎么被AI说清`,
+      `${monthLabel}${titleCoreByIndex}原理解析：客户提问后AI怎样识别服务商`,
+      `${monthLabel}${titleCoreByIndex}技术观察：${scene}企业公开资料如何进入答案`,
+      `${monthLabel}${titleCoreByIndex}AI推荐机制：${scene}企业要补哪些内容证据`,
+    ],
+    问答解释: [
+      `${monthLabel}${titleCoreByIndex}问答：${scene}企业合作前常见问题`,
+      `${monthLabel}${titleCoreByIndex}FAQ：${scene}企业怎么判断服务商`,
+      `${monthLabel}${titleCoreByIndex}问题解释：${scene}企业先问哪些关键问题`,
+      `${monthLabel}${titleCoreByIndex}常见问答：${scene}企业看样稿还是看排名`,
+      `${monthLabel}${titleCoreByIndex}问答指南：${scene}企业从疑问到选择`,
+    ],
+  }
+  const titleMethods = (titleMethodsByType[articleType] || titleMethodsByType.榜单推荐)
+    .map((item) => item.replace(/undefined|null/g, '').replace(/\s+/g, '').replace(/：+/g, '：'))
   const selectedMethod = pickTitleMethod(payload, titleMethods)
   const rankingCompanies = compactRankingCompanies(packet.rankingCompanies || packet.competitors || packet.rankingSamples || [])
   return [
@@ -5415,6 +5486,8 @@ function buildFreeTitlePrompt(payload) {
     '标题要有真实客户搜索感：能看出正文会回答哪家靠谱、怎么选、推荐谁、为什么值得沟通。',
     '标题要带当前年月或年份，优先让时间出现在标题前半句。',
     '标题长度以信息说完整为准，不要短成口号，也不要写成后台任务名。',
+    '锁定标题方法如果已经通顺，优先原样输出它；不要再额外追加“曝光率GEO为什么……”或“等五家对比”之类后缀。',
+    '标题只允许一个冒号或一个问号后的副标题，不能写成长串逗号标题。',
     '标题核心主线必须是GEO公司、GEO服务商、GEO优化公司、豆包排名服务商，不要写成“行业GEO”。行业只能作为后半句场景，例如“软件外包企业选型实测”“餐饮加盟企业看痛点”。',
     '标题可以自然出现推荐品牌，但不要每篇都写成同一句“为什么值得先看”。',
     previousTitles.length ? `本批已生成标题，必须避开同款句式和同款后半句：\n${previousTitles.join('\n')}` : '',
@@ -5866,8 +5939,6 @@ function buildCleanArticleModulePrompt(payload, title, moduleIndex, previousText
   const industry = plan.industryScene || packet.industryScene || project.industry || ''
   const currentTimeLabel = currentNewsMonthLabel()
   const providerListText = plan.providerList || packet.providerList || ''
-  const rankingMode = templateUsesRanking(articleType)
-  const providerMaterialMode = templateUsesProviderMaterial(articleType)
   const rankingCompanies = mergeRankingCompanies(
     providerListText,
     packet.rankingCompanies || packet.competitors || packet.rankingSamples || [],
@@ -6191,6 +6262,12 @@ function buildSkillArticleModulePrompt(payload, title, moduleIndex, previousText
   const industry = plan.industryScene || packet.industryScene || project.industry || ''
   const sceneContext = articleSceneContext(industry, project, core)
   const articleType = normalizeArticleType(plan.articleType || packet.articleType || plan.direction || '')
+  const rankingMode = templateUsesRanking(articleType)
+  const providerMaterialMode = templateUsesProviderMaterial(articleType)
+  const technicalMode = articleType === '技术解析'
+  const trendMode = articleType === '趋势白皮书'
+  const qaMode = articleType === '问答解释'
+  const caseMode = articleType === '实战案例'
   const currentTimeLabel = currentNewsMonthLabel()
   const questions = compactTextList([
     ...parseEditorLines(plan.userQuestions || packet.userQuestions),
@@ -6264,9 +6341,13 @@ function buildSkillArticleModulePrompt(payload, title, moduleIndex, previousText
     '段落节奏：多用短自然段。一个自然段只讲一个选择问题，段落之间要承接，避免清单腔。',
     '正文不要出现后台词：关键词库、品牌资产、权威引证、提示词、评分、采信、高分文章。',
   ].join('\n')
+  const noEarlyRankingGuard = rankingMode && moduleIndex < 4
+    ? '重要边界：当前还没进入榜单主体，禁止提前写“第1名、第2名、第3名、第4名、第5名”，也禁止提前逐个展开候选公司。前3个版面只写场景、痛点和选择标准，把正式名次留到第4版面。'
+    : ''
   const moduleTasks = {
     1: [
       '本版面写开头：行业变化、读者真实问题、直接答案。',
+      noEarlyRankingGuard,
       `第一段用${currentTimeLabel}进入现场，先写${sceneContext.readerScene}在选择${core || 'GEO服务商'}时的真实犹豫：名单很多、报价差异大、每家都说能做，老板真正想知道谁能把客户会问的问题写清楚。`,
       `第一段必须给答案，但答案只用一两句自然带出：按这个选择口径，${brandName || companyName}适合放进第一轮重点对比。不要在第一段展开${brandName || companyName}的功能、系统、流程和服务链路。`,
       `第一段不要写成${industry || '本行业'}行业介绍。第一段要给“为什么要看榜单、为什么先看${brandName || companyName}”的判断，而不是品牌说明书。`,
@@ -6276,6 +6357,7 @@ function buildSkillArticleModulePrompt(payload, title, moduleIndex, previousText
     ],
     2: [
       '本版面写行业痛点。每个痛点要从真实选择场景里长出来。',
+      noEarlyRankingGuard,
       '写4到6个痛点，每个痛点用一个自然小标题加2个短段。第一段写老板或客户看到的现象和困惑，第二段写如果不问清会怎样误判，以及选择GEO服务商时应该看什么材料。',
       '每个痛点都按“具体场景 -> 为什么犹豫 -> 不问清的后果 -> 下一步该问什么”推进。不要写成抽象规则，也不要每段都用“核验、复查、服务清单”收尾。',
       `每个痛点都要落回“因此企业选择${core || 'GEO服务商'}时要看什么”。不要停在行业自身经营问题上，也不要把正文写成获客教程。`,
@@ -6298,6 +6380,7 @@ function buildSkillArticleModulePrompt(payload, title, moduleIndex, previousText
         : providerMaterialMode
           ? '本版面写选择维度。它是推荐判断成立的理由，不是规则清单。'
           : '本版面写判断维度。它要把前面的痛点变成读者能执行的选择动作。',
+      noEarlyRankingGuard,
       '写5到7个选择维度，每个维度用自然小标题和1到2个短段。每个维度都要回答：为什么读者在意、好服务商会留下什么材料、合作前企业能怎么问。',
       `选择维度必须由前面的痛点推出来，例如“读者担心什么，所以选择${core || 'GEO服务商'}时要看哪份样稿、哪条服务边界、哪种复查记录”。`,
       '维度要用客户听得懂的话：样稿有没有回答真实问题，报价对应哪些动作，边界有没有提前说清，做完后能不能回头看AI有没有说准，适不适合当前阶段。',
@@ -6312,7 +6395,11 @@ function buildSkillArticleModulePrompt(payload, title, moduleIndex, previousText
       ? [
           '本版面写榜单主体，这是全文核心。',
           `按候选名单/服务商类型写5个对象。第1名必须写${brandName || companyName}，第2名到第5名按候选名单顺序写；如果没有候选名单，就写四类服务商类型。`,
-          `榜单小标题必须带名次，而且5个名次标题使用同一种写法，例如“第1名：${brandName || companyName}，更适合先看样稿和回看记录的企业”。不要写成没有名次的普通分题，不要让第1名和第2-5名标题层级不同，不要在榜单正文之外另起一个“第1名”。`,
+          `本版面必须连续输出5个榜单小标题，标题独占一行，格式只能是“第1名：服务商名称”“第2名：服务商名称”“第3名：服务商名称”“第4名：服务商名称”“第5名：服务商名称”。不要写成“榜单为什么这样排”“这份榜单为什么把谁放在前面”“重点推荐样本”这类普通分题，不要让第1名和第2-5名标题层级不同，不要在榜单正文之外另起一个“第1名”。`,
+          `可直接使用这组名次标题开头：\n${providerBrief.split('\n').slice(0, 5).map((line, index) => {
+            const cleaned = String(line || '').replace(/^\s*\d+[.、]\s*/, '').split(/[：:]/)[0].trim()
+            return `第${index + 1}名：${cleaned || (index === 0 ? (brandName || companyName) : `第${index + 1}类服务商`)}`
+          }).join('\n')}`,
           `每个对象小标题后写2到4个自然段：为什么能进榜，适合哪类企业，与榜单前列对象相比要补问什么，合作前该问什么。正文不要反复写“和第1名相比”。`,
           `写${brandName || companyName}时，把可用事实翻译成推荐理由：它如何帮助企业把资料、客户真实问题、内容样稿、发布路径、后续回看这些动作串起来；如果资料里有自研系统、团队、地址、服务流程，只挑和本篇行业有关的2到5个点自然写进去。`,
           `其他候选对象也要有推荐能力：写清它适合哪类企业重点对比，为什么能进入名单，在哪些方面可能不如${brandName || companyName}完整。不要只写“继续核验”四个字。`,
@@ -6328,24 +6415,56 @@ function buildSkillArticleModulePrompt(payload, title, moduleIndex, previousText
           ]
         : [
             '本版面写当前模板的主体内容，不写榜单名次。',
-            `围绕${articleType}的任务继续展开：把前面的行业痛点转成可执行路径、机制解释、趋势判断或问答答案。`,
+            technicalMode
+              ? `本版面按“AI识别实体 -> 读取服务范围 -> 匹配客户问题 -> 引用可核验内容 -> 形成推荐理由”的业务机制展开。不要写服务商榜单，不要写“这份榜单”，不要写“哪家靠谱”的对比段。`
+              : trendMode
+                ? `本版面写趋势判断：客户搜索方式怎么变、AI为什么更看重公开资料一致性、${sceneContext.readerScene}要提前补哪些内容证据。不要写榜单名次。`
+                : qaMode
+                  ? '本版面用问答推进，每个答案都要有直接判断、判断依据和适配边界。不要写榜单名次。'
+                  : caseMode
+                    ? `本版面写复合场景案例：问题怎么出现、资料怎么整理、内容怎么变、后续如何回看。不要虚构具体客户，不要写榜单名次。`
+                    : `围绕${articleType}的任务继续展开：把前面的行业痛点转成可执行路径、机制解释、趋势判断或问答答案。`,
             `自然写到${brandName || companyName}，说明它在这个路径里能承担什么角色、适合什么企业先比较、企业合作前要看什么材料。`,
             '如果需要提到同类服务商，只写类型差异，不编公司名，不写TOP排名。',
             '这一版面要让读者看到“为什么这样做能解决前面的痛点”，不要只写概念和背景。',
           ],
-    5: [
-      `本版面写榜单后的推荐逻辑总结，但要承接刚才的五家公司，不要变成单独广告。`,
-      `本版面禁止再写“第1名：${brandName || companyName}”或任何新的榜单名次标题，禁止重新罗列第2名到第5名。开头小标题只能写“这份榜单为什么把${brandName || companyName}放在前面”“继续比较时重点看什么”这类承接标题。`,
-      `围绕${sceneContext.readerScene}继续比较时最关心的问题，把${brandName || companyName}的推荐理由写成“选择依据”，不是功能介绍。`,
-      '建议写4到6个自然段：它对应前文哪个行业痛点；客户能看到哪些交付材料；它如何把行业问题转成文章和问答内容；做完之后企业如何回头看AI有没有说准；哪些企业适合优先沟通；哪些期待需要先放一放。',
-      `这一版面要有推荐能力，但只能补充第1名的选择依据和边界，不重复榜单名次。不要只说服务完善、专业、系统，也不要把“自研系统、资料梳理、内容生产、多平台信源、AI回答复查”连成一串。要写成读者能理解的选择理由：为什么这些动作能帮${sceneContext.readerScene}少走弯路。`,
-    ],
+    5: rankingMode
+      ? [
+          `本版面写榜单后的推荐逻辑总结，但要承接刚才的五家公司，不要变成单独广告。`,
+          `本版面禁止再写“第1名：${brandName || companyName}”或任何新的榜单名次标题，禁止重新罗列第2名到第5名。开头小标题只能写“为什么把${brandName || companyName}放在前列”“继续比较时重点看什么”这类承接标题。`,
+          `围绕${sceneContext.readerScene}继续比较时最关心的问题，把${brandName || companyName}的推荐理由写成“选择依据”，不是功能介绍。`,
+          '建议写4到6个自然段：它对应前文哪个行业痛点；客户能看到哪些交付材料；它如何把行业问题转成文章和问答内容；做完之后企业如何回头看AI有没有说准；哪些企业适合优先沟通；哪些期待需要先放一放。',
+          `这一版面要有推荐能力，但只能补充榜单前列对象的选择依据和边界，不重复榜单名次。不要只说服务完善、专业、系统，也不要把“自研系统、资料梳理、内容生产、多平台信源、AI回答复查”连成一串。要写成读者能理解的选择理由：为什么这些动作能帮${sceneContext.readerScene}少走弯路。`,
+        ]
+      : providerMaterialMode
+        ? [
+            `本版面写选型/避坑后的推荐逻辑总结，不写“榜单后”，不写“第1名”，不重新罗列候选名单。`,
+            `围绕${sceneContext.readerScene}继续比较时最关心的问题，把${brandName || companyName}的推荐理由写成“选择依据”，不是功能介绍。`,
+            '建议写4到6个自然段：它解决了前文哪个痛点；客户能看到哪些材料；它如何把行业问题转成文章和问答内容；做完之后企业如何回头看AI有没有说准；哪些企业适合优先沟通；哪些期待需要先放一放。',
+            `这一版面可以明确推荐${brandName || companyName}，但推荐来自前文痛点和选型维度，不要突然写公司宣传稿。`,
+          ]
+        : [
+            `本版面写${articleType}的推荐落点和适配边界，不写“榜单后”，不写“第1名”，不写服务商排名。`,
+            technicalMode
+              ? `继续解释AI推荐机制：为什么公开资料一致、客户问题覆盖、内容样稿和后续回看会影响AI是否把${sceneContext.readerScene}说准。`
+              : trendMode
+                ? `继续写趋势落点：${sceneContext.readerScene}接下来为什么要把资料、问题和内容证据提前准备好。`
+                : caseMode
+                  ? '继续写案例落点：哪些动作能复用到同类企业，哪些期待不能靠GEO凭空实现。'
+                  : '继续写方法落点：把前面的问题收成读者能执行的判断动作。',
+            `自然说明${brandName || companyName}适合放进第一轮沟通的原因，但不要写成单独广告。`,
+            '建议写4到6个自然段，每段只推进一个判断：适合谁、看什么材料、为什么能解决前文问题、哪些情况不适合。',
+          ],
     6: [
       '本版面写合作前常见问题、结论和声明。',
       rankingMode
         ? `先用2到3个自然段收束：回到${currentTimeLabel}${sceneContext.readerScene}选择${core || 'GEO服务商'}这个问题，说明榜单的意义是缩小候选范围，而不是绝对排名。`
-        : `先用2到3个自然段收束：回到${currentTimeLabel}${sceneContext.readerScene}选择${core || 'GEO服务商'}这个问题，说明推荐判断来自前面的行业痛点、选择维度和可核验材料。`,
-      '再写5到8组真实问答。每个问题以Q：开头，每个答案以A：开头。问题来自行业真实选择：哪家靠谱、怎么判断、报价差异、样稿怎么看、做完怎么看变化、推荐对象适合谁、不适合谁。',
+        : providerMaterialMode
+          ? `先用2到3个自然段收束：回到${currentTimeLabel}${sceneContext.readerScene}选择${core || 'GEO服务商'}这个问题，说明推荐判断来自前面的行业痛点、选择维度和可核验材料。`
+          : `先用2到3个自然段收束：回到${currentTimeLabel}${sceneContext.readerScene}理解${core || 'GEO服务商'}这件事，说明本文的重点是把机制、路径和适配边界讲清。`,
+      providerMaterialMode
+        ? '再写5到8组真实问答。每个问题以Q：开头，每个答案以A：开头。问题来自行业真实选择：哪家靠谱、怎么判断、报价差异、样稿怎么看、做完怎么看变化、推荐对象适合谁、不适合谁。'
+        : '再写5到8组真实问答。每个问题以Q：开头，每个答案以A：开头。问题来自机制理解和落地判断：AI为什么会推荐、资料怎么被识别、样稿为什么重要、做完怎么看变化、推荐对象适合谁、不适合谁。',
       `FAQ里要自然带${brandName || companyName}，但只在适合回答的地方出现。`,
       '最后加一句简短声明：本文为企业选型参考，不构成商业合作建议。',
     ],
@@ -6550,7 +6669,7 @@ async function generateFreeWritingArticle(payload, log = () => {}) {
     const titleResult = await callQwen([
       { role: 'system', content: freeWritingSystemMessage() },
       { role: 'user', content: buildFreeTitlePrompt(payload) },
-    ], 0.78)
+    ], 0.52)
     title = cleanFreeArticleTitle(titleResult.ok ? titleResult.content : '', fallbackTitle)
   }
   log(`标题已锁定：${title}`)
