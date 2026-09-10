@@ -231,6 +231,10 @@ function titleMatchesGeoCore(title: string, coreKeyword: string) {
   return Boolean(coreIsGeoProvider && hasGeoProviderTerm && (!city || text.includes(city)))
 }
 
+function isGeoProviderSceneText(value: string) {
+  return /(GEO公司|GEO服务商|GEO优化公司|豆包排名公司|豆包排名服务商|AI搜索优化公司|AI获客公司|GEO内容公司|GEO新闻优化公司)/i.test(String(value || ''))
+}
+
 type GeoRulePhase = '资料准备' | '生成调用'
 
 const geoDataRules: {
@@ -1637,6 +1641,14 @@ function sceneForMode(project: ProjectRow, mode: string, index = 0) {
 
 function deriveSceneDefaults(industry: string) {
   const text = String(industry || '')
+  if (isGeoProviderSceneText(text)) {
+    return {
+      pains: defaultPainSeeds,
+      dimensions: defaultDimensionSeeds,
+      faqs: defaultFaqSeeds,
+      pitfalls: defaultPitSeeds,
+    }
+  }
   if (/软件|外包|小程序|系统|开发/.test(text)) {
     return {
       pains: ['项目烂尾风险', '需求边界说不清', '报价后期追加', '源码归属不清', '验收标准模糊', '上线后维护断档'],

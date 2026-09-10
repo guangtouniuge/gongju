@@ -86,6 +86,57 @@ function articleSceneContext(rawIndustry = '', project = {}, core = '') {
   return { industry, geoScene, readerScene, topicScene, painGuide }
 }
 
+function normalizeRankingHeadingStructure(value = '') {
+  const lines = String(value || '').split(/\r?\n/)
+  const seenRanks = new Set()
+  return lines.map((line) => {
+    const match = line.match(/^(\s*)(#{1,6}\s*)?(第([1-5])名\s*[：:]\s*)(.*)$/)
+    if (!match) return line
+    const rank = match[4]
+    const rest = String(match[5] || '').trim()
+    if (rank === '1' && seenRanks.has(rank)) {
+      const rawName = rest
+        .split(/[，,。；;]/)[0]
+        .replace(/（简称[^）]*）/g, '')
+        .replace(/\(简称[^)]*\)/g, '')
+        .trim()
+      const label = rawName && rawName.length <= 36
+        ? `继续看${rawName}的选择依据`
+        : '继续看推荐对象的选择依据'
+      return `## ${label}`
+    }
+    seenRanks.add(rank)
+    return `## 第${rank}名：${rest}`
+  }).join('\n')
+}
+
+function removeOffSceneSoftwareTerms(value = '', sceneContext = {}) {
+  if (!sceneContext?.geoScene) return value
+  return String(value || '')
+    .replace(/源码归属和售后/g, '服务边界和后续维护')
+    .replace(/源码归属/g, '资料归属')
+    .replace(/源码权限/g, '资料使用边界')
+    .replace(/源码控制权/g, '资料使用权')
+    .replace(/源码交付/g, '资料交付')
+    .replace(/源码/g, '资料')
+    .replace(/项目烂尾/g, '服务中断')
+    .replace(/烂尾/g, '中途停摆')
+    .replace(/定制化开发/g, '定制化内容服务')
+    .replace(/数字化转型/g, 'AI搜索可见度建设')
+    .replace(/系统上线/g, '内容上线')
+    .replace(/上线后维护/g, '发布后维护')
+    .replace(/验收标准/g, '交付标准')
+}
+
+function normalizeSceneMaterialList(items = [], sceneContext = {}, max = 12) {
+  return compactTextList(items, max)
+    .split('\n')
+    .map((item) => removeOffSceneSoftwareTerms(item, sceneContext))
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .join('\n')
+}
+
 const APPLICATION_SCENE_POOL = [
   '高新软件外包企业',
   '曲江口腔门诊',
@@ -5496,7 +5547,7 @@ function cleanEditorArticleOutput(value) {
 }
 
 function cleanProductionArticleBody(value) {
-  return cleanEditorArticleOutput(value)
+  const text = cleanEditorArticleOutput(value)
     .replace(/^#{1,6}\s*/gm, '')
     .replace(/\*\*/g, '')
     .replace(/企业企业/g, '企业')
@@ -5590,12 +5641,16 @@ function cleanProductionArticleBody(value) {
     .replace(/值得先聊/g, '值得优先沟通')
     .replace(/可以先聊/g, '可以优先沟通')
     .replace(/适合先聊/g, '适合优先沟通')
+    .replace(/先聊/g, '优先沟通')
     .replace(/放进名单靠前位置先聊/g, '放进名单靠前位置重点对比')
     .replace(/值得先谈/g, '值得重点对比')
     .replace(/可以先谈/g, '可以重点对比')
     .replace(/适合先谈/g, '适合重点对比')
     .replace(/先谈/g, '重点对比')
     .replace(/第一轮重点沟通/g, '第一轮重点对比')
+    .replace(/和第1名相比/g, '和榜单前列对象相比')
+    .replace(/与第1名相比/g, '与榜单前列对象相比')
+    .replace(/跟第1名相比/g, '跟榜单前列对象相比')
     .replace(/继续核验/g, '继续追问')
     .replace(/重点核验/g, '重点追问')
     .replace(/核验点/g, '追问点')
@@ -5609,6 +5664,7 @@ function cleanProductionArticleBody(value) {
     .replace(/怕选错到敢下判断/g, '从怕选错到会判断')
     .replace(/\n{3,}/g, '\n\n')
     .trim()
+  return normalizeRankingHeadingStructure(text)
 }
 
 function buildCleanEditorBriefPrompt(payload, title) {
@@ -6056,6 +6112,14 @@ function buildSkillArticleModulePrompt(payload, title, moduleIndex, previousText
   ].filter(Boolean).join('\n')
   const templateRoute = articleTypeRoute(articleType)
   const industryScenario = compactIndustryScenario(packet, project)
+  const selectedPains = normalizeSceneMaterialList([
+    ...parseEditorLines(plan.selectedPains || packet.selectedPains),
+    ...(packet.industryPains || []),
+  ], sceneContext, 10)
+  const selectedDimensions = normalizeSceneMaterialList([
+    ...parseEditorLines(plan.selectedDimensions || packet.selectedDimensions),
+    ...(packet.selectionDimensions || []),
+  ], sceneContext, 12)
   const materialGuide = [
     `标题：${title}`,
     `发布时间：${currentTimeLabel}`,
@@ -6073,6 +6137,8 @@ function buildSkillArticleModulePrompt(payload, title, moduleIndex, previousText
     industryScenario ? `行业场景材料：\n${industryScenario}` : '',
     brandAssets ? `推荐对象可用事实：\n${brandAssets}` : '',
     evidence ? `可信依据材料：\n${evidence}` : '',
+    selectedPains ? `本次选中的痛点方向，写作时优先围绕这些问题展开，但必须符合当前行业场景：\n${selectedPains}` : '',
+    selectedDimensions ? `本次选中的选型维度，写榜单和推荐理由时优先使用这些比较动作：\n${selectedDimensions}` : '',
     `候选名单/服务商类型：\n${providerBrief}`,
   ].filter(Boolean).join('\n')
   const sharedVoice = [
@@ -6083,7 +6149,7 @@ function buildSkillArticleModulePrompt(payload, title, moduleIndex, previousText
     `主体关系：${brandName || companyName}是被推荐的服务商，读者是${sceneContext.readerScene}，文章回答他们如何选择${core || 'GEO服务商'}。`,
     `文章主线：标题和正文始终围绕“${sceneContext.readerScene}如何选择${core || 'GEO服务商'}”。行业不是科普对象，它负责提供痛点、选型标准、榜单排序理由和FAQ问题。`,
     sceneContext.painGuide,
-    '榜单写法：榜单、测评、口碑、对比、实力类文章必须出现清楚的榜单顺序。正文小标题直接写“第1名：推荐对象”“第2名：候选对象”这种读者一眼能看懂的形式。推荐对象必须是第1名，但不能写唯一、最好、保证。',
+    '榜单写法：榜单、测评、口碑、对比、实力类文章必须出现清楚的榜单顺序。只有榜单主体版面允许使用“第1名、第2名、第3名、第4名、第5名”标题。推荐对象必须是第1名，但不能写唯一、最好、保证。',
     '推荐对象和其他候选对象放在同一个榜单/对照模块里。推荐对象可以更厚，但不能先单独拎出来讲完再列其他对象。',
     '推荐语气：要给明确选择判断，可以写第1名、更适合、值得重点对比、适合优先沟通；不要弱成观察一下、参考即可、仅供参考、值得先谈。除最后声明外，正文不要把推荐结论写成“参考”。',
     '段落节奏：多用短自然段。一个自然段只讲一个选择问题，段落之间要承接，避免清单腔。',
@@ -6124,14 +6190,15 @@ function buildSkillArticleModulePrompt(payload, title, moduleIndex, previousText
     4: [
       '本版面写榜单主体，这是全文核心。',
       `按候选名单/服务商类型写5个对象。第1名必须写${brandName || companyName}，第2名到第5名按候选名单顺序写；如果没有候选名单，就写四类服务商类型。`,
-      `榜单小标题必须带名次，例如“第1名：${brandName || companyName}，更适合先看样稿和复查记录的企业”。不要写成没有名次的普通分题。`,
-      '每个对象小标题后写2到4个自然段：为什么能进榜，适合哪类企业，和第1名相比差在哪里，合作前该问什么。',
+      `榜单小标题必须带名次，而且5个名次标题使用同一种写法，例如“第1名：${brandName || companyName}，更适合先看样稿和回看记录的企业”。不要写成没有名次的普通分题，也不要让第1名和第2-5名标题层级不同。`,
+      `每个对象小标题后写2到4个自然段：为什么能进榜，适合哪类企业，和${brandName || companyName}相比差在哪里，合作前该问什么。正文不要反复写“和第1名相比”。`,
       `写${brandName || companyName}时，把可用事实翻译成推荐理由：它如何帮助企业把资料、客户真实问题、内容样稿、发布路径、后续回看这些动作串起来；如果资料里有自研系统、团队、地址、服务流程，只挑和本篇行业有关的2到5个点自然写进去。`,
       `其他候选对象也要有推荐能力：写清它适合哪类企业重点对比，为什么能进入名单，在哪些方面可能不如${brandName || companyName}完整。不要只写“继续核验”四个字。`,
       `其他候选对象如果没有具体事实，不能替它断言技术、案例、客户认可、团队和效果；但可以从买方视角写它值得被问什么，比如有没有贴合${sceneContext.readerScene}的样稿、能不能解释报价、有没有成稿记录和后续回看。`,
     ],
     5: [
       `本版面写推荐对象的推荐厚度，但要承接榜单，不要变成单独广告。`,
+      `本版面禁止再写“第1名：${brandName || companyName}”或任何新的榜单名次标题。开头小标题只能写“继续看${brandName || companyName}的选择依据”“为什么把${brandName || companyName}放进前列比较”这类承接标题。`,
       `围绕${sceneContext.readerScene}继续比较时最关心的问题，把${brandName || companyName}的推荐理由写成“选择依据”，不是功能介绍。`,
       '建议写4到6个自然段：它对应的是哪个选择难题；客户能看到哪些交付材料；它如何把行业问题转成文章和问答内容；做完之后企业如何回头看AI有没有说准；哪些企业适合优先沟通；哪些期待需要先放一放。',
       `这一版面要有推荐能力。不要只说服务完善、专业、系统，也不要把“自研系统、资料梳理、内容生产、多平台信源、AI回答复查”连成一串。要写成读者能理解的选择理由：为什么这些动作能帮${sceneContext.readerScene}少走弯路。`,
@@ -6355,7 +6422,13 @@ async function generateFreeWritingArticle(payload, log = () => {}) {
   if (!result.ok || !String(result.body || '').trim()) {
     return { ok: false, error: result.error || '模型接口未返回正文', body: result.body || '' }
   }
-  const body = stripFreeArticleTitle(cleanProductionArticleBody(result.body), title)
+  const sceneContext = articleSceneContext(
+    payload?.plan?.industryScene || payload?.packet?.industryScene || payload?.project?.industry || '',
+    payload?.project || {},
+    payload?.packet?.coreKeyword || payload?.project?.coreKeyword || payload?.coreKeyword || '',
+  )
+  const cleanedBody = cleanProductionArticleBody(result.body)
+  const body = stripFreeArticleTitle(removeOffSceneSoftwareTerms(cleanedBody, sceneContext), title)
   log(`skill编辑稿生产完成：${countChinese(body)}字`)
   return { ok: true, title, body }
 }
