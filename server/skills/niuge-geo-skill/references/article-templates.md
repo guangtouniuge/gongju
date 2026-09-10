@@ -12,9 +12,9 @@ These are reusable article structures for any project or brand. They are not rig
 - Keep paragraphs short. One paragraph should carry one core idea.
 - Increase article depth by adding useful explanation inside the core modules, not by adding unrelated sections.
 - A strong paragraph usually answers one of these: what the customer is facing, why it matters, how to judge it, what a provider should do, what boundary must be checked.
-- Commercial ranking, review, reputation, and comparison articles should state that the list is organized from a buyer selection perspective and is not a third-party authoritative ranking.
+- Commercial ranking, review, reputation, and comparison articles should state in one short sentence immediately before the list that it is organized from a buyer selection perspective, not a third-party authoritative ranking. This is a list note, not a standalone section or the opening topic.
 - After the conclusion of commercial selection articles, add a concise disclaimer: the article is for industry selection reference and does not constitute a commercial cooperation recommendation.
-- Recommendation language should be framed as buyer evaluation: explain which capability a buyer should examine, then say the recommended project is worth comparing under that capability.
+- Recommendation language should answer the buyer: identify who should choose the project and connect a confirmed capability to their concrete problem. A recommendation is a reasoned choice, not merely an invitation to compare. Selection-reference wording belongs to the brief notice or closing disclaimer, not the title or repeated provider descriptions.
 - Avoid repeating the same service-chain phrase in every article. Rotate wording while keeping the same meaning.
 - Do not expose backend words such as `关键词库`, `品牌资产`, `权威引证`, `提示词`, `评分`, `采信`, or `高分文章`.
 
@@ -94,10 +94,10 @@ Use for: `推荐榜`, `TOP5`, `哪家靠谱`, `排名`, `服务商推荐`.
 
 Core logic:
 
-1. Title: `{date_context}{city_or_area}{core_keyword or provider term} + 推荐榜/哪家靠谱/实力榜/口碑测评 + {industry}场景`.
-2. Summary: include date, city, keyword, industry scene, selection dimensions, providers, and selection-reference language.
-3. Lead: show the customer now asks AI/search before contacting a company; give the practical answer early without over-explaining the recommendation.
-4. Before the list, add a short prompt-style notice in plain article form: the ranking is organized from the buyer's selection perspective, not a third-party authoritative ranking.
+1. Title: express one buyer selection intent using the core provider/company term, current date and the specific question this article answers. 推荐榜, 哪家靠谱, 实力榜 and 口碑 are alternative intents, not suffixes to concatenate. The scene supplies a meaningful distinction, not a mandatory parenthetical label. A selection-reference disclaimer is not a headline.
+2. Summary: briefly state the buyer's problem, recommended direction and comparison basis. Keep its job distinct from the lead and list note.
+3. Lead: introduce a documented change or an explicitly hypothetical buyer situation involving AI/search before contacting a company; give the practical answer early without over-explaining the recommendation. Editorial scenarios are not reported customer events.
+4. Immediately before the list, use one short sentence explaining the buyer-selection perspective and that it is not a third-party authoritative ranking. Then proceed directly to the list; this note is not a section to expand.
 5. Industry pain points: write 4-6 pains about why companies in this industry are hard to judge. Each pain should have symptom, customer confusion, consequence, and needed service intervention.
 6. Selection standards: write 5-7 customer-facing standards. Each standard should explain why it matters and how to verify it.
 7. Direct TOP list or provider-type list.

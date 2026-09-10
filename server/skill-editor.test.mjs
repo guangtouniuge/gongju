@@ -11,6 +11,9 @@ test('all twelve briefs are independently routed and retain the recommended subj
     assert.ok(prompt.includes('测试咨询'))
     assert.ok(prompt.includes('技术团队、自研系统、客户案例原文'))
     assert.ok(!prompt.includes('第1/6'))
+    assert.ok(prompt.includes('## Paragraph Tasking'))
+    assert.ok(prompt.includes('不是标题卖点'))
+    assert.ok(prompt.includes('A recommendation is a reasoned choice'))
   }
 })
 
@@ -19,6 +22,15 @@ test('empty selection rotates all types; explicit selection rotates only chosen 
   assert.equal(selectTemplate('技术解析', 17).id, 'G')
   assert.equal(selectTemplate('榜单推荐、避坑指南', 1).id, 'E')
   assert.equal(selectTemplate('榜单推荐、避坑指南', 2).id, 'A')
+})
+
+test('soft-list templates receive provider facts without switching to ranking', () => {
+  for (const name of ['选型指南', '避坑指南', '行业场景解决方案']) {
+    const editor = buildIsolatedEditor({ plan: { articleType: name }, packet: { rankingCompanies: [{ name: '对照企业资料' }] } }, '2026年9月')
+    assert.equal(editor.template.name, name)
+    assert.ok(editor.messages[1].content.includes('对照企业资料'))
+    assert.equal((editor.messages[1].content.match(/^## Template [A-L]:/gm) || []).length, 1)
+  }
 })
 
 test('article output preserves model language and heading hierarchy', () => {
