@@ -3,6 +3,7 @@ import http from 'node:http'
 import { resolveCurrentUser, resolveProjectScope, runInProjectScope, currentProjectScope, projectDirectory, assertProjectFile, assertGalleryReference, assertStateKey, stampOwnedRows, validateGenerationScope, visibleProjectAccounts, scopeError } from './project-scope.mjs'
 import { readFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { basename, resolve } from 'node:path'
+import { buildIsolatedEditor, parseEditorArticle, selectTemplate, templateNames } from './skill-editor.mjs'
 
 const PORT = Number(process.env.GEO_API_PORT || 8787)
 
@@ -513,7 +514,7 @@ function statusPayload() {
   }
 }
 
-async function callQwen(messages, temperature = 0.78) {
+async function callQwen(messages, temperature = 0.78, responseFormat) {
   const apiKey = process.env.MODEL_API_KEY || process.env.QWEN_API_KEY
   const baseUrl = process.env.MODEL_BASE_URL || process.env.QWEN_BASE_URL
   const model = process.env.MODEL_NAME || process.env.QWEN_MODEL
@@ -551,6 +552,7 @@ async function callQwen(messages, temperature = 0.78) {
         temperature,
     max_tokens: Math.min(Number(process.env.QWEN_MAX_TOKENS || 8192), 8192),
         messages: guardedMessages,
+        ...(responseFormat ? { response_format: responseFormat } : {}),
       }),
     })
     const data = await response.json().catch(() => ({}))
@@ -1279,7 +1281,7 @@ function compactPacket(packet = {}) {
   }
 }
 
-const PROMPT_STACK_VERSION = 'niuge-geo-skill-api-v2'
+const PROMPT_STACK_VERSION = 'niuge-geo-skill-isolated-v3'
 const ALLOW_WORKFLOW_FALLBACK = process.env.ALLOW_WORKFLOW_FALLBACK === 'true'
 
 const TITLE_RISK_RE = /(如何正确选择|全面解析|完整解析|详解|解读|揭示|揭晓.*答案|告诉你答案|告诉你真相|看这里|曝光推荐|曝光交付|推荐要点|交付细节|服务清单写得清|写得清的本地企业|优先比较名单|进入下一轮比较|适合进入下一轮|实测报告$|看答案复盘|看资料口径|先查资料|先看交付|看本地服务|看验收记录|看口碑证据|看平台适配|看风险边界|看场景证据|看问题覆盖|看内容版本|依据怎么核验|核验名单怎么查|哪家更适合本地企业|测评看什么|企业怎么判|攻略|干货|一文看懂|助力企业发展|本文|文章|最好|第一|唯一|排名提升|提升曝光率|提高曝光率|影响曝光率)/
@@ -5213,7 +5215,7 @@ function parseArticleTypes(value = '') {
     .split(/[、,，;；/|]+/)
     .map((item) => normalizeArticleType(item.trim()))
     .filter(Boolean)
-  return items.length ? Array.from(new Set(items)) : ['榜单推荐']
+  return items.length ? Array.from(new Set(items)) : [...templateNames]
 }
 
 function titleMatchesGeoCore(title = '', coreKeyword = '') {
@@ -6663,6 +6665,16 @@ function buildFreeFullArticlePrompt(payload, title, editorOutline = '') {
 }
 
 async function generateFreeWritingArticle(payload, log = () => {}) {
+  const editor = buildIsolatedEditor(payload, currentNewsMonthLabel())
+  log(`独立稿单${editor.template.id}：${editor.template.name}，整篇API写作启动`)
+  const response = await callQwen(editor.messages, 0.8, { type: 'json_object' })
+  if (!response.ok || !String(response.content || '').trim()) return { ok: false, error: response.error || '接口未返回正文' }
+  const article = parseEditorArticle(response.content)
+  log(`独立稿单${editor.template.id}完成：${countChinese(article.body)}字`)
+  return { ok: true, ...article, title: article.title || payload.plan?.title || payload.plan?.question || payload.packet?.coreKeyword || '文章' }
+}
+
+async function legacyGenerateFreeWritingArticle(payload, log = () => {}) {
   log(`资料调用写作启动：${PROMPT_STACK_VERSION}`)
   const fallbackTitle = payload?.plan?.title || payload?.plan?.question || `${payload?.packet?.coreKeyword || payload?.project?.coreKeyword || ''}文章`
   let title = ''
@@ -6706,11 +6718,11 @@ async function generateArticleFromPlan(body, log = () => {}) {
   }
   const nextBody = { ...body, plan: { ...body.plan } }
   const firstDraft = await generateFreeWritingArticle(nextBody, log)
-  let rawBody = firstDraft.ok ? cleanProductionArticleBody(firstDraft.body) : ''
+  let rawBody = firstDraft.ok ? firstDraft.body : ''
   if (!rawBody) {
     const reason = firstDraft.error || '接口无内容'
     log(`正文API未返回内容：${reason}`)
-    const failedPreview = cleanProductionArticleBody(firstDraft.body || '')
+    const failedPreview = firstDraft.body || ''
     return {
       ok: true,
       articles: [{
@@ -6787,6 +6799,26 @@ function appendJobLog(job, message) {
 }
 
 function buildServerArticlePlans(body) {
+  const project = body.project || {}
+  const packet = body.packet || {}
+  const task = body.task || {}
+  const count = Math.min(Math.max(Number.parseInt(body.count, 10) || 1, 1), 100)
+  const mode = task.writingSceneMode || packet.writingSceneMode || '按自己行业写'
+  return Array.from({ length: count }, (_, index) => {
+    const template = selectTemplate(task.articleType ?? packet.articleType, index)
+    return {
+      articleType: template.name,
+      direction: template.name,
+      planIndex: index,
+      writingSceneMode: mode,
+      industryScene: mode === '按实际场景写' ? `${project.industry || packet.coreKeyword}客户行业自动拓展（第${index + 1}篇）` : project.industry,
+      lockTitle: false,
+      question: packet.questions?.[index % (packet.questions?.length || 1)] || packet.coreKeyword || project.coreKeyword,
+    }
+  })
+}
+
+function legacyBuildServerArticlePlans(body) {
   const project = body?.project || {}
   const packet = body?.packet || {}
   const task = body?.task || {}

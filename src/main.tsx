@@ -227,7 +227,7 @@ function parseArticleTypes(value?: string) {
     .split(/[、,，;；/|]+/)
     .map((item) => item.trim())
     .filter(Boolean)
-  return items.length ? Array.from(new Set(items)) : ['榜单推荐']
+  return items.length ? Array.from(new Set(items)) : [...articleTypeOptions]
 }
 
 function needsRankingMaterials(value?: string) {
@@ -982,10 +982,10 @@ function buildWorkflowPacket(project: ProjectRow): WorkflowPacket {
     .map((row) => `${row[1]}（${row[3]}，完整度${row[4]}）`)
   const brandAssets = knowledgeContentRows
     .filter((row) => row[0] === project.name)
-    .map((row) => normalizeEvidenceForGeoPrompt(`${row[2]}：${row[3]}`))
+    .map((row) => `${row[2]}：${row[3]}`)
   const authorityEvidence = knowledgeContentRows
     .filter((row) => row[0] === project.name)
-    .map((row) => normalizeEvidenceForGeoPrompt(`${row[2]}：${row[4]}`))
+    .map((row) => `${row[2]}：${row[4]}`)
   const galleries = galleryRows
     .filter((row) => row[0] === project.name)
     .map((row) => `${row[1]}（${row[2]}，${row[3]}${row[5] ? `，文件：${row[5]}` : ''}）`)
@@ -1735,7 +1735,7 @@ function projectOwnWritingScene(project: ProjectRow) {
 }
 
 function sceneForMode(project: ProjectRow, mode: string, index = 0) {
-  if (mode === '按实际场景写') return applicationScenePool[index % applicationScenePool.length]
+  if (mode === '按实际场景写') return `${project.industry || project.coreKeyword}客户行业自动拓展（第${index + 1}篇）`
   return projectOwnWritingScene(project)
 }
 
@@ -2791,11 +2791,11 @@ function Tasks({
   }
   const toggleArticleType = (type: string) => {
     setDraft((current) => {
-      const selected = parseArticleTypes(current.articleType)
+      const selected = current.articleType ? parseArticleTypes(current.articleType) : []
       const next = selected.includes(type)
         ? selected.filter((item) => item !== type)
         : [...selected, type]
-      return { ...current, articleType: (next.length ? next : ['榜单推荐']).join('、') }
+      return { ...current, articleType: next.join('、') }
     })
   }
   const activeProject = projectRows.find((project) => project.name === activeBrand) ?? projectRows[0] ?? createEmptyProject(activeBrand)
@@ -2978,7 +2978,7 @@ function Tasks({
     const requestedCount = Number.parseInt(activeTask?.limit ?? draft.limit, 10) || 10
     const generateCount = Math.min(Math.max(requestedCount, 1), 100)
     const queueSceneMode = activeTask?.writingSceneMode || activeWritingSceneMode
-    const taskArticleType = activeTask?.articleType || draft.articleType || '榜单推荐'
+    const taskArticleType = activeTask?.articleType ?? draft.articleType
     const taskProviderList = needsRankingMaterials(taskArticleType) ? selectedCandidateLines.join('\n') : ''
     const taskUserQuestions = activeTask?.userQuestions || draft.userQuestions || questionOptions.slice(0, 8).join('\n')
     const firstSceneDraft = getSceneDraftForIndex(0, queueSceneMode)
@@ -3060,7 +3060,7 @@ function Tasks({
         }
         const candidate = {
           ...article,
-          title: ensureTitleHasCoreKeyword(article.title || plan.title, selectedCoreKeyword),
+          title: article.title || plan.title,
           angle: article.angle || plan.angle,
           id: `AI-${Date.now().toString().slice(-5)}-${index + 1}`,
           project: activeProject.name,
@@ -3198,7 +3198,7 @@ function Tasks({
     const requestedCount = Number.parseInt(taskForRun.limit, 10) || 10
     const generateCount = Math.min(Math.max(requestedCount, 1), 100)
     const taskInputs = {
-      articleType: taskForRun.articleType || draft.articleType || '榜单推荐',
+      articleType: taskForRun.articleType ?? draft.articleType,
       writingSceneMode: taskForRun.writingSceneMode || activeWritingSceneMode,
       industryScene: taskForRun.industryScene || draft.industryScene || activeSceneName,
       userQuestions: taskForRun.userQuestions || draft.userQuestions || questionOptions.slice(0, 8).join('\n'),
@@ -3293,7 +3293,7 @@ function Tasks({
         const latestLog = latestJob.logs[latestJob.logs.length - 1]?.message || '后台任务运行中'
         const syncedArticles = latestJob.articles.map((article, index) => ({
           ...article,
-          title: ensureTitleHasCoreKeyword(article.title || queuePlans[index]?.title || '', selectedCoreKeyword),
+          title: article.title || queuePlans[index]?.title || '',
           angle: article.angle || queuePlans[index]?.angle || '',
           id: article.id,
           project: activeProject.name,
@@ -3527,7 +3527,7 @@ function Tasks({
                 {articleTypeOptions.map((type) => (
                   <button
                     type="button"
-                    className={parseArticleTypes(draft.articleType).includes(type) ? 'type-chip active' : 'type-chip'}
+                    className={draft.articleType && parseArticleTypes(draft.articleType).includes(type) ? 'type-chip active' : 'type-chip'}
                     key={type}
                     onClick={() => toggleArticleType(type)}
                   >

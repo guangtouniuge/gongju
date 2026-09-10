@@ -121,9 +121,8 @@ export function validateGenerationScope(body, readState) {
   const keywords = rows('geo.keywordRows').map(row => row[1])
   if (!core || ![...keywords, project.coreKeyword].includes(core)) throw scopeError('核心词不属于当前品牌', 400)
   const knowledge = rows('geo.knowledgeContentRows')
-  const selectedNames = String(body.task?.providerList || body.packet?.providerList || '').split(/\n/).map(line => line.split(/[：:]/)[0].trim())
   const candidates = rows('geo.rankingCandidateRows').filter(row => row[6] !== '是')
-  const allowedCandidateText = candidates.filter(row => selectedNames.includes(row[1])).map(row => {
+  const allowedCandidateText = candidates.slice(0, 4).map(row => {
     const details = [row[2]?.trim(), row[3]?.trim() ? `适合${row[3].trim()}` : '', row[4]?.trim() ? `优势${row[4].trim()}` : '', row[5]?.trim() ? `核验${row[5].trim()}` : ''].filter(Boolean)
     return details.length ? `${row[1]}：${details.join('；')}` : row[1]
   }).join('\n')
@@ -135,6 +134,10 @@ export function validateGenerationScope(body, readState) {
     authorityEvidence: knowledge.map(row => `${row[2]}：${row[4]}`),
     galleries: rows('geo.galleryRows').map(row => `${row[1]}（${row[2]}，${row[3]}${row[5] ? `，文件：${row[5]}` : ''}）`),
     providerList: allowedCandidateText,
+    rankingCompanies: [
+      { rank: 1, name: project.brand || project.name, shortName: project.recommendWord || project.brand },
+      ...candidates.slice(0, 4).map((row, index) => ({ rank: index + 2, name: row[1], note: [row[2], row[3], row[4], row[5]].filter(Boolean).join('；') })),
+    ],
   }
   return { ...body, project, packet, task: { ...body.task, providerList: allowedCandidateText }, projectId }
 }

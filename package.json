@@ -10,7 +10,7 @@
     "dev:all": "node server/geo-api-server.mjs & vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "test": "npm run build && npm run test:auth && npm run test:project-isolation",
+    "test": "npm run build && npm run test:auth && npm run test:project-isolation && node --test server/skill-editor.test.mjs",
     "test:auth": "node --test server/auth.test.mjs",
     "test:project-isolation": "node --test server/project-scope.test.mjs server/project-ui.test.mjs"
   },

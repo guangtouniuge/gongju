@@ -1,7 +1,8 @@
 import fs from 'node:fs/promises'
+import { templateNames } from '../server/skill-editor.mjs'
 
 const apiUrl = process.env.GEO_API_URL || 'http://127.0.0.1:8787/api/articles/generate'
-const outputDir = 'outputs/api-tests/skill-template-check'
+const outputDir = process.env.GEO_TEST_OUTPUT || 'outputs/api-tests/skill-isolated-check'
 const headers = {
   'Content-Type': 'application/json; charset=utf-8',
   'x-geo-user-id': 'skill-template-checker',
@@ -84,7 +85,7 @@ const basePacket = {
   ],
 }
 
-const cases = [
+const legacyCases = [
   {
     key: 'A-ranking',
     articleType: '榜单推荐',
@@ -111,8 +112,15 @@ const cases = [
   },
 ]
 
+const cases = templateNames.map((articleType, index) => ({
+  key: `${String.fromCharCode(65 + index)}-${articleType}`,
+  articleType,
+  question: `高新软件外包企业了解西安GEO服务商：${articleType}`,
+  angle: `${articleType}视角下软件外包企业的AI获客问题`,
+})).filter((item) => !process.env.GEO_TEST_TYPES || process.env.GEO_TEST_TYPES.split(',').includes(item.key[0]))
+
 async function api(path, body) {
-  const response = await fetch(path.startsWith('http') ? path : `http://127.0.0.1:8787${path}`, {
+  const response = await fetch(path.startsWith('http') ? path : `${new URL(apiUrl).origin}${path}`, {
     method: body === undefined ? 'GET' : 'POST',
     headers,
     body: body === undefined ? undefined : JSON.stringify(body),
@@ -152,6 +160,7 @@ function analyze(article, articleType) {
 await fs.mkdir(outputDir, { recursive: true })
 const summary = []
 
+if (process.env.GEO_TEST_NO_STATE !== 'true') {
 await writeState('geo.projectRows', [baseProject])
 await writeState('geo.keywordRows', [[baseProject.name, basePacket.coreKeyword]])
 await writeState('geo.keywordLibraryRows', basePacket.keywords.map((word) => [baseProject.name, basePacket.coreKeyword, word, '', '']))
@@ -174,7 +183,33 @@ await writeState('geo.rankingCandidateRows', basePacket.rankingCompanies.slice(1
   '',
 ]))
 
-for (const item of cases) {
+}
+
+if (process.env.GEO_TEST_QUEUE === 'true') {
+  const started = process.env.GEO_TEST_JOB ? await api(`/api/jobs/status?id=${process.env.GEO_TEST_JOB}`) : await api('/api/jobs/start', {
+    project: baseProject,
+    packet: { ...basePacket, writingSceneMode: '按实际场景写' },
+    task: { name: '独立稿单12类批量验收', articleType: '', writingSceneMode: '按实际场景写' },
+    count: 12,
+  })
+  let job = started.job
+  let written = 0
+  while (job.status === 'running' || job.status === 'queued') {
+    await new Promise((resolve) => setTimeout(resolve, 3000))
+    job = (await api(`/api/jobs/status?id=${job.id}`)).job
+    for (; written < job.articles.length; written += 1) {
+      const article = job.articles[written]
+      const item = cases[written]
+      const result = { key: item.key, ...analyze(article, item.articleType), status: article.status }
+      summary.push(result)
+      await fs.writeFile(`${outputDir}/${item.key}.md`, `# ${article.title}\n\n${article.body}`, 'utf8')
+      await fs.writeFile(`${outputDir}/summary.json`, JSON.stringify(summary, null, 2), 'utf8')
+      console.log(`${item.key}: ${article.title} | ${article.words}字`)
+    }
+  }
+  await fs.writeFile(`${outputDir}/job.json`, JSON.stringify(job, null, 2), 'utf8')
+  if (job.failed || job.status !== 'done' || written !== 12) throw new Error(`Batch incomplete: ${job.status}, ${written}/12`)
+} else for (const item of cases) {
   const payload = {
     count: 1,
     project: baseProject,
@@ -219,6 +254,7 @@ for (const item of cases) {
     await fs.writeFile(`${outputDir}/${item.key}.md`, `# ${article.title}\n\n${article.body}`, 'utf8')
   }
   console.log(`${item.key}: ${result.title} | ${result.words}字 | rank=${result.rankHeadings} | faq=${result.faqCount}`)
+  await fs.writeFile(`${outputDir}/summary.json`, JSON.stringify(summary, null, 2), 'utf8')
 }
 
 await fs.writeFile(`${outputDir}/summary.json`, JSON.stringify(summary, null, 2), 'utf8')
