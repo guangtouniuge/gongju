@@ -12,6 +12,7 @@ await page.addInitScript(() => {
 })
 await page.goto('https://geoskill.7chacha.com', { waitUntil: 'networkidle' })
 await page.getByRole('button', { name: '创建生成任务', exact: true }).first().click()
+await page.getByText('当前品牌资料已就绪', { exact: false }).waitFor()
 await page.getByRole('button', { name: '创建生成任务', exact: true }).first().click()
 await page.getByRole('button', { name: '榜单推荐', exact: true }).click()
 assert.equal(await page.locator('.type-chip.active').count(), 0)
