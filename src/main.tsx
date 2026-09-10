@@ -2806,14 +2806,12 @@ function Tasks({
   const dimensionOptions = sceneDefaults.dimensions
   const sceneFaqOptions = sceneDefaults.faqs
   const pitfallOptions = sceneDefaults.pitfalls
-  const selectedPainItems = splitInputList(draft.selectedPains).length ? splitInputList(draft.selectedPains) : painOptions.slice(0, 5)
-  const selectedDimensionItems = splitInputList(draft.selectedDimensions).length ? splitInputList(draft.selectedDimensions) : dimensionOptions.slice(0, 6)
+  const scenePainGuide = painOptions.slice(0, 6)
+  const sceneDimensionGuide = dimensionOptions.slice(0, 7)
   const mainBrandName = activeProject.recommendWord || activeProject.brand || activeProject.name
   const projectCandidateRows = candidateRows.filter((row) => row[0] === activeBrand && row[1] !== mainBrandName && row[6] !== '是')
   const useRankingMaterials = needsRankingMaterials(draft.articleType)
-  const selectedCandidateNames = (splitInputList(draft.selectedCandidates).length
-    ? splitInputList(draft.selectedCandidates).filter((name) => projectCandidateRows.some((row) => row[1] === name))
-    : projectCandidateRows.slice(0, 4).map((row) => row[1])).slice(0, 4)
+  const selectedCandidateNames = projectCandidateRows.slice(0, 4).map((row) => row[1])
   const selectedCandidateLines = projectCandidateRows
     .filter((row) => selectedCandidateNames.includes(row[1]))
     .map(formatCandidateLine)
@@ -2821,32 +2819,23 @@ function Tasks({
   const getSceneDraftForIndex = (index = 0, mode = activeWritingSceneMode) => {
     const scene = sceneForMode(activeProject, mode, index)
     const defaults = deriveSceneDefaults(scene)
-    const useManualSelection = mode !== '按实际场景写'
     return {
       scene,
-      pains: useManualSelection ? selectedPainItems : defaults.pains.slice(0, 5),
-      dimensions: useManualSelection ? selectedDimensionItems : defaults.dimensions.slice(0, 6),
+      pains: defaults.pains.slice(0, 6),
+      dimensions: defaults.dimensions.slice(0, 7),
       faqs: defaults.faqs,
       pitfalls: defaults.pitfalls,
     }
   }
   const updateWritingSceneMode = (mode: string) => {
     const scene = sceneForMode(activeProject, mode, 0)
-    const defaults = deriveSceneDefaults(scene)
     setDraft((current) => ({
       ...current,
       writingSceneMode: mode,
       industryScene: scene,
-      selectedPains: joinInputList(defaults.pains.slice(0, 5)),
-      selectedDimensions: joinInputList(defaults.dimensions.slice(0, 6)),
+      selectedPains: '',
+      selectedDimensions: '',
     }))
-  }
-  const toggleDraftListItem = (key: 'selectedPains' | 'selectedDimensions' | 'selectedCandidates', item: string) => {
-    setDraft((current) => {
-      const selected = splitInputList(current[key])
-      const next = selected.includes(item) ? selected.filter((value) => value !== item) : [...selected, item]
-      return { ...current, [key]: joinInputList(next) }
-    })
   }
   const projectCoreRows = keywordRows.filter((row) => row[0] === activeBrand)
   const coreOptions = projectCoreRows.length ? projectCoreRows.map((row) => row[1]) : activeProject.coreKeyword ? [activeProject.coreKeyword] : []
@@ -2928,13 +2917,13 @@ function Tasks({
       providerList: effectiveCandidateLines.join('\n'),
       mainReason: '',
       unfitScenario: '',
-      selectedPains: joinInputList(effectivePains.slice(0, 5)),
-      selectedDimensions: joinInputList(effectiveDimensions.slice(0, 6)),
-      selectedCandidates: joinInputList(effectiveCandidates.slice(0, 4)),
+      selectedPains: '',
+      selectedDimensions: '',
+      selectedCandidates: '',
       titlePreference: '',
       forbiddenContent: '不写联系方式、虚构客户、绝对化承诺',
     }))
-    notify('已按当前写作场景准备痛点和维度；榜单类文章会调用你填写的4家对比公司。')
+    notify('已按当前写作场景准备稿单；榜单类文章会自动调用榜单库前4家对比公司。')
     setShowTaskModal(true)
   }
   const createTask = () => {
@@ -2968,12 +2957,12 @@ function Tasks({
         writingSceneMode: activeWritingSceneMode,
         industryScene: draft.industryScene,
         userQuestions: draft.userQuestions,
-        providerList: draft.providerList || selectedCandidateLines.join('\n'),
+        providerList: useRankingMaterials ? selectedCandidateLines.join('\n') : '',
         mainReason: draft.mainReason,
         unfitScenario: draft.unfitScenario,
-        selectedPains: draft.selectedPains || joinInputList(selectedPainItems),
-        selectedDimensions: draft.selectedDimensions || joinInputList(selectedDimensionItems),
-        selectedCandidates: draft.selectedCandidates || joinInputList(selectedCandidateNames.slice(0, 4)),
+        selectedPains: '',
+        selectedDimensions: '',
+        selectedCandidates: useRankingMaterials ? joinInputList(selectedCandidateNames.slice(0, 4)) : '',
         titlePreference: draft.titlePreference,
         forbiddenContent: draft.forbiddenContent,
       },
@@ -2990,7 +2979,7 @@ function Tasks({
     const generateCount = Math.min(Math.max(requestedCount, 1), 100)
     const queueSceneMode = activeTask?.writingSceneMode || activeWritingSceneMode
     const taskArticleType = activeTask?.articleType || draft.articleType || '榜单推荐'
-    const taskProviderList = activeTask?.providerList || draft.providerList || selectedCandidateLines.join('\n')
+    const taskProviderList = needsRankingMaterials(taskArticleType) ? selectedCandidateLines.join('\n') : ''
     const taskUserQuestions = activeTask?.userQuestions || draft.userQuestions || questionOptions.slice(0, 8).join('\n')
     const firstSceneDraft = getSceneDraftForIndex(0, queueSceneMode)
     const packet = {
@@ -3037,9 +3026,9 @@ function Tasks({
         industryScene: getSceneDraftForIndex(index, queueSceneMode).scene,
         userQuestions: taskUserQuestions,
         providerList: taskProviderList,
-        selectedPains: joinInputList(getSceneDraftForIndex(index, queueSceneMode).pains),
-        selectedDimensions: joinInputList(getSceneDraftForIndex(index, queueSceneMode).dimensions),
-        selectedCandidates: activeTask?.selectedCandidates || joinInputList(selectedCandidateNames.slice(0, 4)),
+        selectedPains: '',
+        selectedDimensions: '',
+        selectedCandidates: needsRankingMaterials(selectedType) ? joinInputList(selectedCandidateNames.slice(0, 4)) : '',
         planIndex: batchPlanOffset + index + 1,
       }
     })
@@ -3197,12 +3186,12 @@ function Tasks({
       writingSceneMode: activeWritingSceneMode,
       industryScene: draft.industryScene || activeSceneName,
       userQuestions: draft.userQuestions || questionOptions.slice(0, 8).join('\n'),
-      providerList: draft.providerList || selectedCandidateLines.join('\n'),
+      providerList: needsRankingMaterials(draft.articleType) ? selectedCandidateLines.join('\n') : '',
       mainReason: draft.mainReason,
       unfitScenario: draft.unfitScenario,
-      selectedPains: draft.selectedPains || joinInputList(selectedPainItems),
-      selectedDimensions: draft.selectedDimensions || joinInputList(selectedDimensionItems),
-      selectedCandidates: draft.selectedCandidates || joinInputList(selectedCandidateNames.slice(0, 4)),
+      selectedPains: '',
+      selectedDimensions: '',
+      selectedCandidates: needsRankingMaterials(draft.articleType) ? joinInputList(selectedCandidateNames.slice(0, 4)) : '',
       titlePreference: draft.titlePreference,
       forbiddenContent: draft.forbiddenContent,
     }
@@ -3213,12 +3202,12 @@ function Tasks({
       writingSceneMode: taskForRun.writingSceneMode || activeWritingSceneMode,
       industryScene: taskForRun.industryScene || draft.industryScene || activeSceneName,
       userQuestions: taskForRun.userQuestions || draft.userQuestions || questionOptions.slice(0, 8).join('\n'),
-      providerList: taskForRun.providerList || draft.providerList || selectedCandidateLines.join('\n'),
+      providerList: needsRankingMaterials(taskForRun.articleType || draft.articleType) ? selectedCandidateLines.join('\n') : '',
       mainReason: taskForRun.mainReason || draft.mainReason || '',
       unfitScenario: taskForRun.unfitScenario || draft.unfitScenario || '',
-      selectedPains: taskForRun.selectedPains || draft.selectedPains || joinInputList(selectedPainItems),
-      selectedDimensions: taskForRun.selectedDimensions || draft.selectedDimensions || joinInputList(selectedDimensionItems),
-      selectedCandidates: taskForRun.selectedCandidates || draft.selectedCandidates || joinInputList(selectedCandidateNames.slice(0, 4)),
+      selectedPains: '',
+      selectedDimensions: '',
+      selectedCandidates: needsRankingMaterials(taskForRun.articleType || draft.articleType) ? joinInputList(selectedCandidateNames.slice(0, 4)) : '',
       titlePreference: taskForRun.titlePreference || draft.titlePreference || '',
       forbiddenContent: taskForRun.forbiddenContent || draft.forbiddenContent || '',
     }
@@ -3249,8 +3238,10 @@ function Tasks({
         articleType: selectedType,
         direction: selectedType || plan.direction,
         industryScene: sceneDraft.scene,
-        selectedPains: joinInputList(sceneDraft.pains),
-        selectedDimensions: joinInputList(sceneDraft.dimensions),
+        providerList: needsRankingMaterials(selectedType) ? selectedCandidateLines.join('\n') : '',
+        selectedPains: '',
+        selectedDimensions: '',
+        selectedCandidates: needsRankingMaterials(selectedType) ? joinInputList(selectedCandidateNames.slice(0, 4)) : '',
         angle: sceneDraft.scene || plan.angle,
         lockTitle: false,
         planIndex: batchPlanOffset + index + 1,
@@ -3519,72 +3510,18 @@ function Tasks({
             </div>
             <div className="type-selector">
               <div>
-                <strong>客户痛点</strong>
-                <span>多选，文章会围绕这些真实场景展开，不再泛泛写GEO行业。</span>
+                <strong>场景写作方向</strong>
+                <span>系统按当前场景自动推导痛点、选型维度和FAQ，只作为稿单方向，不做硬性限制。</span>
               </div>
               <div className="type-chip-grid">
-                {painOptions.map((pain) => (
-                  <button
-                    type="button"
-                    className={selectedPainItems.includes(pain) ? 'type-chip active' : 'type-chip'}
-                    key={pain}
-                    onClick={() => toggleDraftListItem('selectedPains', pain)}
-                  >
-                    {pain}
-                  </button>
-                ))}
+                {scenePainGuide.slice(0, 4).map((pain) => <span className="type-chip readonly" key={pain}>{pain}</span>)}
+                {sceneDimensionGuide.slice(0, 3).map((dimension) => <span className="type-chip readonly" key={dimension}>{dimension}</span>)}
               </div>
             </div>
-            <div className="type-selector">
-              <div>
-                <strong>选型维度</strong>
-                <span>多选，作为榜单成立和服务商推荐的比较口径。</span>
-              </div>
-              <div className="type-chip-grid">
-                {dimensionOptions.map((dimension) => (
-                  <button
-                    type="button"
-                    className={selectedDimensionItems.includes(dimension) ? 'type-chip active' : 'type-chip'}
-                    key={dimension}
-                    onClick={() => toggleDraftListItem('selectedDimensions', dimension)}
-                  >
-                    {dimension}
-                  </button>
-                ))}
-              </div>
-            </div>
-            {useRankingMaterials && <div className="type-selector">
-              <div>
-                <strong>对比服务商</strong>
-                <span>只选另外4家；主推品牌由项目资料自动带入，不在这里重复填写。</span>
-              </div>
-              <div className="type-chip-grid">
-                {projectCandidateRows.length ? projectCandidateRows.map((row) => (
-                  <button
-                    type="button"
-                    className={selectedCandidateNames.includes(row[1]) ? 'type-chip active' : 'type-chip'}
-                    key={row[1]}
-                    onClick={() => {
-                      toggleDraftListItem('selectedCandidates', row[1])
-                      const nextSelected = selectedCandidateNames.includes(row[1])
-                        ? selectedCandidateNames.filter((name) => name !== row[1])
-                        : [...selectedCandidateNames, row[1]]
-                      const nextLines = projectCandidateRows
-                        .filter((candidate) => nextSelected.includes(candidate[1]))
-                        .map(formatCandidateLine)
-                        .filter(Boolean)
-                      updateDraft('providerList', nextLines.join('\n'))
-                    }}
-                  >
-                    {row[1]}
-                  </button>
-                )) : <button type="button" className="type-chip" onClick={() => navigate('candidates')}>去添加4家对比服务商</button>}
-              </div>
-            </div>}
             <div className="type-selector">
               <div>
                 <strong>文章类型</strong>
-                <span>可多选，系统按单篇轮换；行业只作为痛点场景，主线仍然是GEO公司/服务商选型。</span>
+                <span>可多选，系统按单篇轮换；每种类型自带稿单，并自动决定是否调用榜单库。</span>
               </div>
               <div className="type-chip-grid">
                 {articleTypeOptions.map((type) => (
@@ -3604,9 +3541,8 @@ function Tasks({
               <span>写作场景：{activeWritingSceneMode}</span>
               <span>当前场景：{activeWritingSceneMode === '按实际场景写' ? `${activeSceneName}，批量时自动轮换` : activeSceneName}</span>
               <span>核心词：{selectedCoreKeyword}</span>
-              <span>客户痛点：{selectedPainItems.length} 个</span>
-              <span>选型维度：{selectedDimensionItems.length} 个</span>
-              <span>对比服务商：{useRankingMaterials ? selectedCandidateNames.length : 0} 个</span>
+              <span>场景方向：痛点{scenePainGuide.length}个 / 维度{sceneDimensionGuide.length}个，API自行取舍</span>
+              <span>榜单库：{useRankingMaterials ? `按文章类型自动调用${selectedCandidateNames.length}家` : '当前类型不强制调用'}</span>
               <span>蒸馏词：{questionOptions.length} 个</span>
               <span>关键词库：{projectKeywordLibrary.length} 个</span>
               <span>知识库：{draft.knowledge || knowledgeOptions[0] || '待选择'}</span>

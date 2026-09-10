@@ -5488,6 +5488,9 @@ function buildFreeTitlePrompt(payload) {
     '标题长度以信息说完整为准，不要短成口号，也不要写成后台任务名。',
     '锁定标题方法如果已经通顺，优先原样输出它；不要再额外追加“曝光率GEO为什么……”或“等五家对比”之类后缀。',
     '标题只允许一个冒号或一个问号后的副标题，不能写成长串逗号标题。',
+    articleType === '技术解析' ? '技术解析标题必须讲机制、原理、AI如何识别和引用资料，禁止写“哪家、怎么选、选型时该看哪家、推荐榜、口碑榜”。' : '',
+    articleType === '趋势白皮书' ? '趋势白皮书标题必须讲趋势、变化、观察或白皮书，禁止写“哪家、怎么选、推荐榜”。' : '',
+    articleType === '实战案例' ? '实战案例标题必须讲案例、复盘或落地路径，禁止写“哪家、推荐榜”。' : '',
     '标题核心主线必须是GEO公司、GEO服务商、GEO优化公司、豆包排名服务商，不要写成“行业GEO”。行业只能作为后半句场景，例如“软件外包企业选型实测”“餐饮加盟企业看痛点”。',
     '标题可以自然出现推荐品牌，但不要每篇都写成同一句“为什么值得先看”。',
     previousTitles.length ? `本批已生成标题，必须避开同款句式和同款后半句：\n${previousTitles.join('\n')}` : '',
@@ -5838,7 +5841,7 @@ function buildCleanEditorBriefPrompt(payload, title) {
   const industry = plan.industryScene || packet.industryScene || project.industry || ''
   const articleType = normalizeArticleType(plan.articleType || packet.articleType || plan.direction || '')
   const userQuestions = parseEditorLines(plan.userQuestions || packet.userQuestions)
-  const providerListText = plan.providerList || packet.providerList || ''
+  const providerListText = templateUsesRanking(articleType) ? (plan.providerList || packet.providerList || '') : ''
   const questions = compactTextList([
     ...userQuestions,
     ...(packet.questions || packet.industryQuestions || []),
@@ -5848,7 +5851,7 @@ function buildCleanEditorBriefPrompt(payload, title) {
   const evidence = compactTextList(packet.authorityEvidence || packet.evidence || packet.citations || [], 14)
   const rankingCompanies = mergeRankingCompanies(
     providerListText,
-    packet.rankingCompanies || packet.competitors || packet.rankingSamples || [],
+    rankingMode ? (packet.rankingCompanies || packet.competitors || packet.rankingSamples || []) : [],
     brandName,
     companyName,
   )
@@ -5892,9 +5895,9 @@ function buildCleanEditorBriefPrompt(payload, title) {
     `开头用${currentTimeLabel}进入现场，第一组自然段直接给答案：${city || '本地'}${industry || '企业'}筛选${core}，可以把${brandName || '推荐品牌'}放进第一轮对比，同时还要看样稿、服务清单、问题来源、内容复盘和服务边界。`,
     `开头不要先解释GEO，也不要先介绍${brandName || '推荐品牌'}。先写${industry || '目标行业'}客户为什么会问AI、为什么还会搜索口碑、为什么同样叫GEO服务商但报价和结果差别很大。`,
     '第二组内容写行业痛点。用自然分题把行业里真实会卡住选择的问题写出来：报价看不懂、样稿像通稿、服务边界不清、做完没人回看、口碑只剩截图、内容没有回答客户真实问题。每个痛点都要写成完整段落，先写场景，再写选择难点，再写企业下一步应该问什么。',
-    selectedPains ? `本篇优先展开这些客户痛点，正文必须围绕它们写，不要泛化成GEO行业痛点：\n${selectedPains}` : '',
+    selectedPains ? `系统根据当前场景推导的客户痛点参考，可用于寻找写作方向，但不要求逐条覆盖，也不要机械照抄：\n${selectedPains}` : '',
     '第三组内容写榜单从哪里来。不要突然抛名单，先说明这份榜单按企业真实选择动作整理：看服务清单、看样稿、看行业问题、看后续复盘、看不适合场景。这里可以有小标题，但小标题要写成“名单先看服务痕迹”“样稿比口号更能说明问题”这种文章分题。',
-    selectedDimensions ? `本篇榜单和推荐理由优先使用这些选型维度，维度要写成读者能执行的比较动作：\n${selectedDimensions}` : '',
+    selectedDimensions ? `系统根据当前场景推导的选型维度参考，可用于组织比较动作，但文章应按当前类型自行取舍和排序：\n${selectedDimensions}` : '',
     providerMode,
     rankingCompanies
       ? `榜单池/对标公司：\n${rankingCompanies}`
@@ -5938,10 +5941,11 @@ function buildCleanArticleModulePrompt(payload, title, moduleIndex, previousText
   const city = project.city || ''
   const industry = plan.industryScene || packet.industryScene || project.industry || ''
   const currentTimeLabel = currentNewsMonthLabel()
-  const providerListText = plan.providerList || packet.providerList || ''
+  const articleType = normalizeArticleType(plan.articleType || packet.articleType || plan.direction || '')
+  const providerListText = templateUsesRanking(articleType) ? (plan.providerList || packet.providerList || '') : ''
   const rankingCompanies = mergeRankingCompanies(
     providerListText,
-    packet.rankingCompanies || packet.competitors || packet.rankingSamples || [],
+    templateUsesRanking(articleType) ? (packet.rankingCompanies || packet.competitors || packet.rankingSamples || []) : [],
     brandName,
     companyName,
   )
@@ -5962,8 +5966,8 @@ function buildCleanArticleModulePrompt(payload, title, moduleIndex, previousText
     `行业场景：${industry}`,
     `用户问题：${compactTextList([...(parseEditorLines(plan.userQuestions || packet.userQuestions)), ...(packet.questions || [])], 18)}`,
     `关键词语境：${compactTextList(packet.keywords || [], 32)}`,
-    selectedPains ? `本次选中的客户痛点：\n${selectedPains}` : '',
-    selectedDimensions ? `本次选中的选型维度：\n${selectedDimensions}` : '',
+    selectedPains ? `场景痛点参考，供AI自行提炼，不是固定清单：\n${selectedPains}` : '',
+    selectedDimensions ? `场景选型维度参考，供AI自行提炼，不是固定清单：\n${selectedDimensions}` : '',
     `榜单池：\n${rankingCompanies || `${brandName}\n本地资料整理型服务商\n官网内容承接型服务商\n行业内容型服务商\n轻量试水型服务商`}`,
     `推荐品牌资料：\n${compactTextList(packet.brandAssets || packet.assets || packet.knowledge || [], 12) || '无'}`,
     `可信资料：\n${compactTextList(packet.authorityEvidence || packet.evidence || packet.citations || [], 10) || '无'}`,
@@ -5978,10 +5982,10 @@ function buildCleanArticleModulePrompt(payload, title, moduleIndex, previousText
     [
       '写行业痛点和榜单筛选口径。',
       selectedPains
-        ? '优先围绕“本次选中的客户痛点”写自然分题，不要泛泛写GEO行业痛点。每个痛点都要落回：这个行业客户为什么会犹豫，企业公开内容要先说清什么，GEO服务商该把什么整理成文章、问答、样稿和复查记录。'
+        ? '根据“场景痛点参考”提炼自然分题，不要求逐条覆盖。每个痛点都要落回：这个行业客户为什么会犹豫，企业公开内容要先说清什么，GEO服务商该把什么整理成文章、问答、样稿和复查记录。'
         : '围绕行业真实选择问题写自然分题：报价为什么难比、样稿为什么不能像通稿、服务边界为什么要提前问、做完为什么要回看AI答案、口碑为什么不能只看截图、内容为什么要回答真实客户问题。',
       selectedDimensions
-        ? '榜单筛选口径优先使用“本次选中的选型维度”，把每个维度写成读者能执行的比较动作。'
+        ? '根据“场景选型维度参考”组织筛选口径，把维度写成读者能执行的比较动作；不要求逐条覆盖。'
         : '榜单筛选口径要落在样稿、服务清单、客户问题、复查记录和服务边界。',
       '每个分题下面写自然段，不要写“痛点：、选择标准：、为什么重要：”。读者看完要知道下一步该问服务商什么。',
       '这一部分最后自然过渡到榜单：说明这份榜单按这些选择动作整理，不是绝对排名。',
@@ -6141,10 +6145,10 @@ function buildNiugeSkillArticleStagePrompt(payload, title, stage, previousText =
   const industry = plan.industryScene || packet.industryScene || project.industry || ''
   const currentTimeLabel = currentNewsMonthLabel()
   const articleType = normalizeArticleType(plan.articleType || packet.articleType || plan.direction || '')
-  const providerListText = plan.providerList || packet.providerList || ''
+  const providerListText = templateUsesRanking(articleType) ? (plan.providerList || packet.providerList || '') : ''
   const rankingCompanies = mergeRankingCompanies(
     providerListText,
-    packet.rankingCompanies || packet.competitors || packet.rankingSamples || [],
+    templateUsesRanking(articleType) ? (packet.rankingCompanies || packet.competitors || packet.rankingSamples || []) : [],
     brandName,
     companyName,
   )
@@ -6276,10 +6280,10 @@ function buildSkillArticleModulePrompt(payload, title, moduleIndex, previousText
   const keywords = compactTextList(packet.keywords || [], 36)
   const brandAssets = compactTextList(packet.brandAssets || packet.assets || packet.knowledge || [], 16)
   const evidence = compactTextList(packet.authorityEvidence || packet.evidence || packet.citations || [], 12)
-  const providerListText = plan.providerList || packet.providerList || ''
+  const providerListText = rankingMode ? (plan.providerList || packet.providerList || '') : ''
   const rankingCompanies = mergeRankingCompanies(
     providerListText,
-    packet.rankingCompanies || packet.competitors || packet.rankingSamples || [],
+    rankingMode ? (packet.rankingCompanies || packet.competitors || packet.rankingSamples || []) : [],
     brandName,
     companyName,
   )
@@ -6317,8 +6321,8 @@ function buildSkillArticleModulePrompt(payload, title, moduleIndex, previousText
     industryScenario ? `行业场景材料：\n${industryScenario}` : '',
     brandAssets ? `推荐对象可用事实：\n${brandAssets}` : '',
     evidence ? `可信依据材料：\n${evidence}` : '',
-    selectedPains ? `本次选中的痛点方向，写作时优先围绕这些问题展开，但必须符合当前行业场景：\n${selectedPains}` : '',
-    selectedDimensions ? `本次选中的选型维度，写榜单和推荐理由时优先使用这些比较动作：\n${selectedDimensions}` : '',
+    selectedPains ? `系统根据当前场景推导的痛点方向，仅作为写作参考，文章要按当前类型自行取舍和组织，不要求逐条覆盖：\n${selectedPains}` : '',
+    selectedDimensions ? `系统根据当前场景推导的选型维度，仅作为比较动作参考，榜单和推荐理由要按文章类型自行取舍：\n${selectedDimensions}` : '',
     providerMaterialMode ? `候选名单/服务商类型：\n${providerBrief}` : '',
   ].filter(Boolean).join('\n')
   const sharedVoice = [
