@@ -2925,7 +2925,7 @@ function Tasks({
       writingSceneMode: effectiveSceneMode,
       industryScene: effectiveScene,
       userQuestions: questionOptions.slice(0, 8).join('\n'),
-      providerList: needsRankingMaterials('榜单推荐') ? effectiveCandidateLines.join('\n') : '',
+      providerList: effectiveCandidateLines.join('\n'),
       mainReason: '',
       unfitScenario: '',
       selectedPains: joinInputList(effectivePains.slice(0, 5)),
@@ -2968,12 +2968,12 @@ function Tasks({
         writingSceneMode: activeWritingSceneMode,
         industryScene: draft.industryScene,
         userQuestions: draft.userQuestions,
-        providerList: useRankingMaterials ? draft.providerList : '',
+        providerList: draft.providerList || selectedCandidateLines.join('\n'),
         mainReason: draft.mainReason,
         unfitScenario: draft.unfitScenario,
         selectedPains: draft.selectedPains || joinInputList(selectedPainItems),
         selectedDimensions: draft.selectedDimensions || joinInputList(selectedDimensionItems),
-        selectedCandidates: useRankingMaterials ? draft.selectedCandidates || joinInputList(selectedCandidateNames.slice(0, 4)) : '',
+        selectedCandidates: draft.selectedCandidates || joinInputList(selectedCandidateNames.slice(0, 4)),
         titlePreference: draft.titlePreference,
         forbiddenContent: draft.forbiddenContent,
       },
@@ -2990,10 +2990,7 @@ function Tasks({
     const generateCount = Math.min(Math.max(requestedCount, 1), 100)
     const queueSceneMode = activeTask?.writingSceneMode || activeWritingSceneMode
     const taskArticleType = activeTask?.articleType || draft.articleType || '榜单推荐'
-    const taskNeedsRanking = needsRankingMaterials(taskArticleType)
-    const taskProviderList = taskNeedsRanking
-      ? activeTask?.providerList || draft.providerList || selectedCandidateLines.join('\n')
-      : ''
+    const taskProviderList = activeTask?.providerList || draft.providerList || selectedCandidateLines.join('\n')
     const taskUserQuestions = activeTask?.userQuestions || draft.userQuestions || questionOptions.slice(0, 8).join('\n')
     const firstSceneDraft = getSceneDraftForIndex(0, queueSceneMode)
     const packet = {
@@ -3029,9 +3026,9 @@ function Tasks({
       ),
     )
     const selectedArticleTypes = parseArticleTypes(taskArticleType)
+    const batchPlanOffset = Date.now() % 997
     const queuePlans = plans.slice(0, generateCount).map((plan, index) => {
       const selectedType = selectedArticleTypes[index % selectedArticleTypes.length] || '榜单推荐'
-      const planNeedsRanking = needsRankingMaterials(selectedType)
       return {
         ...plan,
         articleType: selectedType,
@@ -3039,10 +3036,11 @@ function Tasks({
         writingSceneMode: queueSceneMode,
         industryScene: getSceneDraftForIndex(index, queueSceneMode).scene,
         userQuestions: taskUserQuestions,
-        providerList: planNeedsRanking ? taskProviderList : '',
+        providerList: taskProviderList,
         selectedPains: joinInputList(getSceneDraftForIndex(index, queueSceneMode).pains),
         selectedDimensions: joinInputList(getSceneDraftForIndex(index, queueSceneMode).dimensions),
-        selectedCandidates: planNeedsRanking ? activeTask?.selectedCandidates || joinInputList(selectedCandidateNames.slice(0, 4)) : '',
+        selectedCandidates: activeTask?.selectedCandidates || joinInputList(selectedCandidateNames.slice(0, 4)),
+        planIndex: batchPlanOffset + index + 1,
       }
     })
     const generatedSlots: Article[] = new Array(generateCount)
@@ -3199,12 +3197,12 @@ function Tasks({
       writingSceneMode: activeWritingSceneMode,
       industryScene: draft.industryScene || activeSceneName,
       userQuestions: draft.userQuestions || questionOptions.slice(0, 8).join('\n'),
-      providerList: useRankingMaterials ? draft.providerList : '',
+      providerList: draft.providerList || selectedCandidateLines.join('\n'),
       mainReason: draft.mainReason,
       unfitScenario: draft.unfitScenario,
       selectedPains: draft.selectedPains || joinInputList(selectedPainItems),
       selectedDimensions: draft.selectedDimensions || joinInputList(selectedDimensionItems),
-      selectedCandidates: useRankingMaterials ? draft.selectedCandidates || joinInputList(selectedCandidateNames.slice(0, 4)) : '',
+      selectedCandidates: draft.selectedCandidates || joinInputList(selectedCandidateNames.slice(0, 4)),
       titlePreference: draft.titlePreference,
       forbiddenContent: draft.forbiddenContent,
     }
@@ -3215,12 +3213,12 @@ function Tasks({
       writingSceneMode: taskForRun.writingSceneMode || activeWritingSceneMode,
       industryScene: taskForRun.industryScene || draft.industryScene || activeSceneName,
       userQuestions: taskForRun.userQuestions || draft.userQuestions || questionOptions.slice(0, 8).join('\n'),
-      providerList: needsRankingMaterials(taskForRun.articleType || draft.articleType) ? taskForRun.providerList || draft.providerList || '' : '',
+      providerList: taskForRun.providerList || draft.providerList || selectedCandidateLines.join('\n'),
       mainReason: taskForRun.mainReason || draft.mainReason || '',
       unfitScenario: taskForRun.unfitScenario || draft.unfitScenario || '',
       selectedPains: taskForRun.selectedPains || draft.selectedPains || joinInputList(selectedPainItems),
       selectedDimensions: taskForRun.selectedDimensions || draft.selectedDimensions || joinInputList(selectedDimensionItems),
-      selectedCandidates: needsRankingMaterials(taskForRun.articleType || draft.articleType) ? taskForRun.selectedCandidates || draft.selectedCandidates || joinInputList(selectedCandidateNames.slice(0, 4)) : '',
+      selectedCandidates: taskForRun.selectedCandidates || draft.selectedCandidates || joinInputList(selectedCandidateNames.slice(0, 4)),
       titlePreference: taskForRun.titlePreference || draft.titlePreference || '',
       forbiddenContent: taskForRun.forbiddenContent || draft.forbiddenContent || '',
     }
@@ -3238,9 +3236,10 @@ function Tasks({
       ])),
       industryPains: firstSceneDraft.pains,
       selectionDimensions: firstSceneDraft.dimensions,
-      providerList: needsRankingMaterials(taskInputs.articleType) ? taskInputs.providerList || selectedCandidateLines.join('\n') : '',
+      providerList: taskInputs.providerList || selectedCandidateLines.join('\n'),
     }
     const selectedArticleTypes = parseArticleTypes(taskInputs.articleType)
+    const batchPlanOffset = Date.now() % 997
     const queuePlans = plans.slice(0, generateCount).map((plan, index) => {
       const sceneDraft = getSceneDraftForIndex(index, taskInputs.writingSceneMode)
       const selectedType = selectedArticleTypes[index % selectedArticleTypes.length] || '榜单推荐'
@@ -3254,7 +3253,8 @@ function Tasks({
         selectedDimensions: joinInputList(sceneDraft.dimensions),
         angle: sceneDraft.scene || plan.angle,
         lockTitle: false,
-        planIndex: index + 1,
+        planIndex: batchPlanOffset + index + 1,
+        runBatchSeed: batchPlanOffset,
       }
     })
     const batchLabel = localDateTime()

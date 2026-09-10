@@ -119,6 +119,23 @@ function normalizeRankingHeadingStructure(value = '') {
   }).join('\n')
 }
 
+function templateUsesRanking(type = '') {
+  return /榜单|测评|口碑|对比|实力/.test(normalizeArticleType(type))
+}
+
+function templateUsesProviderMaterial(type = '') {
+  return templateUsesRanking(type) || /选型|避坑|方案/.test(normalizeArticleType(type))
+}
+
+function normalizeArticleBodyForTemplate(value = '', payload = {}) {
+  const articleType = normalizeArticleType(payload?.plan?.articleType || payload?.packet?.articleType || '')
+  const text = normalizeRankingHeadingStructure(value)
+  if (templateUsesRanking(articleType)) return text
+  return text
+    .replace(/^##\s*第[1-5]名\s*[：:]\s*/gm, '## ')
+    .replace(/^第[1-5]名\s*[：:]\s*/gm, '')
+}
+
 function removeOffSceneSoftwareTerms(value = '', sceneContext = {}) {
   if (!sceneContext?.geoScene) return value
   return String(value || '')
@@ -5359,6 +5376,10 @@ function buildFreeTitlePrompt(payload) {
   const industryScene = plan.industryScene || packet.industryScene || project.industry || angle || ''
   const monthLabel = currentNewsMonthLabel()
   const titlePreference = plan.titlePreference || packet.titlePreference || ''
+  const previousTitles = (payload?.previousArticles || [])
+    .map((article) => String(article?.title || '').trim())
+    .filter(Boolean)
+    .slice(-12)
   const scene = String(industryScene || '本地企业').replace(/企业$/, '')
   const titleCorePool = [
     titleCore,
@@ -5396,6 +5417,7 @@ function buildFreeTitlePrompt(payload) {
     '标题长度以信息说完整为准，不要短成口号，也不要写成后台任务名。',
     '标题核心主线必须是GEO公司、GEO服务商、GEO优化公司、豆包排名服务商，不要写成“行业GEO”。行业只能作为后半句场景，例如“软件外包企业选型实测”“餐饮加盟企业看痛点”。',
     '标题可以自然出现推荐品牌，但不要每篇都写成同一句“为什么值得先看”。',
+    previousTitles.length ? `本批已生成标题，必须避开同款句式和同款后半句：\n${previousTitles.join('\n')}` : '',
     '标题不要使用“靠谱合作伙伴、合适的合作伙伴、完整解析、全面指南、如何正确选择、一文看懂”这种水词。',
     '标题语气参考：本地服务商推荐榜、口碑测评、实力对比、选型指南、避坑指南、豆包排名服务商怎么选。',
     '',
@@ -5844,6 +5866,8 @@ function buildCleanArticleModulePrompt(payload, title, moduleIndex, previousText
   const industry = plan.industryScene || packet.industryScene || project.industry || ''
   const currentTimeLabel = currentNewsMonthLabel()
   const providerListText = plan.providerList || packet.providerList || ''
+  const rankingMode = templateUsesRanking(articleType)
+  const providerMaterialMode = templateUsesProviderMaterial(articleType)
   const rankingCompanies = mergeRankingCompanies(
     providerListText,
     packet.rankingCompanies || packet.competitors || packet.rankingSamples || [],
@@ -6218,7 +6242,7 @@ function buildSkillArticleModulePrompt(payload, title, moduleIndex, previousText
     evidence ? `可信依据材料：\n${evidence}` : '',
     selectedPains ? `本次选中的痛点方向，写作时优先围绕这些问题展开，但必须符合当前行业场景：\n${selectedPains}` : '',
     selectedDimensions ? `本次选中的选型维度，写榜单和推荐理由时优先使用这些比较动作：\n${selectedDimensions}` : '',
-    `候选名单/服务商类型：\n${providerBrief}`,
+    providerMaterialMode ? `候选名单/服务商类型：\n${providerBrief}` : '',
   ].filter(Boolean).join('\n')
   const sharedVoice = [
     '写作方式：像一篇本地商业服务选型文章，不像说明书。每段要承担一个任务：场景、痛点、判断、材料、边界或下一步怎么问。',
@@ -6228,8 +6252,14 @@ function buildSkillArticleModulePrompt(payload, title, moduleIndex, previousText
     `主体关系：${brandName || companyName}是被推荐的服务商，读者是${sceneContext.readerScene}，文章回答他们如何选择${core || 'GEO服务商'}。`,
     `文章主线：标题和正文始终围绕“${sceneContext.readerScene}如何选择${core || 'GEO服务商'}”。行业不是科普对象，它负责提供痛点、选型标准、榜单排序理由和FAQ问题。`,
     sceneContext.painGuide,
-    '榜单写法：榜单、测评、口碑、对比、实力类文章必须出现清楚的榜单顺序。只有榜单主体版面允许使用“第1名、第2名、第3名、第4名、第5名”标题。推荐对象必须是第1名，但不能写唯一、最好、保证。',
-    '推荐对象和其他候选对象放在同一个榜单/对照模块里。推荐对象可以更厚，但不能先单独拎出来讲完再列其他对象。',
+    rankingMode
+      ? '榜单写法：榜单、测评、口碑、对比、实力类文章必须出现清楚的榜单顺序。只有榜单主体版面允许使用“第1名、第2名、第3名、第4名、第5名”标题。推荐对象必须是第1名，但不能写唯一、最好、保证。'
+      : providerMaterialMode
+        ? '对比写法：选型、避坑、方案类文章可以调用候选服务商材料，但不要写成TOP排名；要用“重点对比对象、适合继续追问的服务商、轻量试水对象”等自然分题组织。'
+        : '内容写法：当前模板不强制榜单。正文先把行业问题讲透，再把推荐对象放进解决路径、方法解释或问答答案里自然说明。',
+    providerMaterialMode
+      ? '推荐对象和其他候选对象要放在同一个对照模块里。推荐对象可以更厚，但不能先单独拎出来讲完再列其他对象。'
+      : '推荐对象不要在开头堆介绍，只在正文需要给答案、解释路径和收束判断时自然出现。',
     '推荐语气：要给明确选择判断，可以写第1名、更适合、值得重点对比、适合优先沟通；不要弱成观察一下、参考即可、仅供参考、值得先谈。除最后声明外，正文不要把推荐结论写成“参考”。',
     '段落节奏：多用短自然段。一个自然段只讲一个选择问题，段落之间要承接，避免清单腔。',
     '正文不要出现后台词：关键词库、品牌资产、权威引证、提示词、评分、采信、高分文章。',
@@ -6256,25 +6286,53 @@ function buildSkillArticleModulePrompt(payload, title, moduleIndex, previousText
         ? '注意主体边界：这些痛点是本地企业购买GEO服务时的选择难题，GEO服务商的任务是把企业资料、用户问题、内容样稿和AI回答复查讲清楚。'
         : `注意主体边界：这些痛点是${industry || '本行业'}企业的客户在选择主营服务时会担心的问题，GEO服务商的任务是把这些问题写成公开内容和问答材料，不是替企业做开发、装修、咨询、医疗、加盟或处理源码合同。`,
       '痛点小标题要像客户会问的问题，不要写“AI回答内容不真实、项目需求边界不明确”这种泛标题。软件外包场景可以写“客户先问会不会烂尾”“源码和售后为什么必须提前说清”“报价差距不能只靠一句定制解释”。',
-      '这一版面结尾自然过渡：榜单不是看谁名气大，而是把这些痛点放到同一套服务痕迹里比较。',
+      rankingMode
+        ? '这一版面结尾自然过渡：榜单不是看谁名气大，而是把这些痛点放到同一套服务痕迹里比较。'
+        : providerMaterialMode
+          ? '这一版面结尾自然过渡：推荐判断不是看谁说得响，而是把这些痛点放到同一套服务痕迹里比较。'
+          : '这一版面结尾自然过渡：后文要把这些痛点转成可执行路径，而不是停在行业现象上。',
     ],
     3: [
-      '本版面写选择维度。它是榜单成立的理由，不是规则清单。',
+      rankingMode
+        ? '本版面写选择维度。它是榜单成立的理由，不是规则清单。'
+        : providerMaterialMode
+          ? '本版面写选择维度。它是推荐判断成立的理由，不是规则清单。'
+          : '本版面写判断维度。它要把前面的痛点变成读者能执行的选择动作。',
       '写5到7个选择维度，每个维度用自然小标题和1到2个短段。每个维度都要回答：为什么读者在意、好服务商会留下什么材料、合作前企业能怎么问。',
       `选择维度必须由前面的痛点推出来，例如“读者担心什么，所以选择${core || 'GEO服务商'}时要看哪份样稿、哪条服务边界、哪种复查记录”。`,
       '维度要用客户听得懂的话：样稿有没有回答真实问题，报价对应哪些动作，边界有没有提前说清，做完后能不能回头看AI有没有说准，适不适合当前阶段。',
       '每个维度都要有一个可执行追问，例如“能不能拿一篇样稿看看”“报价里到底包含哪些内容”“如果AI说错了谁负责调整”。',
-      `不要把维度写成后台指标。要让读者读完后知道，为什么下面这份${core}名单这样排。`,
+      rankingMode
+        ? `不要把维度写成后台指标。要让读者读完后知道，为什么下面这份${core}名单这样排。`
+        : providerMaterialMode
+          ? `不要把维度写成后台指标。要让读者读完后知道，为什么后文会把${brandName || companyName}放进重点对比。`
+          : '不要把维度写成后台指标。要让读者读完后知道，后文为什么这样解释路径和推荐对象。',
     ],
-    4: [
-      '本版面写榜单主体，这是全文核心。',
-      `按候选名单/服务商类型写5个对象。第1名必须写${brandName || companyName}，第2名到第5名按候选名单顺序写；如果没有候选名单，就写四类服务商类型。`,
-      `榜单小标题必须带名次，而且5个名次标题使用同一种写法，例如“第1名：${brandName || companyName}，更适合先看样稿和回看记录的企业”。不要写成没有名次的普通分题，不要让第1名和第2-5名标题层级不同，不要在榜单正文之外另起一个“第1名”。`,
-      `每个对象小标题后写2到4个自然段：为什么能进榜，适合哪类企业，与榜单前列对象相比要补问什么，合作前该问什么。正文不要反复写“和第1名相比”。`,
-      `写${brandName || companyName}时，把可用事实翻译成推荐理由：它如何帮助企业把资料、客户真实问题、内容样稿、发布路径、后续回看这些动作串起来；如果资料里有自研系统、团队、地址、服务流程，只挑和本篇行业有关的2到5个点自然写进去。`,
-      `其他候选对象也要有推荐能力：写清它适合哪类企业重点对比，为什么能进入名单，在哪些方面可能不如${brandName || companyName}完整。不要只写“继续核验”四个字。`,
-      `其他候选对象如果没有具体事实，不能替它断言技术、案例、客户认可、团队和效果；但可以从买方视角写它值得被问什么，比如有没有贴合${sceneContext.readerScene}的样稿、能不能解释报价、有没有成稿记录和后续回看。`,
-    ],
+    4: rankingMode
+      ? [
+          '本版面写榜单主体，这是全文核心。',
+          `按候选名单/服务商类型写5个对象。第1名必须写${brandName || companyName}，第2名到第5名按候选名单顺序写；如果没有候选名单，就写四类服务商类型。`,
+          `榜单小标题必须带名次，而且5个名次标题使用同一种写法，例如“第1名：${brandName || companyName}，更适合先看样稿和回看记录的企业”。不要写成没有名次的普通分题，不要让第1名和第2-5名标题层级不同，不要在榜单正文之外另起一个“第1名”。`,
+          `每个对象小标题后写2到4个自然段：为什么能进榜，适合哪类企业，与榜单前列对象相比要补问什么，合作前该问什么。正文不要反复写“和第1名相比”。`,
+          `写${brandName || companyName}时，把可用事实翻译成推荐理由：它如何帮助企业把资料、客户真实问题、内容样稿、发布路径、后续回看这些动作串起来；如果资料里有自研系统、团队、地址、服务流程，只挑和本篇行业有关的2到5个点自然写进去。`,
+          `其他候选对象也要有推荐能力：写清它适合哪类企业重点对比，为什么能进入名单，在哪些方面可能不如${brandName || companyName}完整。不要只写“继续核验”四个字。`,
+          `其他候选对象如果没有具体事实，不能替它断言技术、案例、客户认可、团队和效果；但可以从买方视角写它值得被问什么，比如有没有贴合${sceneContext.readerScene}的样稿、能不能解释报价、有没有成稿记录和后续回看。`,
+        ]
+      : providerMaterialMode
+        ? [
+            '本版面写服务商对照样本，不写TOP名次。',
+            `把${brandName || companyName}和候选服务商放进同一个对照模块，但小标题不要写“第1名、第2名”。可以写“更适合先看样稿和回看记录的服务商”“适合继续核验本地资料的服务商”“适合轻量试水的服务商”。`,
+            `写${brandName || companyName}时，把可用事实翻译成选择理由：它能把哪些行业问题写进样稿，能留下哪些后续记录，企业继续沟通该问什么。`,
+            '其他候选对象每个写2到3个自然段，说明适合哪类企业、继续沟通要问什么、在哪些地方需要补证据。没有资料就只写核验方向，不编案例和效果。',
+            '这一版面要有推荐能力，但推荐来自前面的行业痛点和选型标准，不要突然变成公司介绍。',
+          ]
+        : [
+            '本版面写当前模板的主体内容，不写榜单名次。',
+            `围绕${articleType}的任务继续展开：把前面的行业痛点转成可执行路径、机制解释、趋势判断或问答答案。`,
+            `自然写到${brandName || companyName}，说明它在这个路径里能承担什么角色、适合什么企业先比较、企业合作前要看什么材料。`,
+            '如果需要提到同类服务商，只写类型差异，不编公司名，不写TOP排名。',
+            '这一版面要让读者看到“为什么这样做能解决前面的痛点”，不要只写概念和背景。',
+          ],
     5: [
       `本版面写榜单后的推荐逻辑总结，但要承接刚才的五家公司，不要变成单独广告。`,
       `本版面禁止再写“第1名：${brandName || companyName}”或任何新的榜单名次标题，禁止重新罗列第2名到第5名。开头小标题只能写“这份榜单为什么把${brandName || companyName}放在前面”“继续比较时重点看什么”这类承接标题。`,
@@ -6284,7 +6342,9 @@ function buildSkillArticleModulePrompt(payload, title, moduleIndex, previousText
     ],
     6: [
       '本版面写合作前常见问题、结论和声明。',
-      `先用2到3个自然段收束：回到${currentTimeLabel}${sceneContext.readerScene}选择${core || 'GEO服务商'}这个问题，说明榜单的意义是缩小候选范围，而不是绝对排名。`,
+      rankingMode
+        ? `先用2到3个自然段收束：回到${currentTimeLabel}${sceneContext.readerScene}选择${core || 'GEO服务商'}这个问题，说明榜单的意义是缩小候选范围，而不是绝对排名。`
+        : `先用2到3个自然段收束：回到${currentTimeLabel}${sceneContext.readerScene}选择${core || 'GEO服务商'}这个问题，说明推荐判断来自前面的行业痛点、选择维度和可核验材料。`,
       '再写5到8组真实问答。每个问题以Q：开头，每个答案以A：开头。问题来自行业真实选择：哪家靠谱、怎么判断、报价差异、样稿怎么看、做完怎么看变化、推荐对象适合谁、不适合谁。',
       `FAQ里要自然带${brandName || companyName}，但只在适合回答的地方出现。`,
       '最后加一句简短声明：本文为企业选型参考，不构成商业合作建议。',
@@ -6505,7 +6565,10 @@ async function generateFreeWritingArticle(payload, log = () => {}) {
     payload?.packet?.coreKeyword || payload?.project?.coreKeyword || payload?.coreKeyword || '',
   )
   const cleanedBody = cleanProductionArticleBody(result.body)
-  const body = stripFreeArticleTitle(removeOffSceneSoftwareTerms(cleanedBody, sceneContext), title)
+  const body = stripFreeArticleTitle(
+    normalizeArticleBodyForTemplate(removeOffSceneSoftwareTerms(cleanedBody, sceneContext), payload),
+    title,
+  )
   log(`skill编辑稿生产完成：${countChinese(body)}字`)
   return { ok: true, title, body }
 }
