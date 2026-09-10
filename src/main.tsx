@@ -1,4 +1,5 @@
 import { identityKey, projectHeaders, projectStorage, fetchProjectFile } from './project-scope'
+import { AuthGate } from './auth'
 import { StrictMode, type ChangeEvent, type Dispatch, type SetStateAction, useEffect, useRef, useState } from 'react'
 import ReactDOM from 'react-dom/client'
 import {
@@ -888,12 +889,14 @@ async function apiJson<T>(path: string, payload?: unknown, timeoutMs = 30000): P
   try {
     const response = await fetch(path, {
       method: payload === undefined ? 'GET' : 'POST',
+      credentials: 'same-origin',
       headers: { ...projectHeaders(), ...(payload === undefined ? {} : { 'Content-Type': 'application/json' }) },
       body: payload === undefined ? undefined : JSON.stringify(payload),
       signal: controller.signal,
     })
     const data = (await response.json()) as T & { error?: string }
     if (scope !== identityKey()) throw new Error('项目已切换，请在当前项目重新操作。')
+    if (response.status === 401 || response.status === 409) window.dispatchEvent(new Event('geo-auth-expired'))
     if (!response.ok) {
       throw new Error(data.error || `接口返回${response.status}`)
     }
@@ -4553,7 +4556,7 @@ const windowWithRoot = window as typeof window & { __geoContentRoot?: ReturnType
 windowWithRoot.__geoContentRoot ??= ReactDOM.createRoot(rootElement)
 windowWithRoot.__geoContentRoot.render(
   <StrictMode>
-    <ProjectApp />
+    <AuthGate><ProjectApp /></AuthGate>
   </StrictMode>,
 )
 

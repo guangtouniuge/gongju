@@ -86,7 +86,7 @@ test('HTTP isolation: state, summaries, generation jobs, gallery, export and ano
     const upload = await (await request('/api/gallery/upload', 'a', { brand: 'Same brand', files: [{ name: 'pixel.png', dataUrl: 'data:image/png;base64,iVBORw0KGgo=' }] })).json()
     const image = upload.files[0]
     assert.equal((await request(image.path, 'a')).status, 200)
-    assert.equal((await request(image.path, 'b')).status, 403)
+    assert.equal((await request(image.path, 'b')).status, 404)
     assert.equal((await request('/api/state', 'b', { key: 'geo.galleryRows', value: [['Same brand', '', '', '', '', image.path]] })).status, 403)
     assert.equal((await request('/api/state', 'b', { key: 'geo.articleRows', value: [{ id: 'x', body: `![foreign](${image.path})` }] })).status, 403)
     const exported = await (await request('/api/articles/export', 'a', { articles: [{ id: 'article-a', body: 'forged' }], format: 'doc' })).json()

@@ -16,3 +16,7 @@ Thumbs.db
 # generated documents
 *.docx
 *.pdf
+
+# Account credentials, sessions and tenant data
+outputs/auth/
+outputs/workspaces/

@@ -46,6 +46,9 @@ export function resolveProjectScope(user) {
   if (!user) return { projectId: 'legacy', agentId: '', ownerUserId: '', legacy: true }
   const projectId = identifier(user.projectId)
   const project = listProjectAccounts().find(row => row.projectId === projectId)
+  if (!project && process.env.GEO_ALLOW_UNREGISTERED_AUTH_PROJECT !== 'false') {
+    return { currentUser: user, projectId, agentId: user.agentId || '', ownerUserId: user.userId }
+  }
   if (!project || (!user.isSuperAdmin && (user.role === 'agent' ? !user.agentId || project.agentId !== user.agentId : project.projectId !== user.projectId))) {
     throw scopeError('无权访问此项目')
   }

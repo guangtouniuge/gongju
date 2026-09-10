@@ -1,3 +1,4 @@
+import { createAuth, requestAccount, workspacePath, roles } from './auth.mjs'
 import http from 'node:http'
 import { resolveCurrentUser, resolveProjectScope, runInProjectScope, currentProjectScope, projectDirectory, assertProjectFile, assertGalleryReference, assertStateKey, stampOwnedRows, validateGenerationScope, visibleProjectAccounts, scopeError } from './project-scope.mjs'
 import { readFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs'
@@ -25,7 +26,7 @@ function loadEnvFile(path) {
 function json(res, status, payload) {
   res.writeHead(status, {
     'Content-Type': 'application/json; charset=utf-8',
-    'Access-Control-Allow-Origin': '*',
+    'Cache-Control': 'no-store',
     'Access-Control-Allow-Headers': 'Content-Type',
     'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
   })
@@ -34,15 +35,22 @@ function json(res, status, payload) {
 
 async function readJson(req) {
   const chunks = []
-  for await (const chunk of req) chunks.push(chunk)
+  let size = 0
+  const limit = req.url?.startsWith('/api/auth/') || req.url?.startsWith('/api/admin/') ? 16384 : 32 * 1024 * 1024
+  for await (const chunk of req) {
+    size += chunk.length
+    if (size > limit) throw Object.assign(new Error('请求过大'), { status: 413 })
+    chunks.push(chunk)
+  }
   const raw = Buffer.concat(chunks).toString('utf8')
-  return raw ? JSON.parse(raw) : {}
+  try { return raw ? JSON.parse(raw) : {} } catch { throw Object.assign(new Error('JSON格式错误'), { status: 400 }) }
 }
 
 function safeFileName(name) {
   return String(name || 'GEO成品文章')
     .replace(/[\\/:*?"<>|]/g, '')
     .replace(/\s+/g, '')
+    .replace(/^\.+$/, '')
     .slice(0, 80) || 'GEO成品文章'
 }
 
@@ -169,7 +177,7 @@ function sendDownload(res, fileName) {
   res.writeHead(200, {
     'Content-Type': isWord ? 'application/msword; charset=utf-8' : 'text/markdown; charset=utf-8',
     'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(safeName)}`,
-    'Access-Control-Allow-Origin': '*',
+    'Cache-Control': 'no-store',
   })
   res.end(content)
 }
@@ -177,7 +185,12 @@ function sendDownload(res, fileName) {
 function sendGalleryFile(res, fileName) {
   if (!fileName) return json(res, 400, { ok: false, error: '缺少图片文件' })
   const uploadRoot = projectDirectory('uploads')
-  const filePath = assertProjectFile(fileName)
+  let filePath = ''
+  try {
+    filePath = assertProjectFile(fileName)
+  } catch {
+    return json(res, 404, { ok: false, error: '图片不存在' })
+  }
   if (!filePath.startsWith(uploadRoot) || !existsSync(filePath)) {
     return json(res, 404, { ok: false, error: '图片不存在' })
   }
@@ -345,6 +358,7 @@ function exportArticles(body) {
   const requested = Array.isArray(body?.articles) ? body.articles : []
   const stored = getStateArray('geo.articleRows')
   const articles = currentProjectScope().legacy ? requested : requested.map(item => {
+    if (!item?.id && (item?.title || item?.body)) return item
     const article = stored.find(row => row.id === item.id)
     if (!article || article.projectId !== currentProjectScope().projectId) throw scopeError('不能下载其他项目的文章')
     return { ...article, body: String(article.body || '').replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (match, alt, src) => {
@@ -6696,10 +6710,55 @@ async function publishToMedia(body) {
   return { ok: true, data }
 }
 
-async function handleProjectRequest(req, res) {
+const auth = createAuth({ json, readJson })
+
+function hasTrustedProjectHeaders(req) {
+  return process.env.GEO_ALLOW_HEADER_IDENTITY !== 'false'
+    && Boolean(req.headers['x-geo-role'])
+}
+
+function projectUserFromAccount(account, req) {
+  const projectId = String(req.headers['x-geo-project-id'] || account.workspaceId || account.id)
+  return {
+    userId: account.id,
+    role: account.role,
+    agentId: account.workspaceId || account.id,
+    projectId,
+    isSuperAdmin: account.role === 'super_admin',
+  }
+}
+
+function projectSummaryFor(user) {
+  const registered = visibleProjectAccounts(user)
+  if (registered.length) {
+    return registered.map(project => runInProjectScope(resolveProjectScope({ ...user, projectId: project.projectId }), () => ({
+      projectId: project.projectId,
+      agentId: project.agentId,
+      projectName: project.projectName,
+      status: project.status,
+      createdAt: project.createdAt,
+      updatedAt: project.updatedAt,
+      brands: getStateArray('geo.projectRows').length,
+      articles: getStateArray('geo.articleRows').length,
+      tasks: getStateArray('geo.taskRows').length,
+    })))
+  }
+  return runInProjectScope(resolveProjectScope(user), () => [{
+    projectId: user.projectId,
+    agentId: user.agentId,
+    projectName: user.projectId,
+    status: 'ACTIVE',
+    brands: getStateArray('geo.projectRows').length,
+    articles: getStateArray('geo.articleRows').length,
+    tasks: getStateArray('geo.taskRows').length,
+  }])
+}
+
+async function handleProjectRequest(req, res, account, requestUrl) {
   if (req.method === 'OPTIONS') return json(res, 204, {})
-  try {
-    const requestUrl = new URL(req.url || '/', `http://${req.headers.host || '127.0.0.1'}`)
+  if (req.headers['x-geo-workspace'] && req.headers['x-geo-workspace'] !== account.workspaceId) return json(res, 409, { ok: false, error: '账号已切换，请刷新页面重新登录' })
+  if (['/api/config/status', '/api/model/test'].includes(requestUrl.pathname) && !roles[account.role].includes('system:manage')) return json(res, 403, { ok: false, error: '需要系统管理权限' })
+  if (requestUrl.pathname === '/api/media/publish' && !roles[account.role].includes('media:publish')) return json(res, 403, { ok: false, error: '需要发布权限' })
     if (req.method === 'GET' && requestUrl.pathname === '/api/articles/download') {
       return sendDownload(res, requestUrl.searchParams.get('file'))
     }
@@ -6757,26 +6816,29 @@ async function handleProjectRequest(req, res) {
       return json(res, result.ok ? 200 : result.status || 503, result)
     }
     return json(res, 404, { ok: false, error: '接口不存在' })
-  } catch (error) {
-    return json(res, error.status || 500, { ok: false, error: error instanceof Error ? error.message : '服务异常' })
-  }
 }
 
 const server = http.createServer(async (req, res) => {
   if (req.method === 'OPTIONS') return json(res, 204, {})
   try {
-    const user = await resolveCurrentUser(req)
-    if (req.method === 'GET' && req.url === '/api/projects/summary') {
-      if (!user) throw scopeError('请先登录', 401)
-      const projects = visibleProjectAccounts(user).map(project => runInProjectScope(resolveProjectScope({ ...user, projectId: project.projectId }), () => ({
-        projectId: project.projectId, agentId: project.agentId, projectName: project.projectName,
-        status: project.status, createdAt: project.createdAt, updatedAt: project.updatedAt,
-        brands: getStateArray('geo.projectRows').length,
-        articles: getStateArray('geo.articleRows').length, tasks: getStateArray('geo.taskRows').length,
-      })))
-      return json(res, 200, { ok: true, projects })
+    const requestUrl = new URL(req.url || '/', `http://${req.headers.host || '127.0.0.1'}`)
+    if (hasTrustedProjectHeaders(req)) {
+      const user = await resolveCurrentUser(req)
+      if (req.method === 'GET' && requestUrl.pathname === '/api/projects/summary') {
+        return json(res, 200, { ok: true, projects: projectSummaryFor(user) })
+      }
+      return await runInProjectScope(resolveProjectScope(user), () => handleProjectRequest(req, res, { id: user.userId, role: user.role, workspaceId: user.projectId }, requestUrl))
     }
-    return await runInProjectScope(resolveProjectScope(user), () => handleProjectRequest(req, res))
+    auth.checkOrigin(req)
+    if (await auth.handle(req, res, requestUrl.pathname)) return
+    const account = auth.authenticate(req)
+    const user = projectUserFromAccount(account, req)
+    return await requestAccount.run(account, async () => {
+      if (req.method === 'GET' && requestUrl.pathname === '/api/projects/summary') {
+        return json(res, 200, { ok: true, projects: projectSummaryFor(user) })
+      }
+      return await runInProjectScope(resolveProjectScope(user), () => handleProjectRequest(req, res, account, requestUrl))
+    })
   } catch (error) {
     return json(res, error.status || 500, { ok: false, error: error.message || '服务异常' })
   }
