@@ -10,7 +10,8 @@
     "dev:all": "node server/geo-api-server.mjs & vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "test": "npm run build"
+    "test": "npm run build",
+    "test:project-isolation": "node --test server/project-scope.test.mjs server/project-ui.test.mjs"
   },
   "repository": {
     "type": "git",

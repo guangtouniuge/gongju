@@ -1,4 +1,5 @@
 import http from 'node:http'
+import { resolveCurrentUser, resolveProjectScope, runInProjectScope, currentProjectScope, projectDirectory, assertProjectFile, assertGalleryReference, assertStateKey, stampOwnedRows, validateGenerationScope, visibleProjectAccounts, scopeError } from './project-scope.mjs'
 import { readFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { basename, resolve } from 'node:path'
 
@@ -157,7 +158,7 @@ function resolveWritingScene(project = {}, packet = {}, task = {}, index = 0) {
 }
 
 function sendDownload(res, fileName) {
-  const exportDir = resolve(process.cwd(), 'outputs', 'exports')
+  const exportDir = projectDirectory('exports')
   const safeName = basename(fileName || '')
   const filePath = resolve(exportDir, safeName)
   if (!safeName || !filePath.startsWith(exportDir) || !existsSync(filePath)) {
@@ -175,8 +176,8 @@ function sendDownload(res, fileName) {
 
 function sendGalleryFile(res, fileName) {
   if (!fileName) return json(res, 400, { ok: false, error: '缺少图片文件' })
-  const uploadRoot = resolve(process.cwd(), 'outputs', 'uploads')
-  const filePath = resolve(fileName)
+  const uploadRoot = projectDirectory('uploads')
+  const filePath = assertProjectFile(fileName)
   if (!filePath.startsWith(uploadRoot) || !existsSync(filePath)) {
     return json(res, 404, { ok: false, error: '图片不存在' })
   }
@@ -190,14 +191,14 @@ function sendGalleryFile(res, fileName) {
         : 'image/png'
   res.writeHead(200, {
     'Content-Type': contentType,
-    'Cache-Control': 'public, max-age=31536000',
+    'Cache-Control': 'private, no-store',
     'Access-Control-Allow-Origin': '*',
   })
   res.end(readFileSync(filePath))
 }
 
 function stateFilePath() {
-  const dataDir = resolve(process.cwd(), 'outputs', 'data')
+  const dataDir = projectDirectory('data')
   mkdirSync(dataDir, { recursive: true })
   return resolve(dataDir, 'app-state.json')
 }
@@ -217,13 +218,14 @@ function writeAppState(state) {
 }
 
 function getStateValue(key) {
+  assertStateKey(key)
   const state = readAppState()
   return Object.prototype.hasOwnProperty.call(state, key) ? state[key] : null
 }
 
 function setStateValue(key, value) {
   const state = readAppState()
-  state[key] = value
+  state[key] = stampOwnedRows(key, value)
   writeAppState(state)
   return state[key]
 }
@@ -340,12 +342,23 @@ function buildArticleExportContent(articles, body, format) {
 }
 
 function exportArticles(body) {
-  const articles = Array.isArray(body?.articles) ? body.articles : []
+  const requested = Array.isArray(body?.articles) ? body.articles : []
+  const stored = getStateArray('geo.articleRows')
+  const articles = currentProjectScope().legacy ? requested : requested.map(item => {
+    const article = stored.find(row => row.id === item.id)
+    if (!article || article.projectId !== currentProjectScope().projectId) throw scopeError('不能下载其他项目的文章')
+    return { ...article, body: String(article.body || '').replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (match, alt, src) => {
+      const path = assertGalleryReference(src)
+      if (!existsSync(path)) return match
+      const mime = /\.jpe?g$/i.test(path) ? 'image/jpeg' : /\.webp$/i.test(path) ? 'image/webp' : /\.gif$/i.test(path) ? 'image/gif' : 'image/png'
+      return `![${alt}](data:${mime};base64,${readFileSync(path).toString('base64')})`
+    }) }
+  })
   if (!articles.length) return { ok: false, status: 400, error: '没有可导出的文章' }
   const format = body?.format === 'doc' ? 'doc' : 'md'
-  const exportDir = resolve(process.cwd(), 'outputs', 'exports')
+  const exportDir = projectDirectory('exports')
   mkdirSync(exportDir, { recursive: true })
-  const fileName = `${safeFileName(body.filePrefix)}_${localDate()}_${Date.now().toString().slice(-6)}.${format}`
+  const fileName = `${safeFileName(body.filePrefix)}_${localDate()}_${Date.now()}_${Math.random().toString(36).slice(2, 10)}.${format}`
   const filePath = resolve(exportDir, fileName)
   const content = buildArticleExportContent(articles, body, format)
   writeFileSync(filePath, content, 'utf8')
@@ -363,15 +376,17 @@ function uploadGalleryFiles(body) {
   const category = safeFileName(body?.category || '图库')
   const files = Array.isArray(body?.files) ? body.files : []
   if (!files.length) return { ok: false, status: 400, error: '没有选择图片文件' }
-  const uploadDir = resolve(process.cwd(), 'outputs', 'uploads', brand, category)
+  const uploadDir = resolve(projectDirectory('uploads'), brand, category)
+  assertProjectFile(resolve(uploadDir, 'upload-check'))
   mkdirSync(uploadDir, { recursive: true })
   const savedFiles = []
   for (const file of files) {
     const originalName = safeFileName(file?.name || `image-${Date.now()}.png`)
     const match = String(file?.dataUrl || '').match(/^data:([^;]+);base64,(.+)$/)
     if (!match) continue
+    if (!['image/png', 'image/jpeg', 'image/gif', 'image/webp'].includes(match[1])) return { ok: false, status: 400, error: '仅支持PNG、JPEG、GIF、WebP图片' }
     const ext = originalName.includes('.') ? '' : match[1].includes('jpeg') ? '.jpg' : match[1].includes('png') ? '.png' : '.img'
-    const fileName = `${Date.now()}_${originalName}${ext}`
+    const fileName = `${Date.now()}_${Math.random().toString(36).slice(2, 10)}_${originalName}${ext}`
     const filePath = resolve(uploadDir, fileName)
     writeFileSync(filePath, Buffer.from(match[2], 'base64'))
     savedFiles.push({
@@ -6604,6 +6619,8 @@ function startArticleJob(body) {
   const batchLabel = body?.batchLabel || new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false })
   const job = {
     id: `JOB-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+    projectId: currentProjectScope().projectId,
+    legacyScope: Boolean(currentProjectScope().legacy),
     status: 'queued',
     total: plans.length,
     completed: 0,
@@ -6629,7 +6646,7 @@ function startArticleJob(body) {
           job.failed += 1
           appendJobLog(job, `第${index + 1}篇接口失败：${result.error || '未知错误'}`)
         } else {
-          const article = result.articles[0]
+          const article = stampOwnedRows('geo.articleRows', result.articles)[0]
           article.batchId = batchId
           article.taskName = taskName
           article.batchLabel = batchLabel
@@ -6679,7 +6696,7 @@ async function publishToMedia(body) {
   return { ok: true, data }
 }
 
-const server = http.createServer(async (req, res) => {
+async function handleProjectRequest(req, res) {
   if (req.method === 'OPTIONS') return json(res, 204, {})
   try {
     const requestUrl = new URL(req.url || '/', `http://${req.headers.host || '127.0.0.1'}`)
@@ -6706,18 +6723,19 @@ const server = http.createServer(async (req, res) => {
     }
     if (req.method === 'POST' && req.url === '/api/jobs/start') {
       const body = await readJson(req)
-      const job = startArticleJob(body)
+      const job = startArticleJob(validateGenerationScope(body, getStateValue))
       return json(res, 200, { ok: true, job })
     }
     if (req.method === 'GET' && requestUrl.pathname === '/api/jobs/status') {
       const id = requestUrl.searchParams.get('id') || ''
       const job = articleJobs.get(id)
-      if (!job) return json(res, 404, { ok: false, error: '任务不存在或服务已重启' })
+      if (!job || job.projectId !== currentProjectScope().projectId || job.legacyScope !== Boolean(currentProjectScope().legacy)) return json(res, 404, { ok: false, error: '任务不存在或服务已重启' })
       return json(res, 200, { ok: true, job: publicJob(job) })
     }
     if (req.method === 'POST' && req.url === '/api/articles/generate') {
       const body = await readJson(req)
-      const result = await generateArticleFromPlan(body)
+      const result = await generateArticleFromPlan(validateGenerationScope(body, getStateValue))
+      if (result.articles) result.articles = stampOwnedRows('geo.articleRows', result.articles)
       return json(res, result.ok ? 200 : result.status || 503, result)
     }
     if (req.method === 'POST' && req.url === '/api/articles/export') {
@@ -6725,7 +6743,9 @@ const server = http.createServer(async (req, res) => {
       return json(res, result.ok ? 200 : result.status || 503, result)
     }
     if (req.method === 'POST' && (req.url === '/api/gallery/upload' || req.url === '/api/images/upload')) {
-      const result = uploadGalleryFiles(await readJson(req))
+      const body = await readJson(req)
+      if (!currentProjectScope().legacy && !getStateArray('geo.projectRows').some(row => row.name === body.brand)) throw scopeError('品牌不属于当前项目')
+      const result = uploadGalleryFiles(body)
       return json(res, result.ok ? 200 : result.status || 503, result)
     }
     if (req.method === 'POST' && req.url === '/api/keywords/expand') {
@@ -6738,7 +6758,27 @@ const server = http.createServer(async (req, res) => {
     }
     return json(res, 404, { ok: false, error: '接口不存在' })
   } catch (error) {
-    return json(res, 500, { ok: false, error: error instanceof Error ? error.message : '服务异常' })
+    return json(res, error.status || 500, { ok: false, error: error instanceof Error ? error.message : '服务异常' })
+  }
+}
+
+const server = http.createServer(async (req, res) => {
+  if (req.method === 'OPTIONS') return json(res, 204, {})
+  try {
+    const user = await resolveCurrentUser(req)
+    if (req.method === 'GET' && req.url === '/api/projects/summary') {
+      if (!user) throw scopeError('请先登录', 401)
+      const projects = visibleProjectAccounts(user).map(project => runInProjectScope(resolveProjectScope({ ...user, projectId: project.projectId }), () => ({
+        projectId: project.projectId, agentId: project.agentId, projectName: project.projectName,
+        status: project.status, createdAt: project.createdAt, updatedAt: project.updatedAt,
+        brands: getStateArray('geo.projectRows').length,
+        articles: getStateArray('geo.articleRows').length, tasks: getStateArray('geo.taskRows').length,
+      })))
+      return json(res, 200, { ok: true, projects })
+    }
+    return await runInProjectScope(resolveProjectScope(user), () => handleProjectRequest(req, res))
+  } catch (error) {
+    return json(res, error.status || 500, { ok: false, error: error.message || '服务异常' })
   }
 })
 

@@ -1,3 +1,4 @@
+import { identityKey, projectHeaders, projectStorage, fetchProjectFile } from './project-scope'
 import { StrictMode, type ChangeEvent, type Dispatch, type SetStateAction, useEffect, useRef, useState } from 'react'
 import ReactDOM from 'react-dom/client'
 import {
@@ -849,7 +850,7 @@ type WorkflowPacket = {
 
 function readStoredRows(key: string, fallback: string[][]) {
   if (typeof window === 'undefined') return fallback
-  const saved = window.localStorage.getItem(key)
+  const saved = projectStorage.getItem(key)
   if (!saved) return fallback
   try {
     return JSON.parse(saved) as string[][]
@@ -873,8 +874,7 @@ function createEmptyProject(activeBrand = ''): ProjectRow {
 }
 
 function questionBelongsToBrand(row: string[], brand: string, core: string) {
-  if (row.length >= 5) return row[0] === brand && row[1] === core
-  return row[0] === core
+  return row.length >= 5 && row[0] === brand && row[1] === core
 }
 
 function readQuestionText(row: string[]) {
@@ -882,16 +882,18 @@ function readQuestionText(row: string[]) {
 }
 
 async function apiJson<T>(path: string, payload?: unknown, timeoutMs = 30000): Promise<T> {
+  const scope = identityKey()
   const controller = new AbortController()
   const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs)
   try {
     const response = await fetch(path, {
       method: payload === undefined ? 'GET' : 'POST',
-      headers: payload === undefined ? undefined : { 'Content-Type': 'application/json' },
+      headers: { ...projectHeaders(), ...(payload === undefined ? {} : { 'Content-Type': 'application/json' }) },
       body: payload === undefined ? undefined : JSON.stringify(payload),
       signal: controller.signal,
     })
     const data = (await response.json()) as T & { error?: string }
+    if (scope !== identityKey()) throw new Error('项目已切换，请在当前项目重新操作。')
     if (!response.ok) {
       throw new Error(data.error || `接口返回${response.status}`)
     }
@@ -1030,12 +1032,29 @@ function markdownImageParts(block: string) {
   return match ? { alt: match[1] || '文章配图', src: imageSrcForDisplay(match[2]) } : null
 }
 
+function ProjectImage({ src, alt }: { src: string; alt: string }) {
+  const [url, setUrl] = useState('')
+  useEffect(() => {
+    let active = true
+    let objectUrl = ''
+    if (src.startsWith('/api/gallery/file')) {
+      void fetchProjectFile(src).then(blob => {
+        if (!active) return
+        objectUrl = URL.createObjectURL(blob)
+        setUrl(objectUrl)
+      }).catch(() => setUrl(''))
+    }
+    return () => { active = false; if (objectUrl) URL.revokeObjectURL(objectUrl) }
+  }, [src])
+  return url ? <img src={url} alt={alt} /> : <span>{alt}（图片暂不可用）</span>
+}
+
 function renderArticleBody(body = '') {
   const blocks = body.split(/\n{2,}/).map((block) => block.trim()).filter(Boolean)
   return blocks.map((block, index) => {
     const image = markdownImageParts(block)
     if (image) {
-      return <figure className="article-image-block" key={`${image.src}-${index}`}><img src={image.src} alt={image.alt} /><figcaption>{image.alt}</figcaption></figure>
+      return <figure className="article-image-block" key={`${image.src}-${index}`}><ProjectImage src={image.src} alt={image.alt} /><figcaption>{image.alt}</figcaption></figure>
     }
     const heading = block.match(/^(#{1,3})\s+(.+)$/)
     if (heading || (block.length <= 28 && !/[。！？；]/.test(block))) {
@@ -1062,11 +1081,11 @@ function getArticleAuditFailures(article: Article) {
 }
 
 function useStoredState<T>(key: string, initialValue: T) {
-  const [serverReady, setServerReady] = useState(false)
+  const mountedScope = useRef(identityKey()).current
   const localWriteVersion = useRef(0)
   const [value, setValue] = useState<T>(() => {
     if (typeof window === 'undefined') return initialValue
-    const saved = window.localStorage.getItem(key)
+    const saved = projectStorage.getItem(key)
     if (!saved) return initialValue
     try {
       return JSON.parse(saved) as T
@@ -1082,33 +1101,24 @@ function useStoredState<T>(key: string, initialValue: T) {
       .then((result) => {
         if (!active) return
         if (localWriteVersion.current !== requestedAtVersion) return
-        if (result.value !== null) {
-          setValue(result.value)
-          window.localStorage.setItem(key, JSON.stringify(result.value))
-        }
+        const loaded = result.value ?? initialValue
+        setValue(loaded)
+        projectStorage.setItem(key, JSON.stringify(loaded))
       })
       .catch(() => undefined)
-      .finally(() => {
-        if (active) setServerReady(true)
-      })
     return () => {
       active = false
     }
   }, [key])
 
-  useEffect(() => {
-    window.localStorage.setItem(key, JSON.stringify(value))
-    if (!serverReady) return
-    void apiJson('/api/state', { key, value }, 5000).catch(() => undefined)
-  }, [key, serverReady, value])
-
   const setStoredValue: Dispatch<SetStateAction<T>> = (nextValue) => {
+    if (mountedScope !== identityKey()) return
     localWriteVersion.current += 1
     setValue((currentValue) => {
       const resolvedValue = typeof nextValue === 'function'
         ? (nextValue as (previous: T) => T)(currentValue)
         : nextValue
-      window.localStorage.setItem(key, JSON.stringify(resolvedValue))
+      projectStorage.setItem(key, JSON.stringify(resolvedValue))
       void apiJson('/api/state', { key, value: resolvedValue }, 5000).catch(() => undefined)
       return resolvedValue
     })
@@ -1353,40 +1363,38 @@ function Projects({
     setShowProjectModal(false)
     notify(`${draft.name}已添加，下一步到关键词页添加核心词并一键蒸馏。`)
   }
-  const deleteProject = (projectName: string) => {
-    const targetProject = projectRows.find((project) => project.name === projectName)
-    const targetCores = readStoredRows('geo.keywordRows', [])
-      .filter((row) => row[0] === projectName)
-      .map((row) => row[1])
-    const projectMarkers = [projectName, targetProject?.brand, targetProject?.recommendWord, targetProject?.coreKeyword].filter(Boolean) as string[]
+  const deleteProject = async (projectName: string) => {
+    const keys = ['geo.keywordRows', 'geo.keywordLibraryRows', 'geo.questionRows', 'geo.knowledgeRows', 'geo.knowledgeContentRows', 'geo.galleryRows', 'geo.industrySceneRows', 'geo.rankingCandidateRows', 'geo.taskRows']
+    let sourceState: Record<string, unknown>
+    try {
+      sourceState = Object.fromEntries(await Promise.all(keys.map(async key => {
+        const result = await apiJson<{ value: unknown }>(`/api/state?key=${encodeURIComponent(key)}`, undefined, 5000)
+        return [key, result.value ?? []]
+      })))
+    } catch (error) {
+      notify(error instanceof Error ? error.message : '无法读取品牌资料，未执行删除。')
+      return
+    }
     const updateRows = (key: string, predicate: (row: string[]) => boolean) => {
-      const rows = readStoredRows(key, [])
+      const rows = sourceState[key] as string[][]
       const nextRows = rows.filter((row) => !predicate(row))
-      window.localStorage.setItem(key, JSON.stringify(nextRows))
+      projectStorage.setItem(key, JSON.stringify(nextRows))
       void apiJson('/api/state', { key, value: nextRows }, 5000).catch(() => undefined)
     }
     updateRows('geo.keywordRows', (row) => row[0] === projectName)
-    updateRows('geo.keywordLibraryRows', (row) => row[0] === projectName || targetCores.includes(row[1]))
-    updateRows('geo.questionRows', (row) => row[0] === projectName || targetCores.includes(row[0]) || row[0] === targetProject?.coreKeyword)
+    updateRows('geo.keywordLibraryRows', (row) => row[0] === projectName)
+    updateRows('geo.questionRows', (row) => row.length >= 5 && row[0] === projectName)
     updateRows('geo.knowledgeRows', (row) => row[0] === projectName)
     updateRows('geo.knowledgeContentRows', (row) => row[0] === projectName)
     updateRows('geo.galleryRows', (row) => row[0] === projectName)
     updateRows('geo.industrySceneRows', (row) => row[0] === projectName)
     updateRows('geo.rankingCandidateRows', (row) => row[0] === projectName)
-    const savedTasks = (() => {
-      const saved = window.localStorage.getItem('geo.taskRows')
-      if (!saved) return taskRows
-      try {
-        return JSON.parse(saved) as Array<Record<string, string>>
-      } catch {
-        return taskRows
-      }
-    })()
-    const nextTaskRows = savedTasks.filter((row) => row.project !== projectName && !projectMarkers.some((marker) => JSON.stringify(row).includes(marker)))
-    window.localStorage.setItem('geo.taskRows', JSON.stringify(nextTaskRows))
+    const savedTasks = sourceState['geo.taskRows'] as Array<Record<string, string>>
+    const nextTaskRows = savedTasks.filter((row) => row.project !== projectName)
+    projectStorage.setItem('geo.taskRows', JSON.stringify(nextTaskRows))
     void apiJson('/api/state', { key: 'geo.taskRows', value: nextTaskRows }, 5000).catch(() => undefined)
     setArticleRows((current) =>
-      current.filter((article) => article.project !== projectName && !projectMarkers.some((marker) => `${article.title}${article.keyword}${article.body ?? ''}${article.brand ?? ''}`.includes(marker))),
+      current.filter((article) => article.project !== projectName),
     )
     setProjectRows((current) => {
       const nextRows = current.filter((item) => item.name !== projectName)
@@ -3563,8 +3571,9 @@ function Audit({ notify, navigate, articleRows, setArticleRows, activeBrand, act
     notify('旧审核规则已关闭，当前批次文章已按生成状态整理。')
   }
   const deleteArticle = (id: string) => {
-    const target = articleRows.find((article) => article.id === id)
-    setArticleRows((current) => current.filter((article) => article.id !== id))
+    const target = visibleArticles.find((article) => article.id === id)
+    if (!target) return
+    setArticleRows((current) => current.filter((article) => article.id !== id || article.project !== activeBrand))
     notify(`${target?.title ?? '文章'}已删除。`)
   }
   return (
@@ -3641,16 +3650,13 @@ function LibraryPage({ notify, navigate, articleRows, setArticleRows, activeBran
   const [previewId, setPreviewId] = useState('')
   const [selectedArticles, setSelectedArticles] = useState<string[]>([])
   const [showAllArticles, setShowAllArticles] = useState(false)
-  const [showAllBrands, setShowAllBrands] = useState(false)
   const [isEditingArticle, setIsEditingArticle] = useState(false)
   const [editArticleTitle, setEditArticleTitle] = useState('')
   const [editArticleBody, setEditArticleBody] = useState('')
   const [storedTaskRows] = useStoredState('geo.taskRows', taskRows)
   const [galleryRows] = useStoredState<string[][]>('geo.galleryRows', [])
-  const activeBrandHasGeneratedArticles = articleRows.some((article) => article.project === activeBrand && article.status === '已生成')
-  const hasAnyGeneratedArticles = articleRows.some((article) => article.status === '已生成')
-  const effectiveShowAllBrands = showAllBrands || (!activeBrandHasGeneratedArticles && hasAnyGeneratedArticles)
-  const scopedArticles = articleRows.filter((article) => effectiveShowAllBrands || article.project === activeBrand)
+  const scopedArticles = articleRows.filter((article) => article.project === activeBrand)
+  useEffect(() => { setPreviewId(''); setSelectedArticles([]); setIsEditingArticle(false); setShowAllArticles(false) }, [activeBrand])
   const batches = Array.from(
     scopedArticles
       .filter((article) => article.status === '已生成' || article.status === '生成异常')
@@ -3680,7 +3686,7 @@ function LibraryPage({ notify, navigate, articleRows, setArticleRows, activeBran
   const defaultBatchId = batches.find((batch) => batch.passed > 0)?.id || batches[0]?.id || ''
   const activeBatchHasArticles = batches.some((batch) => batch.id === activeBatchId && batch.passed > 0)
   const latestBatchId = activeBatchHasArticles ? activeBatchId : defaultBatchId
-  const previewArticle = articleRows.find((article) => article.id === previewId)
+  const previewArticle = scopedArticles.find((article) => article.id === previewId)
   const selectedBatch = batches.find((batch) => batch.id === latestBatchId)
   const articleInSelectedBatch = (article: Article) => {
     if (showAllArticles || !latestBatchId) return true
@@ -3692,21 +3698,40 @@ function LibraryPage({ notify, navigate, articleRows, setArticleRows, activeBran
   const selectedPassedArticles = passedArticles.filter((article) => selectedArticles.includes(article.id))
   const taskForBatch = storedTaskRows.find((row) => row.batchId === latestBatchId)
   const allCurrentBatchArticles = scopedArticles.filter(articleInSelectedBatch)
-  const imageCountForArticle = (article: Article) => article.imagePaths?.length || galleryRows.filter((row) => row[0] === (article.project || activeBrand)).length
+  const imageCountForArticle = (article: Article) => [...(article.body || '').matchAll(/!\[[^\]]*\]\([^)]+\)/g)].length
+  const bodyEditorRef = useRef<HTMLTextAreaElement>(null)
+  const editorImages = galleryRows.filter(row => row[0] === previewArticle?.project && row[5])
+  const insertImage = (row: string[]) => {
+    if (!previewArticle || row[0] !== previewArticle.project) return
+    const editor = bodyEditorRef.current
+    const start = editor?.selectionStart ?? editArticleBody.length
+    const end = editor?.selectionEnd ?? start
+    const alt = (row[6] || row[1] || '正文配图').replace(/[\[\]\r\n]/g, '')
+    const inserted = `\n\n![${alt}](${row[5]})\n\n`
+    setEditArticleBody(editArticleBody.slice(0, start) + inserted + editArticleBody.slice(end))
+    requestAnimationFrame(() => { editor?.focus(); editor?.setSelectionRange(start + inserted.length, start + inserted.length) })
+  }
   const openArticleReader = (article: Article) => {
     setPreviewId(article.id)
     setEditArticleTitle(article.title)
     setEditArticleBody(article.body || '')
     setIsEditingArticle(false)
   }
-  const savePreviewArticle = () => {
+  const savePreviewArticle = async () => {
     if (!previewArticle) return
     const nextBody = editArticleBody.trim()
-    setArticleRows((current) => current.map((article) => (
-      article.id === previewArticle.id
-        ? { ...article, title: editArticleTitle.trim() || article.title, body: nextBody, words: String(chineseCount(nextBody)) }
+    const updated = articleRows.map((article) => (
+      article.id === previewArticle.id && article.project === activeBrand
+        ? { ...article, title: editArticleTitle.trim() || article.title, body: nextBody, imagePaths: [...nextBody.matchAll(/!\[[^\]]*\]\(([^)]+)\)/g)].map(match => match[1]), words: String(chineseCount(nextBody)) }
         : article
-    )))
+    ))
+    try {
+      const result = await apiJson<{ value: Article[] }>('/api/state', { key: 'geo.articleRows', value: updated }, 5000)
+      setArticleRows(result.value)
+    } catch (error) {
+      notify(error instanceof Error ? error.message : '文章保存失败，请重试。')
+      return
+    }
     setIsEditingArticle(false)
     notify('文章已保存，下载会使用当前编辑后的版本。')
   }
@@ -3719,19 +3744,8 @@ function LibraryPage({ notify, navigate, articleRows, setArticleRows, activeBran
       return currentVisible.length === passedArticles.length ? [] : passedArticles.map((article) => article.id)
     })
   }
-  const buildDownloadContent = (targets: Article[]) => targets
-    .map((article, index) => [
-      `第${index + 1}篇：${article.title}`,
-      `归属品牌：${article.project ?? activeBrand}`,
-      `推荐词：${article.brand ?? ''}`,
-      `核心词：${article.keyword}`,
-      `字数：${article.words}字`,
-      `生成来源：${displayGenerationSource(article.generationSource)}`,
-      '',
-      article.body || '当前文章暂无完整正文。',
-    ].join('\n'))
-    .join('\n\n==============================\n\n')
   const downloadArticles = async (targets: Article[], filePrefix = 'GEO成品文章') => {
+    targets = targets.filter(article => scopedArticles.some(row => row.id === article.id && row.project === article.project))
     if (!targets.length) {
       notify('当前没有可下载的成品文章。')
       return
@@ -3744,28 +3758,22 @@ function LibraryPage({ notify, navigate, articleRows, setArticleRows, activeBran
         articles: targets,
       })
       const link = document.createElement('a')
-      link.href = result.downloadUrl
+      const fileUrl = URL.createObjectURL(await fetchProjectFile(result.downloadUrl))
+      link.href = fileUrl
       link.download = result.filePath.split(/[\\/]/).pop() || ''
       document.body.appendChild(link)
       link.click()
       link.remove()
-      notify(`已导出${result.count}篇文章：${result.filePath}`)
-    } catch {
-      const blob = new Blob([buildDownloadContent(targets)], { type: 'application/msword;charset=utf-8' })
-      const url = URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = `${filePrefix.replace(/[\\/:*?"<>|]/g, '')}_${new Date().toISOString().slice(0, 10)}.doc`
-      document.body.appendChild(link)
-      link.click()
-      link.remove()
-      window.setTimeout(() => URL.revokeObjectURL(url), 1000)
-      notify(`已用浏览器下载${targets.length}篇成品文章。`)
+      window.setTimeout(() => URL.revokeObjectURL(fileUrl), 1000)
+      notify(`已导出${result.count}篇文章。`)
+    } catch (error) {
+      notify(error instanceof Error ? error.message : '下载失败，请重试。')
     }
   }
   const deleteLibraryArticle = (id: string) => {
-    const target = articleRows.find((article) => article.id === id)
-    setArticleRows((current) => current.filter((article) => article.id !== id))
+    const target = scopedArticles.find((article) => article.id === id)
+    if (!target) return
+    setArticleRows((current) => current.filter((article) => article.id !== id || article.project !== activeBrand))
     setSelectedArticles((current) => current.filter((item) => item !== id))
     notify(`${target?.title ?? '文章'}已从成品文章库删除。`)
   }
@@ -3774,25 +3782,17 @@ function LibraryPage({ notify, navigate, articleRows, setArticleRows, activeBran
     downloadArticles(targets, `${activeBrand}_${taskForBatch?.name ?? '当前任务'}_成品文章`)
   }
   const downloadAllArticles = () => {
-    downloadArticles(allBrandPassedArticles, `${effectiveShowAllBrands ? '全部品牌' : activeBrand}_全部成品文章`)
+    downloadArticles(allBrandPassedArticles, `${activeBrand}_全部成品文章`)
   }
   return (
     <section className="operation-page">
       <div className="operation-toolbar library-toolbar">
         <div>
           <strong>成品文章库</strong>
-          <span>{effectiveShowAllBrands ? '当前显示全部品牌成品文章' : showAllArticles ? `当前显示${activeBrand}全部成品文章` : latestBatchId ? `当前显示最新任务：${taskForBatch?.name ?? selectedBatch?.taskName ?? latestBatchId}` : '这里只放已生成文章，后续可选分发平台。'}</span>
+          <span>{showAllArticles ? `当前显示${activeBrand}全部成品文章` : latestBatchId ? `当前显示最新任务：${taskForBatch?.name ?? selectedBatch?.taskName ?? latestBatchId}` : '这里只放已生成文章，后续可选分发平台。'}</span>
         </div>
         <div className="toolbar-actions">
           <div className="toolbar-group">
-            <button className="ghost-button" disabled={!articleRows.some((article) => article.status === '已生成')} onClick={() => {
-              setShowAllBrands((current) => !current)
-              setShowAllArticles(true)
-              setSelectedArticles([])
-              setPreviewId('')
-            }}>
-              {effectiveShowAllBrands && activeBrandHasGeneratedArticles ? '只看当前品牌' : '全部品牌'}
-            </button>
             <button className="ghost-button" disabled={!allBrandPassedArticles.length} onClick={() => {
               setShowAllArticles((current) => !current)
               setSelectedArticles([])
@@ -3879,7 +3879,7 @@ function LibraryPage({ notify, navigate, articleRows, setArticleRows, activeBran
             <button className="primary-button" onClick={() => navigate('tasks')}>回到写作任务</button>
           </div>
         )}
-        <p className="table-note">{showAllArticles || showAllBrands ? `当前视图共 ${allCurrentBatchArticles.length} 篇文章，已生成 ${passedArticles.length} 篇。` : `当前任务共 ${allCurrentBatchArticles.length} 篇，已生成 ${passedArticles.length} 篇。`} 不勾选时默认下载当前视图全部已生成文章。</p>
+        <p className="table-note">{showAllArticles ? `当前视图共 ${allCurrentBatchArticles.length} 篇文章，已生成 ${passedArticles.length} 篇。` : `当前任务共 ${allCurrentBatchArticles.length} 篇，已生成 ${passedArticles.length} 篇。`} 不勾选时默认下载当前视图全部已生成文章。</p>
       </div>
       {previewArticle && (
         <div className="modal-backdrop">
@@ -3900,8 +3900,12 @@ function LibraryPage({ notify, navigate, articleRows, setArticleRows, activeBran
                   </label>
                   <label>
                     <span>文章正文</span>
-                    <textarea value={editArticleBody} onChange={(event) => setEditArticleBody(event.target.value)} />
+                    <textarea aria-label="文章正文" ref={bodyEditorRef} value={editArticleBody} onChange={(event) => setEditArticleBody(event.target.value)} />
                   </label>
+                  <label><span>插入当前品牌图片</span><select aria-label="插入当前品牌图片" value="" onChange={event => {
+                    const row = editorImages.find(image => image[5] === event.target.value)
+                    if (row) insertImage(row)
+                  }}><option value="">选择图片插入光标位置</option>{editorImages.map(row => <option key={row[5]} value={row[5]}>{row[6] || row[1]}</option>)}</select></label>
                 </div>
               ) : (
                 <article className="article-page-view">
@@ -3909,7 +3913,7 @@ function LibraryPage({ notify, navigate, articleRows, setArticleRows, activeBran
                   <div className="article-meta-line">
                     <span>核心词：{previewArticle.keyword}</span>
                     <span>字数：{previewArticle.words}字</span>
-                    <span>配图：{previewArticle.imagePaths?.length || imageCountForArticle(previewArticle)}张</span>
+                    <span>配图：{imageCountForArticle(previewArticle)}张</span>
                     <span>{displayGenerationSource(previewArticle.generationSource)}</span>
                   </div>
                   <div className="article-content-view">
@@ -4534,12 +4538,22 @@ function SectionTitle({ icon: Icon, title, desc }: { icon: LucideIcon; title: st
   )
 }
 
+function ProjectApp() {
+  const [scope, setScope] = useState(identityKey)
+  useEffect(() => {
+    const changed = () => setScope(identityKey())
+    window.addEventListener('geo:identity-changed', changed)
+    return () => window.removeEventListener('geo:identity-changed', changed)
+  }, [])
+  return <App key={scope} />
+}
+
 const rootElement = document.getElementById('root')!
 const windowWithRoot = window as typeof window & { __geoContentRoot?: ReturnType<typeof ReactDOM.createRoot> }
 windowWithRoot.__geoContentRoot ??= ReactDOM.createRoot(rootElement)
 windowWithRoot.__geoContentRoot.render(
   <StrictMode>
-    <App />
+    <ProjectApp />
   </StrictMode>,
 )
 
