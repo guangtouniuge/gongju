@@ -18,7 +18,20 @@ await page.route('**/api/**', async route => {
   }
   if (url.pathname === '/api/admin/users' && request.method() === 'POST') {
     const body = request.postDataJSON()
-    users.push({ id: `u-${users.length + 1}`, username: body.username, displayName: body.displayName || body.username, role: body.role, status: 'active', workspaceId: body.workspaceId || `workspace-${users.length + 1}` })
+    const id = `u-${users.length + 1}`
+    const agentId = body.role === 'agent' ? body.agentId || `agent-${users.length + 1}` : body.agentId || 'agent-1'
+    const projectId = ['project_admin', 'project_operator'].includes(body.role) ? body.projectId || `project-${users.length + 1}` : ''
+    users.push({
+      id,
+      username: body.username,
+      displayName: body.displayName || body.username,
+      role: body.role,
+      status: 'active',
+      workspaceId: projectId || agentId || `workspace-${users.length + 1}`,
+      agentId,
+      projectId,
+      projectName: body.projectName || body.displayName || body.username,
+    })
     return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ ok: true, user: users.at(-1) }) })
   }
   if (url.pathname === '/api/admin/users/update' && request.method() === 'POST') {
@@ -26,6 +39,12 @@ await page.route('**/api/**', async route => {
     const user = users.find(row => row.id === body.id)
     if (user) Object.assign(user, body)
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, user }) })
+  }
+  if (url.pathname === '/api/projects/summary' && request.method() === 'GET') {
+    const projects = users
+      .filter(user => user.projectId)
+      .map(user => ({ projectId: user.projectId, agentId: user.agentId, projectName: user.projectName, status: 'ACTIVE', brands: 1, articles: 2, tasks: 1, updatedAt: new Date().toISOString() }))
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, projects }) })
   }
   return route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"value":null}' })
 })
@@ -45,6 +64,18 @@ try {
   await page.getByText('UI验收代理').waitFor()
   await page.getByLabel('后台入口', { exact: true }).selectOption('agency')
   await page.getByRole('button', { name: '查看项目' }).click()
+  await page.getByRole('button', { name: '进入项目账户', exact: true }).click()
+  await page.getByText('代理创建客户项目管理员和操作员').waitFor()
+  await page.locator('.operation-page').getByRole('button', { name: '添加项目账号', exact: true }).click()
+  await page.getByLabel('登录账号', { exact: true }).fill('ui-project-admin')
+  await page.getByLabel('显示名称', { exact: true }).fill('UI验收项目管理员')
+  await page.getByLabel('初始密码', { exact: true }).fill('Safe-ui-project-password')
+  await page.getByLabel('项目名称', { exact: true }).fill('验收客户项目')
+  await page.getByRole('button', { name: '保存账号', exact: true }).click()
+  await page.getByRole('button', { name: '客户品牌库', exact: true }).click()
+  await page.getByText('验收客户项目').waitFor()
+  await page.getByLabel('后台入口', { exact: true }).selectOption('project')
+  await page.getByRole('button', { name: '没有项目：先添加品牌', exact: true }).click()
   await page.getByRole('button', { name: '添加品牌', exact: true }).click()
   await page.getByRole('button', { name: '取消', exact: true }).click()
   await page.getByRole('button', { name: '添加品牌', exact: true }).click()

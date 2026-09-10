@@ -6792,6 +6792,7 @@ function projectSummaryFor(user) {
       tasks: getStateArray('geo.taskRows').length,
     })))
   }
+  if (user.role === 'super_admin' || user.role === 'agent') return []
   return runInProjectScope(resolveProjectScope(user), () => [{
     projectId: user.projectId,
     agentId: user.agentId,

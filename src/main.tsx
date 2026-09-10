@@ -33,7 +33,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import './styles.css'
-import { AgencyDirectory, ConsoleOverview, EmptyState, ProjectAccountDirectory, consoleNames, type ConsoleKind } from './console-ui'
+import { AgencyDirectory, ConsoleOverview, EmptyState, ProjectAccountDirectory, ProjectSummaryDirectory, consoleNames, type ConsoleKind } from './console-ui'
 import './console.css'
 
 type NavItem = {
@@ -754,6 +754,16 @@ function localChineseDate() {
   return `${year}年${Number(month)}月${Number(day)}日`
 }
 
+function currentIdentityRole() {
+  return window.__geoIdentity?.role || 'project_operator'
+}
+
+function allowedConsoleKinds(role = currentIdentityRole()): ConsoleKind[] {
+  if (role === 'super_admin') return ['platform', 'agency', 'project']
+  if (role === 'agent') return ['agency', 'project']
+  return ['project']
+}
+
 function localNewsYear() {
   return localDate().split('-')[0] || '2026'
 }
@@ -1168,6 +1178,8 @@ type ActionProps = {
 
 function App() {
   const [route, setRoute] = useState(readConsoleRoute)
+  const [identityRole, setIdentityRole] = useState(currentIdentityRole)
+  const allowedKinds = allowedConsoleKinds(identityRole)
   const active = route.page
   const currentNav = consoleNav[route.kind]
   const changeRoute = (kind: ConsoleKind, page: string) => {
@@ -1183,6 +1195,22 @@ function App() {
     window.addEventListener('hashchange', sync)
     return () => window.removeEventListener('hashchange', sync)
   }, [])
+  useEffect(() => {
+    const syncIdentity = () => setIdentityRole(currentIdentityRole())
+    window.addEventListener('geo:identity-changed', syncIdentity)
+    window.addEventListener('focus', syncIdentity)
+    syncIdentity()
+    return () => {
+      window.removeEventListener('geo:identity-changed', syncIdentity)
+      window.removeEventListener('focus', syncIdentity)
+    }
+  }, [])
+  useEffect(() => {
+    if (!allowedKinds.includes(route.kind)) {
+      const nextKind = allowedKinds[0] || 'project'
+      changeRoute(nextKind, nextKind === 'project' ? 'dashboard' : 'overview')
+    }
+  }, [identityRole, route.kind])
   const [expandedNav, setExpandedNav] = useState<string[]>([])
   const [notice, setNotice] = useState('')
   const [articleRows, setArticleRows] = useStoredState<Article[]>('geo.articleRows', articles)
@@ -1228,7 +1256,7 @@ function App() {
           const kind = e.target.value as ConsoleKind
           setExpandedNav([])
           changeRoute(kind, kind === 'project' ? 'dashboard' : 'overview')
-        }}>{Object.entries(consoleNames).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+        }}>{allowedKinds.map(value => <option key={value} value={value}>{consoleNames[value]}</option>)}</select></label>
         <nav className="nav" aria-label={`${consoleNames[route.kind]}导航`}>
           {currentNav.map((item) => {
             const hasActiveChild = Boolean(item.children?.some((child) => child.id === active))
@@ -1272,7 +1300,8 @@ function App() {
         {active === 'agencies' && <AgencyDirectory />}
         {active === 'accounts' && <ProjectAccountDirectory />}
         {active === 'dashboard' && <Dashboard navigate={setActive} notify={notify} articleRows={articleRows} />}
-        {active === 'projects' && <Projects navigate={setActive} notify={notify} projectRows={projectRows} setProjectRows={setProjectRows} activeBrand={activeBrand} setActiveBrand={selectActiveBrand} setActiveKeyword={setActiveKeyword} setArticleRows={setArticleRows} />}
+        {active === 'projects' && route.kind !== 'project' && <ProjectSummaryDirectory onAccounts={route.kind === 'agency' ? () => setActive('accounts') : undefined} />}
+        {active === 'projects' && route.kind === 'project' && <Projects navigate={setActive} notify={notify} projectRows={projectRows} setProjectRows={setProjectRows} activeBrand={activeBrand} setActiveBrand={selectActiveBrand} setActiveKeyword={setActiveKeyword} setArticleRows={setArticleRows} />}
         {active === 'visibility' && <Diagnosis navigate={setActive} notify={notify} />}
         {active === 'reports' && <Reports navigate={setActive} notify={notify} />}
         {active === 'keywords' && <Keywords navigate={setActive} notify={notify} projectRows={projectRows} activeBrand={activeBrand} setActiveBrand={selectActiveBrand} activeKeyword={activeKeyword} setActiveKeyword={setActiveKeyword} />}

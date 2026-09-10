@@ -15,6 +15,18 @@ type AccountUser = {
   projectName?: string
 }
 
+type ProjectSummary = {
+  projectId: string
+  agentId?: string
+  projectName?: string
+  status?: string
+  createdAt?: string
+  updatedAt?: string
+  brands?: number
+  articles?: number
+  tasks?: number
+}
+
 const roleLabels: Record<AccountUser['role'], string> = {
   super_admin: '总后台管理员',
   agent: '代理账号',
@@ -133,6 +145,36 @@ export function AgencyDirectory() {
 
 export function ProjectAccountDirectory() {
   return <AccountDirectory mode="projects" />
+}
+
+export function ProjectSummaryDirectory({ onAccounts }: { onAccounts?: () => void }) {
+  const [rows, setRows] = useState<ProjectSummary[]>([])
+  const [query, setQuery] = useState('')
+  const [message, setMessage] = useState('')
+  const [loading, setLoading] = useState(true)
+  const load = async () => {
+    setLoading(true); setMessage('')
+    try {
+      const result = await accountRequest<{ projects: ProjectSummary[] }>('/api/projects/summary')
+      setRows(Array.isArray(result.projects) ? result.projects : [])
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : '项目列表加载失败')
+      setRows([])
+    } finally {
+      setLoading(false)
+    }
+  }
+  useEffect(() => { void load() }, [])
+  const visible = rows.filter(row => !query.trim() || `${row.projectName || ''}${row.projectId}${row.agentId || ''}`.includes(query.trim()))
+  return <section className="operation-page">
+    <PageHeader title="客户项目库" description="这里查看代理和项目账号创建出的客户项目；进入具体内容生产请使用项目账号登录项目后台。" actions={<><button className="ghost-button" onClick={() => void load()}>刷新</button>{onAccounts && <button className="primary-button" onClick={onAccounts}>进入项目账户</button>}</>} />
+    <div className="panel">
+      <div className="list-toolbar"><input className="search-input" aria-label="搜索项目" placeholder="搜索项目名称、项目编号或代理编号" value={query} onChange={event => setQuery(event.target.value)} /><span>{loading ? '加载中…' : `共 ${visible.length} 个项目`}</span></div>
+      <div className="table-scroll"><table className="management-table"><thead><tr><th>项目名称</th><th>项目编号</th><th>代理编号</th><th>资料规模</th><th>状态</th><th>更新时间</th></tr></thead><tbody>{visible.map(row => <tr key={row.projectId}><td><strong>{row.projectName || row.projectId}</strong></td><td><code>{row.projectId}</code></td><td>{row.agentId || '—'}</td><td>品牌 {row.brands || 0} · 文章 {row.articles || 0} · 任务 {row.tasks || 0}</td><td><span className="pill">{row.status === 'DISABLED' ? '停用' : '启用'}</span></td><td>{row.updatedAt ? new Date(row.updatedAt).toLocaleString('zh-CN') : '—'}</td></tr>)}</tbody></table></div>
+      {!visible.length && !loading && <EmptyState title={query ? '没有匹配项目' : '还没有客户项目'} description={query ? '换个项目名称或编号再查。' : '先在项目账户中创建客户项目账号，项目会自动出现在这里。'} action={onAccounts && <button className="primary-button" onClick={onAccounts}>进入项目账户</button>} />}
+      {message && <p className="table-note" role="status">{message}</p>}
+    </div>
+  </section>
 }
 
 export function ConsoleOverview({ kind, projectCount, articleCount, onProjects }: { kind: ConsoleKind; projectCount: number; articleCount: number; onProjects: () => void }) {
