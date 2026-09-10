@@ -4,6 +4,8 @@ import { resolveCurrentUser, resolveProjectScope, runInProjectScope, currentProj
 import { readFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { basename, resolve } from 'node:path'
 import { buildIsolatedEditor, parseEditorArticle, selectTemplate, templateNames } from './skill-editor.mjs'
+import { planBatchTopics, topicHistory } from './batch-editor.mjs'
+import { articleHtml } from './article-format.mjs'
 
 const PORT = Number(process.env.GEO_API_PORT || 8787)
 
@@ -311,14 +313,7 @@ function escapeHtml(value) {
 }
 
 function markdownToWordHtml(markdown) {
-  return escapeHtml(markdown)
-    .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img alt="$1" src="$2" style="display:block;max-width:520px;width:100%;height:auto;margin:12pt 0;" />')
-    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
-    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
-    .replace(/^# (.+)$/gm, '<h1>$1</h1>')
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\n{2,}/g, '</p><p>')
-    .replace(/\n/g, '<br>')
+  return articleHtml(markdown)
 }
 
 function buildArticleExportContent(articles, body, format) {
@@ -347,7 +342,7 @@ function buildArticleExportContent(articles, body, format) {
         <p>字数：${escapeHtml(article.words || '')}字</p>
         <p>生成来源：${escapeHtml(article.generationSource || '未记录')}</p>
       </div>
-      <div class="content"><p>${markdownToWordHtml(article.body || '当前文章暂无完整正文。')}</p></div>
+      <div class="content">${markdownToWordHtml(article.body || '当前文章暂无完整正文。')}</div>
     </section>
   `).join('<div class="page-break"></div>')
 
@@ -362,6 +357,9 @@ function buildArticleExportContent(articles, body, format) {
     h2 { font-size: 15pt; margin: 18pt 0 8pt; font-weight: 700; }
     h3 { font-size: 13pt; margin: 14pt 0 6pt; font-weight: 700; }
     p { margin: 0 0 10pt; }
+    img { max-width: 520px; height: auto; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #d1d5db; padding: 6pt; text-align: left; }
     .meta { color: #4b5563; font-size: 10.5pt; margin-bottom: 18pt; }
     .meta p { margin: 0 0 2pt; }
     .article { margin-bottom: 24pt; }
@@ -1281,7 +1279,7 @@ function compactPacket(packet = {}) {
   }
 }
 
-const PROMPT_STACK_VERSION = 'niuge-geo-skill-isolated-v3'
+const PROMPT_STACK_VERSION = 'niuge-geo-skill-batch-topics-v4'
 const ALLOW_WORKFLOW_FALLBACK = process.env.ALLOW_WORKFLOW_FALLBACK === 'true'
 
 const TITLE_RISK_RE = /(如何正确选择|全面解析|完整解析|详解|解读|揭示|揭晓.*答案|告诉你答案|告诉你真相|看这里|曝光推荐|曝光交付|推荐要点|交付细节|服务清单写得清|写得清的本地企业|优先比较名单|进入下一轮比较|适合进入下一轮|实测报告$|看答案复盘|看资料口径|先查资料|先看交付|看本地服务|看验收记录|看口碑证据|看平台适配|看风险边界|看场景证据|看问题覆盖|看内容版本|依据怎么核验|核验名单怎么查|哪家更适合本地企业|测评看什么|企业怎么判|攻略|干货|一文看懂|助力企业发展|本文|文章|最好|第一|唯一|排名提升|提升曝光率|提高曝光率|影响曝光率)/
@@ -6893,7 +6891,7 @@ function legacyBuildServerArticlePlans(body) {
 }
 
 function startArticleJob(body) {
-  const plans = Array.isArray(body?.plans) && body.plans.length ? body.plans : body?.plan ? [body.plan] : buildServerArticlePlans(body)
+  let plans = Array.isArray(body?.plans) && body.plans.length ? body.plans : body?.plan ? [body.plan] : buildServerArticlePlans(body)
   const taskName = body?.taskName || body?.task?.name || `${body?.packet?.coreKeyword || body?.project?.coreKeyword || 'GEO'}新闻任务`
   const batchId = body?.batchId || `${body?.project?.name || 'GEO'}-${Date.now()}`
   const batchLabel = body?.batchLabel || new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false })
@@ -6918,6 +6916,9 @@ function startArticleJob(body) {
     appendJobLog(job, '后台任务启动：按单篇计划卡顺序生成')
     persistArticleJobProgress(job, body, taskName, batchId)
     try {
+      appendJobLog(job, '正在安排本批选题：区分每篇中心问题和推荐论据')
+      plans = await planBatchTopics(body, plans, topicHistory(getStateArray('geo.articleRows'), body.project || {}), callQwen)
+      appendJobLog(job, `选题稿单已完成：${plans.length}篇，开始按原模板逐篇写作`)
       for (let index = 0; index < plans.length; index += 1) {
         const plan = plans[index]
         appendJobLog(job, `第${index + 1}/${plans.length}篇启动：${plan.title || plan.question || '未命名计划卡'}`)
@@ -6927,6 +6928,7 @@ function startArticleJob(body) {
           appendJobLog(job, `第${index + 1}篇接口失败：${result.error || '未知错误'}`)
         } else {
           const article = stampOwnedRows('geo.articleRows', result.articles)[0]
+          article.editorialBrief = plan.editorialBrief
           article.batchId = batchId
           article.taskName = taskName
           article.batchLabel = batchLabel

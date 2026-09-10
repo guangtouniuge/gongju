@@ -10,7 +10,7 @@
     "dev:all": "node server/geo-api-server.mjs & vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "test": "npm run build && npm run test:auth && npm run test:project-isolation && node --test server/skill-editor.test.mjs",
+    "test": "npm run build && npm run test:auth && npm run test:project-isolation && node --test server/skill-editor.test.mjs server/batch-editor.test.mjs server/article-format.test.mjs",
     "test:auth": "node --test server/auth.test.mjs",
     "test:project-isolation": "node --test server/project-scope.test.mjs server/project-ui.test.mjs"
   },
@@ -28,9 +28,12 @@
   "homepage": "https://github.com/guangtouniuge/gongju#readme",
   "dependencies": {
     "@vitejs/plugin-react": "^6.1.1",
+    "dompurify": "^3.4.15",
     "lucide-react": "^1.35.0",
+    "marked": "^18.0.12",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
+    "sanitize-html": "^2.17.7",
     "typescript": "^7.0.2",
     "vite": "^8.2.2"
   },

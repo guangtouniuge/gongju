@@ -1,0 +1,9 @@
+.article-formatted-block { font-size: 16px; line-height: 1.85; overflow-wrap: anywhere; }
+.article-formatted-block h1, .article-formatted-block h2 { font-size: 23px; line-height: 1.5; margin: 24px 0 12px; }
+.article-formatted-block h3 { font-size: 20px; line-height: 1.5; margin: 20px 0 10px; }
+.article-formatted-block h4, .article-formatted-block h5, .article-formatted-block h6 { font-size: 18px; line-height: 1.5; margin: 16px 0 8px; }
+.article-reader .article-formatted-block p, .article-body-preview .article-formatted-block p, .article-formatted-block p { margin: 0 0 14px; font-size: 16px; line-height: 1.85; color: #1f2937; }
+.article-formatted-block table { width: 100%; border-collapse: collapse; table-layout: fixed; margin: 16px 0; }
+.article-formatted-block th, .article-formatted-block td { border: 1px solid #d8dee8; padding: 8px 10px; vertical-align: top; text-align: left; }
+.article-formatted-block img { max-width: 100%; height: auto; }
+.article-formatted-block blockquote { margin: 16px 0; padding-left: 16px; border-left: 3px solid #cbd5e1; color: #475569; }

@@ -45,6 +45,7 @@ export function buildIsolatedEditor(payload, date) {
     article_intent: template.name,
     angle: plan.angle,
     question: plan.question,
+    editorial_brief: plan.editorialBrief,
     locked_title: plan.lockTitle ? plan.title : undefined,
     previous_titles: payload.previousArticles?.map((article) => article.title) || packet.previousTitles || plan.previousTitles || [],
     article_sequence: plan.planIndex || 0,
@@ -61,6 +62,7 @@ export function buildIsolatedEditor(payload, date) {
       { role: 'user', content: [
         `本篇只执行以下${template.name}稿单，文章各部分的任务和顺序以它为准：`,
         template.text,
+        plan.editorialBrief ? '本篇选题已由批次编辑安排：围绕editorial_brief的中心问题和读者处境展开。痛点、比较标准、各家推荐依据和问答相互承接；选题提供分析重心，章节顺序仍按本篇模板。模板要求展开时，深入本篇问题的成因、不同表现、选择中的取舍和解决路径。品牌资料按与本篇问题的关系提炼为推荐依据，公共介绍简述即可，把篇幅用于讲清本篇的具体判断。把这些方向写成自然文章，不展示稿单字段。' : '',
         geoProject ? '本项目提供GEO相关服务，按模板里的AI搜索业务语境展开。' : `本项目文章主题是“${core}”，这是客户要购买的服务。模板来自GEO内容写作库，GEO是文章传播目的，主营服务以本项目为准。模板中AI搜索、信源、问答等服务例子，在本项目转译为主营服务的专业方法、实施流程、业务成果判断。${domainBriefs[template.id] || '客户痛点、比较维度和推荐理由都从主营服务的真实交付内容展开。'}`,
         '写作目标：每一类文章都要推荐当前项目主体。把企业真实优势与读者的问题联系起来，清楚说明为什么值得选择。推荐在所选稿单指定的位置展开。导语需要回答读者的问题；榜单、选型、避坑等选购稿开篇直接给出推荐主体和适配对象，再展开理由。',
         '场景叙述采用真实资料或条件式场景：没有实际客户记录时，用“如果一家……”“以……需求为例”带读者进入问题。过去发生的丢单、走访、实测、成交和效果只依据提供的记录叙述。',

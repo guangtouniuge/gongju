@@ -1,4 +1,5 @@
 import { identityKey, projectHeaders, projectStorage, fetchProjectFile } from './project-scope'
+import { articleHtml } from './article-format'
 import { AuthGate } from './auth'
 import { StrictMode, type ChangeEvent, type Dispatch, type SetStateAction, useEffect, useRef, useState } from 'react'
 import ReactDOM from 'react-dom/client'
@@ -1100,12 +1101,7 @@ function renderArticleBody(body = '') {
     if (image) {
       return <figure className="article-image-block" key={`${image.src}-${index}`}><ProjectImage src={image.src} alt={image.alt} /><figcaption>{image.alt}</figcaption></figure>
     }
-    const heading = block.match(/^(#{1,3})\s+(.+)$/)
-    if (heading || (block.length <= 28 && !/[。！？；]/.test(block))) {
-      const text = heading ? heading[2] : block
-      return <h2 key={`${text}-${index}`}>{text}</h2>
-    }
-    return <p key={`${block.slice(0, 16)}-${index}`}>{block.split(/\n/).map((line, lineIndex) => <span key={`${line}-${lineIndex}`}>{line}{lineIndex < block.split(/\n/).length - 1 ? <br /> : null}</span>)}</p>
+    return <div className="article-formatted-block" key={index} dangerouslySetInnerHTML={{ __html: articleHtml(block) }} />
   })
 }
 
@@ -3669,7 +3665,7 @@ function Audit({ notify, navigate, articleRows, setArticleRows, activeBrand, act
           {currentArticle.body && (
             <div className="article-body-preview">
               <strong>生成正文</strong>
-              <pre>{currentArticle.body}</pre>
+              {renderArticleBody(currentArticle.body)}
             </div>
           )}
           <div className="audit-actions">
