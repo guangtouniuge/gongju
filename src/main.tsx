@@ -33,6 +33,8 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import './styles.css'
+import { AgencyDirectory, ConsoleOverview, EmptyState, consoleNames, type ConsoleKind } from './console-ui'
+import './console.css'
 
 type NavItem = {
   id: string
@@ -113,33 +115,54 @@ type ActiveBatchProps = {
 
 const nav: NavItem[] = [
   { id: 'dashboard', label: '首页大屏', icon: LayoutDashboard },
-  { id: 'projects', label: '项目管理', icon: Boxes },
+  { id: 'projects', label: '企业品牌库', icon: Boxes },
   {
     id: 'prep',
-    label: '资料准备',
+    label: '品牌资料库',
     icon: UploadCloud,
     children: [
-      { id: 'keywords', label: '关键词与意图', icon: KeyRound },
-      { id: 'questions', label: '语义关键词库', icon: ListChecks },
+      { id: 'keywords', label: '关键词', icon: KeyRound },
+      { id: 'questions', label: '关键词库', icon: ListChecks },
       { id: 'candidates', label: '榜单服务商', icon: ClipboardCheck },
       { id: 'knowledge', label: '品牌知识库', icon: BookOpenText },
-      { id: 'gallery', label: '图片素材库', icon: GalleryHorizontal },
+      { id: 'gallery', label: '品牌图库', icon: GalleryHorizontal },
     ],
   },
   {
     id: 'article-system',
-    label: '内容生产',
+    label: '品牌文章系统',
     icon: PenLine,
     children: [
-      { id: 'tasks', label: '文章生成', icon: Workflow },
+      { id: 'tasks', label: '生成任务', icon: Workflow },
+      { id: 'audit', label: '文章审核', icon: ClipboardCheck },
       { id: 'library', label: '成品文章库', icon: Library },
     ],
   },
-  { id: 'distribution', label: '分发发布', icon: Send },
+  { id: 'distribution', label: '品牌媒体投喂', icon: Send },
   { id: 'visibility', label: 'AI诊断', icon: Gauge },
-  { id: 'model', label: '模型配置', icon: Database },
-  { id: 'settings', label: '系统设置', icon: Settings },
+  { id: 'data', label: '数据中心', icon: BarChart3 },
 ]
+
+const consoleNav: Record<ConsoleKind, NavItem[]> = {
+  project: nav,
+  platform: [
+    { id: 'overview', label: '平台概览', icon: LayoutDashboard },
+    { id: 'agencies', label: '代理管理', icon: Boxes },
+    { id: 'projects', label: '企业品牌库', icon: Library },
+    { id: 'model', label: '模型配置', icon: Database },
+    { id: 'settings', label: '系统设置', icon: Settings },
+  ],
+  agency: [
+    { id: 'overview', label: '代理工作台', icon: LayoutDashboard },
+    { id: 'projects', label: '客户品牌库', icon: Boxes },
+  ],
+}
+function readConsoleRoute() {
+  const [, candidate, page] = window.location.hash.split('/')
+  const kind: ConsoleKind = candidate === 'platform' || candidate === 'agency' ? candidate : 'project'
+  const items = consoleNav[kind].flatMap(item => item.children || [item])
+  return { kind, page: items.some(item => item.id === page) ? page : items[0].id }
+}
 
 const workflow = [
   ['项目管理', '确定项目名称、推荐名称、公司名称、项目行业和城市。'],
@@ -1136,7 +1159,22 @@ type ActionProps = {
 }
 
 function App() {
-  const [active, setActive] = useState('dashboard')
+  const [route, setRoute] = useState(readConsoleRoute)
+  const active = route.page
+  const currentNav = consoleNav[route.kind]
+  const changeRoute = (kind: ConsoleKind, page: string) => {
+    window.location.hash = `/${kind}/${page}`
+    setRoute({ kind, page })
+  }
+  const setActive = (page: string) => {
+    const belongs = currentNav.some(item => item.id === page || item.children?.some(child => child.id === page))
+    changeRoute(belongs ? route.kind : 'project', page)
+  }
+  useEffect(() => {
+    const sync = () => setRoute(readConsoleRoute())
+    window.addEventListener('hashchange', sync)
+    return () => window.removeEventListener('hashchange', sync)
+  }, [])
   const [expandedNav, setExpandedNav] = useState<string[]>([])
   const [notice, setNotice] = useState('')
   const [articleRows, setArticleRows] = useStoredState<Article[]>('geo.articleRows', articles)
@@ -1174,18 +1212,25 @@ function App() {
         <div className="brand">
           <div className="brand-mark">G</div>
           <div>
-          <strong>曝光率GEO自研系统</strong>
-          <span>资料准备 · API成文 · 分发</span>
+          <strong>geoskill</strong>
+          <span>GEO 内容生产系统</span>
           </div>
         </div>
-        <nav className="nav">
-          {nav.map((item) => {
+        <label className="console-switch">后台入口<select aria-label="后台入口" value={route.kind} onChange={e => {
+          const kind = e.target.value as ConsoleKind
+          setExpandedNav([])
+          changeRoute(kind, kind === 'project' ? 'dashboard' : 'overview')
+        }}>{Object.entries(consoleNames).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+        <nav className="nav" aria-label={`${consoleNames[route.kind]}导航`}>
+          {currentNav.map((item) => {
             const hasActiveChild = Boolean(item.children?.some((child) => child.id === active))
             const expanded = Boolean(item.children && (expandedNav.includes(item.id) || hasActiveChild))
             return (
               <div className="nav-block" key={item.id}>
                 <button
                   className={`nav-item ${isNavActive(item) ? 'active' : ''}`}
+                  aria-current={!item.children && active === item.id ? 'page' : undefined}
+                  aria-expanded={item.children ? expanded : undefined}
                   onClick={() => toggleNav(item)}
                 >
                   <item.icon size={18} />
@@ -1197,6 +1242,7 @@ function App() {
                   {item.children.map((child) => (
                     <button
                       className={`nav-child ${active === child.id ? 'active' : ''}`}
+                      aria-current={active === child.id ? 'page' : undefined}
                       key={child.id}
                       onClick={() => setActive(child.id)}
                     >
@@ -1213,6 +1259,9 @@ function App() {
       </aside>
 
       <main className="workspace">
+        <header className="console-topbar"><div><span>{consoleNames[route.kind]}</span><ChevronRight size={14} /><strong>{currentNav.flatMap(item => item.children || [item]).find(item => item.id === active)?.label}</strong></div>{route.kind === 'project' && <label>当前品牌<select aria-label="当前品牌" value={activeBrand} onChange={e => selectActiveBrand(e.target.value)}><option value="">请选择品牌</option>{projectRows.map(project => <option key={project.name} value={project.name}>{project.name}</option>)}</select></label>}</header>
+        {active === 'overview' && <ConsoleOverview kind={route.kind} projectCount={projectRows.length} articleCount={articleRows.length} onProjects={() => setActive('projects')} />}
+        {active === 'agencies' && <AgencyDirectory />}
         {active === 'dashboard' && <Dashboard navigate={setActive} notify={notify} articleRows={articleRows} />}
         {active === 'projects' && <Projects navigate={setActive} notify={notify} projectRows={projectRows} setProjectRows={setProjectRows} activeBrand={activeBrand} setActiveBrand={selectActiveBrand} setActiveKeyword={setActiveKeyword} setArticleRows={setArticleRows} />}
         {active === 'visibility' && <Diagnosis navigate={setActive} notify={notify} />}
@@ -1223,6 +1272,7 @@ function App() {
         {active === 'knowledge' && <Knowledge navigate={setActive} notify={notify} projectRows={projectRows} activeBrand={activeBrand} setActiveBrand={selectActiveBrand} />}
         {active === 'gallery' && <Gallery notify={notify} projectRows={projectRows} activeBrand={activeBrand} setActiveBrand={selectActiveBrand} />}
         {active === 'tasks' && <Tasks navigate={setActive} notify={notify} projectRows={projectRows} activeBrand={activeBrand} setActiveBrand={selectActiveBrand} articleRows={articleRows} setArticleRows={setArticleRows} activeBatchId={activeBatchId} setActiveBatchId={setActiveBatchId} />}
+        {active === 'audit' && <Audit navigate={setActive} notify={notify} articleRows={articleRows} setArticleRows={setArticleRows} activeBrand={activeBrand} activeBatchId={activeBatchId} />}
         {active === 'library' && <LibraryPage navigate={setActive} notify={notify} articleRows={articleRows} setArticleRows={setArticleRows} activeBrand={activeBrand} activeBatchId={activeBatchId} setActiveBatchId={setActiveBatchId} />}
         {active === 'distribution' && <Distribution navigate={setActive} notify={notify} articleRows={articleRows} activeBrand={activeBrand} />}
         {active === 'data' && <DataCenter navigate={setActive} notify={notify} />}
@@ -1230,7 +1280,7 @@ function App() {
         {active === 'settings' && <SettingsPage navigate={setActive} notify={notify} />}
       </main>
 
-      {notice && <div className="toast">{notice}</div>}
+      {notice && <div className="toast" role="status">{notice}</div>}
     </div>
   )
 }
@@ -1430,6 +1480,7 @@ function Projects({
         <SectionTitle icon={Workflow} title="品牌列表" desc="先添加品牌，再按品牌进入关键词、知识库和生成任务。" />
         <div className="ops-table project-table">
           <div className="ops-head"><span>项目名称</span><span>推荐名称</span><span>行业</span><span>城市</span><span>资料</span><span>状态</span><span>操作</span></div>
+          {!projectRows.length && <EmptyState title="还没有品牌项目" description="点击右上角添加品牌，保存后即可进入项目。" />}
           {projectRows.map((project) => (
             <div className="ops-row" key={project.name}>
               <strong>{project.name}</strong>

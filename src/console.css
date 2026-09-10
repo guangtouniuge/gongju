@@ -1,0 +1,54 @@
+/* Shared management surfaces. Brand production handlers remain in main.tsx. */
+:root { --ui-border: #e2e8f0; --ui-muted: #64748b; --ui-primary: #2563eb; --ui-radius: 10px; }
+body { min-width: 760px; }
+.app { grid-template-columns: 232px minmax(0, 1fr); background: #f4f6f9; }
+.sidebar { padding: 22px 12px; }
+.workspace { min-width: 0; padding: 0 28px 28px; }
+.console-switch { display: grid; gap: 8px; padding: 18px 8px 0; font-size: 12px; color: #aebbd0; }
+.console-switch select { width: 100%; color: #f8fafc; background: #1e293b; border: 1px solid #3b475a; border-radius: 7px; padding: 10px; }
+.console-topbar { min-height: 72px; display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 0 -28px 24px; padding: 14px 28px; background: white; border-bottom: 1px solid var(--ui-border); }
+.console-topbar > div, .console-topbar label { display: flex; gap: 10px; align-items: center; font-size: 13px; }
+.console-topbar span, .console-topbar label { color: var(--ui-muted); }
+.console-topbar select { max-width: 260px; }
+.console-topbar select, .list-toolbar select, .console-form input { min-height: 38px; border: 1px solid #cbd5e1; border-radius: 6px; padding: 7px 10px; background: white; color: #172033; }
+.panel, .operation-toolbar { border-radius: var(--ui-radius); box-shadow: none; }
+.panel { border: 1px solid var(--ui-border); background: #fff; padding: 20px; }
+.operation-toolbar { background: transparent; border: none; padding: 0; min-height: 56px; margin-bottom: 18px; }
+.operation-toolbar strong { font-size: 20px; }
+.operation-toolbar span { color: var(--ui-muted); font-size: 13px; line-height: 1.6; }
+.toolbar-actions { gap: 8px; flex-wrap: wrap; }
+.primary-button, .ghost-button, .danger-button { min-height: 36px; padding: 8px 14px; border-radius: 6px; font-size: 13px; line-height: 1.25; box-shadow: none; }
+.primary-button { background: var(--ui-primary); border: 1px solid var(--ui-primary); color: white; }
+.ghost-button { background: #fff; border: 1px solid #cbd5e1; color: #334155; }
+.danger-button { border: 1px solid #fecaca; }
+button:disabled { cursor: not-allowed; opacity: .45; }
+button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-visible { outline: 3px solid #93c5fd; outline-offset: 2px; }
+.ops-head { background: #f8fafc; font-weight: 600; }
+.ops-row { min-height: 58px; }
+.empty-state { background: #fafbfd; border: 1px dashed var(--ui-border); min-height: 140px; justify-items: center; align-content: center; text-align: center; padding: 28px; }
+.form-modal { border-radius: var(--ui-radius); box-shadow: 0 24px 70px #0f172a30; }
+.modal-head { background: #fff; color: #172033; border-bottom: 1px solid var(--ui-border); }
+.modal-head button { background: #f8fafc; color: #475569; border: 1px solid var(--ui-border); }
+.modal-backdrop { background: #0f172a66; backdrop-filter: blur(2px); }
+.console-dialog { width: min(540px, calc(100vw - 48px)); max-height: 85vh; overflow: auto; padding: 0 22px 22px; border: 1px solid var(--ui-border); }
+.console-dialog::backdrop { background: #0f172a66; }
+.console-dialog .modal-head { margin-top: 0; }
+.console-form, .console-form label { display: grid; gap: 8px; }
+.console-form { gap: 18px; font-size: 14px; }
+.console-form p { color: #b91c1c; margin: 0; }
+.list-toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+.list-toolbar > span { margin-left: auto; font-size: 13px; color: var(--ui-muted); }
+.table-scroll { overflow-x: auto; border: 1px solid var(--ui-border); border-radius: 8px; }
+.management-table { width: 100%; border-collapse: collapse; font-size: 13px; text-align: left; }
+.management-table th { background: #f8fafc; color: #475569; font-weight: 600; }
+.management-table th, .management-table td { padding: 14px; border-bottom: 1px solid var(--ui-border); }
+.management-table tbody tr:last-child td { border-bottom: 0; }
+.management-table tbody tr:hover { background: #f8fafc; }
+.management-table th:first-child { width: 44px; }
+input[type=checkbox] { accent-color: var(--ui-primary); width: 16px; height: 16px; }
+.batch-bar { display: flex; align-items: center; gap: 12px; background: #eff6ff; border: 1px solid #bfdbfe; padding: 10px 14px; border-radius: 8px; margin-bottom: 14px; font-size: 13px; }
+.batch-bar .toolbar-actions { margin-left: auto; }
+.console-metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; margin-bottom: 20px; }
+.console-metrics span { color: var(--ui-muted); font-size: 13px; }
+.console-metrics strong { display: block; font-size: 30px; margin-top: 12px; }
+@media (max-width: 1100px) { .app { grid-template-columns: 202px minmax(0, 1fr); } .workspace { padding: 0 18px 18px; } .console-topbar { margin: 0 -18px 18px; padding: 12px 18px; flex-wrap: wrap; } .operation-toolbar { flex-wrap: wrap; gap: 12px; } }
