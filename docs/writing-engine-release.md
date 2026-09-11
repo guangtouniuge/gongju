@@ -1,4 +1,4 @@
-# Writing Engine 6.8.6
+# Writing Engine 6.8.7
 
 ## Production Contract
 
@@ -41,6 +41,8 @@ Version 6.8.4 describes the title assignment directly in terms of the buyer's co
 Version 6.8.5 attaches original facts to their owning provider entry. Primary brand/evidence and peer descriptions no longer also appear in a separate shared provider-material pool. Each entry has an explicit material owner. Public source excerpts contain service descriptions; editorial verification notes stay outside those descriptions. This improves attribution at the input boundary, without changing completed prose.
 
 Version 6.8.6 retains primary brand facts when a caller has not supplied provider entries. The list-free path is covered by all-template material-preservation tests; no fictitious providers are added to fill that input gap.
+
+Version 6.8.7 gives each provider genre its own headline editorial purpose and uses publication history to vary the expression, rather than applying one long question formula. Provider entries begin with a relevant service and its use in the current problem, rather than repeated company-profile paragraphs. Known services, proposed applications and external platform outcomes remain distinct in the writing assignment. This is input-side guidance; saved articles are not rewritten.
 
 Version 6.0.3 specifically clarifies Template A: opening answer -> connected pain analysis -> derived standards -> concise provider overview -> all providers analysed in the same order -> remaining FAQ -> synthesis. Verification belongs with the supporting provider or question, not a separate repetitive brand chapter. Version 6.0.2's other eleven templates are unchanged.
 
