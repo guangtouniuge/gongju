@@ -1,4 +1,17 @@
-# Writing Engine 7.0.2
+# Writing Engine 7.0.3
+
+## Batch Editorial Decisions
+
+The planner no longer supplies a fixed bank of GEO topic examples. It compares
+previous business problems, decision focuses and title angles, then plans the batch
+as distinct buyer decisions. Each brief carries its decision focus, title angle,
+opening answer and reasoning path alongside source excerpts. These are per-article
+editorial judgments, not replacement sections; the selected original Skill template
+still owns structure. Old briefs remain compatible. Output is not rewritten.
+
+The live verification runner supports an explicit scene mode so a same-industry,
+same-template batch can be tested without alternating industries. Version 7.0.3
+passes 43 functional checks; prose acceptance is recorded separately from tests.
 
 ## Per-Article Source Handoff
 

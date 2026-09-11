@@ -38,6 +38,27 @@ test('history belongs to the selected project only', () => {
   assert.deepEqual(topicHistory([{ project: 'a', title: 'a' }, { project: 'b', title: 'b' }], { name: 'a' }).map(x => x.title), ['a'])
 })
 
+test('same-type batch carries distinct editorial decisions without replacing the template', async () => {
+  const assignments = Array.from({ length: 3 }, (_, planIndex) => ({ articleType: '榜单推荐', planIndex, writingSceneMode: '按自己行业写' }))
+  const history = [{ title: '旧标题', brief: { centralQuestion: '旧问题', decisionFocus: '旧决策', titleAngle: '旧角度' } }]
+  const plans = await planBatchTopics({}, assignments, history, async messages => {
+    const input = JSON.parse(messages[1].content.split('项目资料：\n')[1])
+    assert.equal(input.topicExamples, undefined)
+    assert.equal(input.previousTopics[0].businessProblem, '旧问题')
+    assert.equal(input.previousTopics[0].decisionFocus, '旧决策')
+    return { ok: true, content: JSON.stringify({ briefs: assignments.map((_, id) => ({ id, businessProblem: `问题${id}`, readerSituation: `处境${id}`, decisionFocus: `决策${id}`, titleAngle: `标题方向${id}`, openingAnswer: `直接答案${id}`, reasoningPath: `推荐推理${id}`, sectionTasks: ['OTHER_OUTLINE'] })) }) }
+  })
+  for (const [id, plan] of plans.entries()) {
+    const editor = buildIsolatedEditor({ plan }, '2026年9月')
+    assert.equal(editor.input.topic.decisionFocus, `决策${id}`)
+    assert.equal(editor.input.topic.openingAnswer, `直接答案${id}`)
+    assert.equal(editor.input.topic.reasoningPath, `推荐推理${id}`)
+    assert.equal(editor.input.topic.titleAngle, `标题方向${id}`)
+    assert.ok(!editor.messages[1].content.includes('OTHER_OUTLINE'))
+    assert.ok(editor.messages[1].content.endsWith(selectTemplate('榜单推荐').text))
+  }
+})
+
 test('topic handoff selects source excerpts and keeps the two customer identities', async () => {
   const payload = { project: { brand: '服务公司' }, packet: { coreKeyword: 'GEO公司', brandAssets: ['提供门店资料梳理。提供多城市运营。'], authorityEvidence: ['品牌自行提供的服务说明。'] } }
   const [plan] = await planBatchTopics(payload, [{ articleType: '问答解释', writingSceneMode: '按实际场景写' }], [], async messages => {

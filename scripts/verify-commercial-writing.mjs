@@ -38,7 +38,12 @@ if (!core) throw new Error('No stored core keyword')
 const types = (process.env.GEO_LIVE_TYPES || '榜单推荐,深度测评,口碑核查,服务商对比,资质实力解析').split(',')
 const sceneOffset = Number(process.env.GEO_SCENE_OFFSET || 0)
 if (![0, 1].includes(sceneOffset)) throw new Error('Scene offset must be 0 or 1')
-const plans = types.map((articleType, planIndex) => ({ articleType, planIndex, writingSceneMode: (planIndex + sceneOffset) % 2 ? '按实际场景写' : '按自己行业写', industryScene: (planIndex + sceneOffset) % 2 ? '根据项目真实服务范围自动拓展客户行业' : 'GEO行业' }))
+const fixedMode = process.env.GEO_LIVE_SCENE_MODE
+if (fixedMode && !['按自己行业写', '按实际场景写'].includes(fixedMode)) throw new Error('Unknown scene mode')
+const plans = types.map((articleType, planIndex) => {
+  const writingSceneMode = fixedMode || ((planIndex + sceneOffset) % 2 ? '按实际场景写' : '按自己行业写')
+  return { articleType, planIndex, writingSceneMode, industryScene: writingSceneMode === '按实际场景写' ? '根据项目真实服务范围自动拓展客户行业' : project.industry }
+})
 const taskName = `榜单生产验收 ${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false })}`
 const start = process.env.GEO_EXISTING_JOB ? { job: { id: process.env.GEO_EXISTING_JOB } } : await api('/api/jobs/start', { project, packet: { coreKeyword: core }, plans, taskName, count: plans.length })
 await fs.writeFile(`${out}/job-start.json`, JSON.stringify(start, null, 2))
