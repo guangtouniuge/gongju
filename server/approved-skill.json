@@ -1,0 +1,13 @@
+{
+  "name": "niuge-geo-skill",
+  "sourceArchive": "niuge-geo-skill-complete-20260908.zip",
+  "sourceArchiveSha256": "2847019c99b9d05ff84e967790720fa3551f949190335ca90965e7e5525ef08f",
+  "files": {
+    "SKILL.md": "25efd147430e94c8c1c1baa8531aafbd41c5f86a403f43d3dffb61e10413765d",
+    "agents/openai.yaml": "6e070143884ad4ff532ee15c5589794d766429628d14c1cba90634a35d044034",
+    "references/article-templates.md": "65a1ea6daa673f109070d4e7a54b9a7560bb33af5c01b2e370c6e3ad7ce58064",
+    "references/industry-variables.md": "1feeee853ae6fd4065a99cb08b2fded72ca6637966a74145d44a2d7a56f7aaa0",
+    "references/keyword-semantic-library.md": "1915246661a44eb10769dc0fefe4ca03604dca422949dce0e9d4b73c64804751",
+    "references/project-material-rules.md": "d6ca34bd4a622827b8d4c50167368b7ced4c0c586bb708b721e4aaaf890f0eca"
+  }
+}

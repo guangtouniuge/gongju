@@ -5,7 +5,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { runWritingEngine, writingRelease } from './writing-engine.mjs'
-import { verifyWritingRelease } from './writing-release.mjs'
+import { verifyWritingRelease, verifyApprovedSkill, contentHash } from './writing-release.mjs'
 import { templateNames } from './skill-editor.mjs'
 
 const payload = { project: { name: '测试项目', brand: '测试品牌', legacyPrompt: 'OLD_INJECTION' }, packet: { coreKeyword: '咨询公司' }, plan: { editorialBrief: { centralQuestion: '如何选择', readerSituation: '连锁企业', argumentSpine: '问题到能力到推荐' } } }
@@ -77,5 +77,10 @@ test('release detects altered production files, without checking article scores'
     assert.equal(verifyWritingRelease(root).version, writingRelease.version)
     fs.appendFileSync(path.join(temp, 'skill-editor.mjs'), '\n// accidental legacy change\n')
     assert.throws(() => verifyWritingRelease(root), /integrity mismatch/)
+    const skillPath = 'skills/niuge-geo-skill/references/article-templates.md'
+    fs.appendFileSync(path.join(temp, skillPath), '\nAltered Skill\n')
+    manifest.files[skillPath] = contentHash(fs.readFileSync(path.join(temp, skillPath), 'utf8'))
+    fs.writeFileSync(path.join(temp, 'writing-release.json'), JSON.stringify(manifest))
+    assert.throws(() => verifyApprovedSkill(root), /Approved Skill changed/)
   } finally { fs.rmSync(temp, { recursive: true, force: true }) }
 })

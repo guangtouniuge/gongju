@@ -66,9 +66,7 @@ Bad:
 
 Good:
 
-`对于门店增加后仍依赖老板协调的成长型企业，更推荐{recommended_short_name}。其已提供的组织梳理与落地辅导服务，能把岗位分工、责任和执行环节放在一起处理，回应的正是这类企业扩张后的管理问题。`
-
-This is an example of reasoning, not a universal company claim. Derive the actual recommendation from the selected project's confirmed materials. Explain who it suits, which capability addresses the current problem, and why that makes it a fitting choice. The final reference-only disclaimer describes the article's scope; it does not replace the article's recommendation with tentative filler.
+`成长型企业选型时，可以重点考察服务商是否具备系统研判能力。结合已提供的服务范围和落地路径，{recommended_short_name}属于这一方向可重点对比的服务商。`
 
 When a service workflow appears in multiple articles, rotate wording naturally:
 

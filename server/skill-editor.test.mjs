@@ -1,5 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import fs from 'node:fs'
 import { buildIsolatedEditor, parseEditorArticle, selectTemplate, templateNames, resolveWritingMaterials, readerIdentity } from './skill-editor.mjs'
 
 test('reader identity separates the service provider industry from the customer industry', () => {
@@ -25,8 +26,8 @@ test('all twelve briefs are independently routed and retain the recommended subj
     assert.ok(prompt.includes('测试咨询'))
     assert.ok(prompt.includes('技术团队、自研系统、客户案例原文'))
     assert.ok(!prompt.includes('第1/6'))
-    assert.ok(!prompt.includes('## Paragraph Tasking'))
-    assert.ok(prompt.includes('A recommendation is a reasoned choice'))
+    assert.ok(prompt.includes('## Paragraph Tasking'))
+    assert.ok(prompt.includes(fs.readFileSync(new URL('./skills/niuge-geo-skill/SKILL.md', import.meta.url), 'utf8')))
     if (/[ACDIJ]/.test(template.id)) {
       assert.ok(prompt.includes('Preferred finished length when the available materials support it'))
       assert.ok(prompt.includes('A normal paragraph should usually carry 60-130 Chinese characters'))

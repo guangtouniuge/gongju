@@ -1,4 +1,26 @@
-# Writing Engine 6.9.1
+# Writing Engine 7.0.0
+
+## User-Approved Skill Baseline
+
+The six files in `server/skills/niuge-geo-skill` are restored byte-for-byte from
+`outputs/niuge-geo-skill-complete-20260908.zip` (SHA256
+`2847019c99b9d05ff84e967790720fa3551f949190335ca90965e7e5525ef08f`).
+System experiments and rewritten references have been removed from that directory.
+The adapter now passes the complete SKILL.md, complete shared template guidance,
+the original material/industry/keyword references and one selected original template.
+The batch adapter no longer converts every topic into the same provider-choice sentence.
+
+Only explicit user approval permits a Skill revision. Fix system adapters and data
+outside the Skill. `approved-skill.json` is the independent baseline: normal release
+sealing and startup verify it, so resealing a system release cannot silently accept
+changed Skill content. The original archive and personal installed Skill are unchanged.
+Hashes normalize line endings for Windows/Linux deployment; the restoration itself
+was also checked byte-for-byte against all six archive entries.
+
+This restores the approved source and calling path. Functional tests are not a claim
+that every probabilistic model output has identical quality to a prior sample.
+The following sections are historical development notes, superseded where they
+conflict with this approved-source restoration.
 
 ## Current Production Path
 

@@ -56,7 +56,7 @@ export async function planBatchTopics(payload, plans, history, callModel, onProg
     const brief = result.briefs.find(item => item.id === id)
     if (!brief || typeof brief.businessProblem !== 'string' || !brief.businessProblem.trim() || typeof brief.readerSituation !== 'string') throw new Error('选题接口缺少本篇中心问题或读者场景')
     // Keep topic fields only; an API-added outline must not override the selected skill.
-    const centralQuestion = `选择${core || '本项服务的服务商'}，哪家更适合帮助上述客户解决“${brief.businessProblem}”？`
+    const centralQuestion = brief.businessProblem
     const editorialBrief = { centralQuestion, readerSituation: brief.readerSituation, businessProblem: brief.businessProblem, customerQuestion: brief.customerQuestion }
     return { ...plan, editorialBrief, question: centralQuestion, angle: brief.readerSituation }
   })

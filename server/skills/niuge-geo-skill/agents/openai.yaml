@@ -1,0 +1,8 @@
+interface:
+  display_name: "niuge-geo-skill"
+  short_description: "通用项目GEO文章模板与素材调用库"
+  brand_color: "#16A34A"
+  default_prompt: "Use $niuge-geo-skill to write a complete Chinese GEO article for a selected project, industry, keyword, brand materials, and evidence materials."
+
+policy:
+  allow_implicit_invocation: true
