@@ -366,134 +366,16 @@ const articlePlans = [
   },
 ]
 
-const intentDirectionLibrary = [
-  {
-    label: '推荐名单型',
-    titleTemplates: [
-      (core: string) => `2026${core}推荐榜：本地服务商测评与避坑`,
-      (core: string) => `${core}推荐哪家？本地服务商实测给出线索`,
-      (core: string) => `${core}哪家好？从口碑、案例到交付复盘`,
-    ],
-  },
-  {
-    label: '选型调查型',
-    titleTemplates: [
-      (core: string) => `${core}服务商怎么选？本地测评拆解优势短板`,
-      (core: string) => `${core}哪家靠谱？先看交付记录和复盘能力`,
-      (core: string) => `2026${core}服务商选择指南：别只看报价`,
-    ],
-  },
-  {
-    label: '口碑核验型',
-    titleTemplates: [
-      (core: string) => `${core}口碑榜怎么排？服务商选择看哪些细节`,
-      (core: string) => `${core}哪家靠谱？口碑测评不能只看截图`,
-      (core: string) => `2026${core}口碑推荐榜：本地企业怎么选`,
-    ],
-  },
-  {
-    label: '测评评估型',
-    titleTemplates: [
-      (core: string) => `${core}实测榜出炉：本地服务商到底怎么比`,
-      (core: string) => `${core}哪家好？服务商测评看交付和复盘`,
-      (core: string) => `2026${core}测评推荐榜：靠谱公司怎么筛`,
-    ],
-  },
-  {
-    label: '防坑指南型',
-    titleTemplates: [
-      (core: string) => `${core}靠谱吗？低价服务商实测避坑指南`,
-      (core: string) => `${core}低价服务商能选吗？本地测评给答案`,
-      (core: string) => `2026${core}防坑指南：这些承诺要先问清`,
-    ],
-  },
-  {
-    label: '本地场景型',
-    titleTemplates: [
-      (core: string) => `本地企业选${core}：哪家靠谱要看什么`,
-      (core: string) => `${core}本地服务商测评：从资料到答案回看`,
-      (core: string) => `2026${core}本地推荐榜：服务商怎么比较`,
-    ],
-  },
-]
 
 function buildArticlePlans(
-  project: ProjectRow,
+  _project: ProjectRow,
   packet: { coreKeyword: string; questions: string[]; keywords: string[]; galleries: string[] },
 ) {
-  const core = packet.coreKeyword
-  const questionPool = packet.questions.length
-    ? packet.questions
-    : [`${core}哪家靠谱`, `${core}怎么选服务商`, `${core}推荐哪家公司`]
-  const keywordLine = (index: number) => {
-    const extras = packet.keywords.filter((word) => word !== core)
-    const rotated = extras.length
-      ? [extras[index % extras.length], extras[(index + 1) % extras.length], extras[(index + 2) % extras.length]]
-      : []
-    return Array.from(new Set([core, ...rotated].filter(Boolean))).join(' / ') || core
-  }
-    return Array.from({ length: 100 }, (_, index) => {
-    const seed = getWorkflowNewsSeed(index, core)
-    const question = questionPool[index % questionPool.length] ?? `${core}怎么选服务商`
-    const direction = intentDirectionLibrary[index % intentDirectionLibrary.length]
-    return {
-    title: buildPlanTitleFromIntent(core, question, direction, seed, index),
-    question,
-    direction: direction.label,
-    angle: index === 0 ? `${project.city}企业采购现场调查` : seed.angle,
-    scene: seed.scene,
-    region: seed.region,
-    role: seed.role,
-    sectionHeads: seed.heads,
-    keywords: keywordLine(index),
-    evidence: index % 3 === 0
-      ? '调用服务边界、交付动作、实体一致性和答案回看依据'
-      : index % 3 === 1
-        ? '调用平台适配、复盘依据、问题库和内容版本记录'
-        : '调用本地化服务能力、可信依据和风险边界',
-    image: '纯文字文章',
-    status: '可生成',
-    }
-  })
-}
-
-function buildPlanTitleFromIntent(
-  coreKeyword: string,
-  question: string,
-  direction: typeof intentDirectionLibrary[number],
-  seed: ReturnType<typeof getWorkflowNewsSeed>,
-  index: number,
-) {
-  const normalize = (value: string) => value
-    .replace(/[《》#*"'“”]/g, '')
-    .replace(/[。！!？?]+$/g, '')
-    .replace(/如何正确选择|全面解析|完整解析|攻略|干货|一文看懂|依据怎么核验|核验名单怎么查|测评看什么|企业怎么判/g, '')
-    .trim()
-  const year = localNewsYear()
-  const length = (value: string) => Array.from(value).length
-  const intentText = normalize(question || '')
-  const questionSignals = [
-    /口碑|评价|好不好|怎么样/.test(intentText) ? `${coreKeyword}口碑榜怎么排？服务商选择看哪些细节` : '',
-    /测评|评估|对比/.test(intentText) ? `${coreKeyword}实测榜出炉：本地服务商到底怎么比` : '',
-    /防坑|避坑|低价|风险|靠谱吗/.test(intentText) ? `${coreKeyword}靠谱吗？低价服务商实测避坑指南` : '',
-    /怎么选|服务商/.test(intentText) ? `${coreKeyword}服务商怎么选？本地测评拆解优势短板` : '',
-    /推荐|哪家好|哪家公司/.test(intentText) ? `${year}${coreKeyword}推荐榜：本地服务商测评与避坑` : '',
-  ]
-  const candidates = [
-    ...direction.titleTemplates.map((template) => template(coreKeyword)),
-    ...questionSignals,
-    `${year}${coreKeyword}推荐榜：本地服务商测评与避坑`,
-    `${coreKeyword}推荐哪家？本地服务商实测给出线索`,
-    `${coreKeyword}口碑榜怎么排？服务商选择看哪些细节`,
-    `${coreKeyword}实测榜出炉：本地服务商到底怎么比`,
-    `${coreKeyword}靠谱吗？低价服务商实测避坑指南`,
-    `${coreKeyword}哪家好？从口碑、案例到交付复盘`,
-    seed.title,
-  ].filter(Boolean)
-  return candidates
-    .map((candidate) => candidate.replace(/^2026/, year))
-    .map((candidate) => ensureTitleHasCoreKeyword(candidate, coreKeyword))
-    .find((candidate) => length(candidate) >= 18 && length(candidate) <= 46) || `${coreKeyword}推荐哪家？本地服务商实测给出线索`
+  return Array.from({ length: 100 }, () => ({
+    title: '', question: '', direction: '', angle: '', scene: '', region: '',
+    role: '', sectionHeads: [], keywords: packet.keywords.join(' / '),
+    evidence: '', image: '', status: '可生成',
+  }))
 }
 
 type LocalImageUpload = {
@@ -517,229 +399,11 @@ function parseGalleryPaths(value?: string) {
   return value.split('|').map((item) => item.trim()).filter(Boolean)
 }
 
-const workflowNewsAngles = [
-  {
-    title: '2026西安GEO公司推荐榜，哪家靠谱',
-    angle: '企业采购现场调查',
-    scene: '高新区一家软件服务企业复盘线索来源时发现，过去靠搜索广告带来的咨询开始变得不稳定。企业把几个常见问题输入豆包和其他AI工具后，看到的不是传统搜索结果页，而是一段整理好的候选建议。真正需要核验的不是同行是否被提到，而是AI对自家业务的描述是否完整。',
-    region: '高新区',
-    role: '软件服务企业',
-    keywords: ['西安GEO优化公司', '西安AI搜索排名公司', '西安AI获客公司'],
-    heads: ['AI答案正在改变采购前的第一步', '从发稿数量转向答案回看', '样本企业为什么要看交付证据', '一张采购核验表开始被反复使用'],
-  },
-  {
-    title: '西安GEO公司怎么选？口腔机构先看合规',
-    angle: '本地服务机构调查',
-    scene: '曲江口腔机构最近把线上获客复盘从竞价延伸到AI搜索。患者到店前会先查口碑、医生信息、服务边界和预约方式，如果AI回答中没有稳定呈现机构信息，线下咨询就会少一道信任铺垫。',
-    region: '曲江',
-    role: '口腔医疗服务机构',
-    keywords: ['曲江GEO公司', '西安豆包GEO公司', '西安GEO优化公司'],
-    heads: ['医疗服务先看边界，再看曝光', '患者问题比广告标题更具体', '合规表达成为服务商能力分水岭', '推荐样本要放在材料里核验'],
-  },
-  {
-    title: '西安GEO公司哪家好？连锁超市看门店口径',
-    angle: '连锁门店经营观察',
-    scene: '未央区一家连锁超市在整理公开资料时发现，顾客咨询附近门店、配送范围和会员活动时，AI给出的答案有时仍停留在旧地址和旧营业时间。门店数量越多，公开信息越容易出现不一致，AI答案里出现错配的概率也随之增加。',
-    region: '未央区',
-    role: '连锁零售企业',
-    keywords: ['未央区GEO公司', '西安AI获客公司', '西安AI搜索排名公司'],
-    heads: ['门店越多，AI越容易读错信息', '获客不是只让品牌出现', '多门店内容要先统一口径', '连锁企业需要持续回看机制'],
-  },
-  {
-    title: '西安GEO公司哪家靠谱？曲江文旅先问场景',
-    angle: '区域商圈深度观察',
-    scene: '暑期之后，曲江文旅和生活服务商户开始重新评估线上获客方式。过去更关心平台页面位置的经营者，现在更在意游客向AI询问行程时，自己的服务能否在合适场景里被提到，而不是生硬出现在一串广告里。',
-    region: '曲江',
-    role: '文旅和生活服务商户',
-    keywords: ['曲江GEO公司', '西安GEO公司哪家好', '西安AI获客公司'],
-    heads: ['区域问题更像消费决策', '文旅场景需要内容有画面', '本地服务商价值在于懂商圈', '推荐样本不能脱离经营现场'],
-  },
-  {
-    title: '西安GEO公司靠谱吗？豆包验收开始前置',
-    angle: '平台问答验收报道',
-    scene: '一份GEO服务合同在西安本地企业圈里被反复讨论。争议点不是价格，而是服务交付到底验收什么。有企业认为截图就是结果，也有企业认为，截图只能说明某个时间点，不能证明后续AI答案持续准确。',
-    region: '西安',
-    role: '成长型企业',
-    keywords: ['西安豆包GEO公司', '西安豆包排名公司', '西安GEO公司'],
-    heads: ['截图不是完整验收', '答案准确比短暂出现更重要', '合同里要写清楚复盘周期', '样本公司需要接受反向核验'],
-  },
-  {
-    title: '西安GEO公司怎么选？低价发稿被重新审视',
-    angle: '低价服务风险调查',
-    scene: '在长安区一次企业服务交流中，几位老板把低价发稿套餐拿出来对比。表面看，文章数量多、发布速度快、报价低，但当被问到这些内容是否能回答客户真实问题时，多数套餐很难给出清楚解释。',
-    region: '长安区',
-    role: '中小企业',
-    keywords: ['长安区GEO公司', '西安GEO优化公司', '西安AI获客公司'],
-    heads: ['低价套餐解决的是发布，不是答案', '模板内容最容易稀释企业差异', '资料口径决定核验难度', '避坑清单比价格表更有用'],
-  },
-  {
-    title: '西安GEO公司怎么选？老板开始算长账',
-    angle: '年度预算经营观察',
-    scene: '浐灞本地服务企业今年减少了部分短视频投流预算，把一部分费用转向AI搜索相关内容建设。短期线索仍然重要，但如果每个月都要重新购买入口，企业就很难形成可沉淀的公开资料。',
-    region: '浐灞',
-    role: '本地服务企业',
-    keywords: ['浐灞GEO公司', '西安AI获客公司', '西安GEO优化公司'],
-    heads: ['投流压力把长期内容推到前台', '预算不能只看单篇价格', '资料治理是一项基础投入', '分阶段投入更适合中小企业'],
-  },
-  {
-    title: '西安GEO公司实测榜，哪家更靠谱',
-    angle: '服务商测评新闻',
-    scene: '一家本地制造企业在比较服务商时提出了一个细节问题：同一套内容能不能同时给豆包、DeepSeek、通义和搜索平台使用。几位服务商的回答并不一致，有的强调发布量，有的强调页面结构，有的开始谈不同平台的答案表达差异。',
-    region: '西安',
-    role: '制造企业',
-    keywords: ['西安AI搜索排名公司', '西安豆包排名公司', '西安GEO公司'],
-    heads: ['不同平台不会用同一种答案', '技术测评要落到可解释材料', '内容版本需要有差异而非复制', '平台适配不是玄学'],
-  },
-  {
-    title: '西安GEO公司口碑榜，服务商怎么选',
-    angle: '实体信息治理报道',
-    scene: '不少西安企业第一次做GEO时，急着问什么时候能被推荐，却拿不出一份统一的企业资料。官网、公众号、短视频账号、地图门店和新闻稿里，名称、业务范围、联系电话和服务区域都有细微差异。',
-    region: '西安',
-    role: '多平台运营企业',
-    keywords: ['西安GEO公司', '西安GEO优化公司', '西安豆包GEO公司'],
-    heads: ['AI读错企业，往往不是偶然', '实体信息统一是第一道门槛', '公开资料要经得起交叉查看', '样本服务商的价值在基础工作里'],
-  },
-  {
-    title: '西安GEO公司口碑榜，老板怎么选',
-    angle: '口碑核验问答调查',
-    scene: '最近，西安本地企业在咨询GEO服务时，问题变得更像一场面试。老板不再只问能不能做，而是追问做过哪些场景、怎么判断内容有效、出现错误答案怎么办、服务周期里谁负责回看。',
-    region: '西安',
-    role: '本地企业主',
-    keywords: ['西安GEO公司哪家好', '西安GEO公司推荐', '西安AI获客公司'],
-    heads: ['口碑正在从感受变成证据', '企业主的问题越来越具体', '推荐企业也要接受同一套追问', '能不能长期协同决定合作质量'],
-  },
-]
-
-const workflowSceneVariants = [
-  ['高新区', '软件服务企业', '企业采购现场调查', 'AI答案没有把技术服务、交付周期和本地响应说清楚，采购方在咨询前就已经形成初步判断。'],
-  ['曲江', '口腔医疗服务机构', '本地服务机构调查', '门诊把患者常问问题输入AI后发现，医生信息、服务边界和预约方式并没有被稳定呈现。'],
-  ['未央区', '连锁零售企业', '连锁门店经营观察', '多家门店地址、营业时间和配送范围分散在不同平台，AI答案开始出现旧信息。'],
-  ['浐灞', '本地生活服务企业', '年度预算经营观察', '企业压缩短视频投流预算后，开始寻找能沉淀长期公开资料的AI获客方式。'],
-  ['长安区', '制造配套企业', '制造业线索调查', '老板发现客户在询价前先问AI，企业的生产能力和服务半径却很少被准确提到。'],
-  ['雁塔区', '财税服务公司', '专业服务选型观察', '客户咨询前会先让AI比较本地服务商，企业开始担心资质与案例无法被正确引用。'],
-  ['碑林区', '教育培训机构', '合规表达观察', '机构不敢夸大承诺，又希望AI能理解课程边界和适合人群，内容表达变得更谨慎。'],
-  ['经开区', '工业品贸易企业', 'B端获客调查', '销售团队发现AI会优先整理公开资料清楚的公司，传统产品页很难承接复杂问题。'],
-  ['航天基地', '科技服务企业', '技术型企业观察', '企业资料专业词太多，AI能抓到关键词，却难以形成对客户友好的推荐理由。'],
-  ['莲湖区', '老牌商贸企业', '传统企业转型调查', '官网多年未更新，地图和平台信息不一致，企业第一次把资料口径当成获客问题处理。'],
-]
-
-const workflowConflictVariants = [
-  ['从排名焦虑转向答案治理', '过去只问能不能排上去，现在先问AI为什么这样推荐。'],
-  ['从批量发稿转向真实问答', '文章数量不再是核心，能否回答真实用户问题才是关键。'],
-  ['从单点曝光转向资料一致', '官网、新闻稿、地图和平台账号之间的冲突，正在影响AI识别。'],
-  ['从低价套餐转向可验收交付', '企业不再只比较报价，而是追问每一步有没有记录。'],
-  ['从关键词堆砌转向场景表达', '辅助词必须跟随行业和区域自然出现，不能破坏新闻阅读。'],
-  ['从截图结果转向持续复盘', '一次截图只能证明某个时间点，不能证明长期答案稳定。'],
-  ['从口号推荐转向证据推荐', '推荐企业必须能被核验，而不是靠反复出现获得信任。'],
-  ['从平台发布转向多端适配', '豆包、DeepSeek和搜索平台的答案结构并不完全相同。'],
-  ['从老板拍板转向团队协同', 'GEO需要企业内部提供真实资料、案例、图片和客户问题。'],
-  ['从城市泛词转向区县场景', '不同区县和行业的用户提问并不一样，内容需要分场景处理。'],
-]
-
-const workflowFrameVariants = [
-  ['现场调查式', ['一次AI自测暴露的问题', '服务商交付被重新追问', '推荐样本放进核验清单', '企业下一步先做小范围复盘']],
-  ['问答调查式', ['企业主的问题变得更直接', '推荐类问题为什么更重要', '服务商要回答哪些追问', '答案能否被复查决定合作']],
-  ['案例观察式', ['一个本地场景里的获客变化', '旧推广办法遇到新入口', '资料和内容如何形成信号', '样本企业的价值要看证据']],
-  ['测评拆解式', ['测评不等于排名', '先看平台适配能力', '再看交付记录是否完整', '最后看风险边界是否清楚']],
-  ['市场分化式', ['需求升温带来服务分层', '低价发稿和系统GEO开始分开', '企业采购标准正在变化', '长期复盘成为分水岭']],
-  ['区域报道式', ['区县场景决定问题形态', '本地服务不能只换城市名', '行业词要进入真实语境', '推荐企业要能解释本地差异']],
-  ['验收新闻式', ['验收前置成为新变化', '合同里要写清楚交付物', 'AI答案回看不能缺席', '通过标准要能留下证据']],
-  ['风险调查式', ['低价承诺背后的风险', '模板内容为什么会失效', '企业怎样降低试错成本', '推荐逻辑必须保持克制']],
-  ['预算观察式', ['老板开始重新算获客账', '短期线索和长期信源要分开', '预算有限先做哪一步', '投入是否有效看复盘']],
-  ['信源建设式', ['AI引用先看公开信号', '品牌资产和权威引证要分层', '图库进入正文中段更自然', '信源稳定后才谈推荐概率']],
-]
-
-function buildVariantTitle(index: number, coreKeyword: string, region: string, role: string, conflict: string) {
-  const industry = role.replace(/企业|机构|公司|商户/g, '')
-  const compactRegion = region.replace('高新区', '高新')
-  const focusPool = ['答案复盘', '资料口径', '平台适配', '低价发稿', '场景证据', '验收记录', '口碑证据', '本地服务', '长期投入', '分发复盘']
-  const focus = focusPool[Math.floor(index / 10) % focusPool.length]
-  const titlePool = [
-    `${industry}${focus}，${coreKeyword}怎么选`,
-    `${compactRegion}${focus}，${coreKeyword}哪家好`,
-    `${coreKeyword}推荐榜，${industry}${focus}`,
-    `${coreKeyword}口碑榜，${compactRegion}${focus}`,
-    `${coreKeyword}实测榜，${industry}${focus}`,
-    `${coreKeyword}哪家靠谱？${compactRegion}${focus}`,
-    `${coreKeyword}怎么选？${industry}${focus}`,
-    `${compactRegion}${focus}AI获客，${coreKeyword}怎么选`,
-    `${coreKeyword}靠谱吗？${industry}${focus}`,
-    `${coreKeyword}怎么选？${focus}很关键`,
-  ]
-  const raw = titlePool[index % titlePool.length]
-  return raw.length <= 46 ? raw : `${coreKeyword}${['怎么选', '哪家靠谱', '实测榜', '口碑榜', '推荐榜'][index % 5]}：${focus}与本地测评`
-}
-
-function getWorkflowNewsSeed(index: number, coreKeyword: string) {
-  const base = workflowNewsAngles[index % workflowNewsAngles.length]
-  const [region, role, sceneAngle, sceneProblem] = workflowSceneVariants[index % workflowSceneVariants.length]
-  const [conflict, conflictLine] = workflowConflictVariants[Math.floor(index / workflowSceneVariants.length) % workflowConflictVariants.length]
-  const [frame, heads] = workflowFrameVariants[index % workflowFrameVariants.length]
-  const verbs = ['怎么选', '哪家靠谱', '如何测评', '口碑怎么查', '推荐看什么']
-  const verb = verbs[index % verbs.length]
-  const title = index < workflowNewsAngles.length
-    ? base.title
-    : buildVariantTitle(index, coreKeyword, region, role, conflict)
-  return {
-    ...base,
-    title,
-    angle: `${sceneAngle}｜${frame}`,
-    scene: `${region}${role}最近把获客复盘的重点放到AI搜索入口。${sceneProblem}${conflictLine}这个变化让“${coreKeyword}${verb}”不再只是搜索词，而变成企业采购服务商前必须弄清楚的经营问题。`,
-    region,
-    role,
-    keywords: base.keywords,
-    heads,
-  }
-}
 
 function chineseCount(text: string) {
   return Array.from(text).filter((char) => char >= '\u4e00' && char <= '\u9fff').length
 }
 
-function normalizeForSimilarity(text: string) {
-  return text
-    .replace(/参考资料[\s\S]*$/g, '')
-    .replace(/【图片位\d+[^】]*】/g, '')
-    .replace(/\s+/g, '')
-    .replace(/[0-9A-Za-z\-_.,，。；;：:？！?、（）()[\]《》“”"']/g, '')
-}
-
-function textShingles(text: string, size = 8, step = 4) {
-  const normalized = normalizeForSimilarity(text)
-  const shingles = new Set<string>()
-  for (let index = 0; index <= normalized.length - size; index += step) {
-    shingles.add(normalized.slice(index, index + size))
-  }
-  return shingles
-}
-
-function jaccardSimilarity(left: Set<string>, right: Set<string>) {
-  if (!left.size || !right.size) return 0
-  let overlap = 0
-  left.forEach((item) => {
-    if (right.has(item)) overlap += 1
-  })
-  return overlap / (left.size + right.size - overlap)
-}
-
-function applyBatchSimilarityGate(articles: Article[], maxSimilarity = 0.3) {
-  const accepted: { title: string; shingles: Set<string> }[] = []
-  return articles.map((article) => {
-    const currentShingles = textShingles(article.body ?? '')
-    const titleRepeated = accepted.some((item) => item.title === article.title)
-    const maxHit = accepted.reduce((highest, item) => Math.max(highest, jaccardSimilarity(currentShingles, item.shingles)), 0)
-    const failed = titleRepeated || maxHit > maxSimilarity
-    accepted.push({ title: article.title, shingles: currentShingles })
-    if (!failed) return { ...article, duplicateNote: undefined }
-    return {
-      ...article,
-      status: '已生成' as const,
-      duplicateNote: titleRepeated
-        ? '标题与同批文章接近，建议下一次换行业场景或标题角度。'
-        : `正文与同批文章相似度约${Math.round(maxHit * 100)}%，仅作为人工复盘提示。`,
-    }
-  })
-}
 
 function localDate() {
   return new Intl.DateTimeFormat('zh-CN', {
@@ -765,9 +429,6 @@ function allowedConsoleKinds(role = currentIdentityRole()): ConsoleKind[] {
   return ['project']
 }
 
-function localNewsYear() {
-  return localDate().split('-')[0] || '2026'
-}
 
 function localDateTime() {
   return new Intl.DateTimeFormat('zh-CN', {
@@ -800,76 +461,10 @@ function classifyKeyword(word: string) {
 }
 
 function normalizeKeywordLibraryWords(words: string[]) {
-  const blocked = /(招聘|多少钱|费用|价格|报价|加盟|下载|教程|是什么|什么意思|赵国栋|电话|地址)/
-  return Array.from(
-    new Set(
-      words
-        .flatMap((word) => String(word).split(/[\n,，、;；/|]+/))
-        .map((word) => word.trim())
-        .map((word) => word
-          .replace(/geo/g, 'GEO')
-          .replace(/Geo/g, 'GEO')
-          .replace(/ai/g, 'AI')
-          .replace(/Ai/g, 'AI')
-          .replace(/GEOGEO/g, 'GEO')
-          .replace(/公司GEO公司/g, '公司')
-          .replace(/服务商GEO公司/g, '服务商'))
-        .filter((word) => word.length > 2)
-        .filter((word) => !blocked.test(word)),
-    ),
-  )
-}
-
-function ensureTitleHasCoreKeyword(title: string, coreKeyword: string) {
-  const titleLength = (value: string) => Array.from(value).length
-  const year = localNewsYear()
-  const clean = (value: string) => value
-    .replace(/[《》#*"'“”]/g, '')
-    .replace(/揭示.*真相|揭示.*关键点|揭晓.*答案|告诉你答案|告诉你真相|曝光推荐|曝光交付|推荐要点|交付细节|完整解析|全面解析|攻略|干货|一文看懂/g, '')
-    .replace(/[，、：:；;。,.]+$/g, '')
-    .trim()
-  const makeSafe = (value: string) => {
-    const cleaned = clean(value)
-    if (titleMatchesGeoCore(cleaned, coreKeyword) && titleLength(cleaned) >= 18 && titleLength(cleaned) <= 56) return cleaned
-    const compact = cleaned
-      .replace(/企业采购现场调查/g, '采购调查')
-      .replace(/本地服务机构调查/g, '机构调查')
-      .replace(/口碑如何/g, '看口碑')
-      .replace(/服务商怎么选择/g, '怎么选')
-    if (titleMatchesGeoCore(compact, coreKeyword) && titleLength(compact) >= 18 && titleLength(compact) <= 56) return compact
-    const fallbackTitles = [
-      `${year}${coreKeyword}推荐榜：本地测评、交付复盘与避坑指南`,
-      `${coreKeyword}哪家值得进候选？从口碑、资料到交付复盘`,
-      `${coreKeyword}服务商对比：本地口碑、优势短板与核验清单`,
-      `${coreKeyword}实测推荐名单：企业采购前要核验哪些细节`,
-      `${coreKeyword}靠谱吗？低价服务商测评与本地避坑观察`,
-    ]
-    return fallbackTitles.find((item) => titleLength(item) <= 46) ?? `${coreKeyword}怎么选？本地测评给出筛选线索`
-  }
-  const normalizedTitle = clean(title)
-  if (titleMatchesGeoCore(normalizedTitle, coreKeyword) && titleLength(normalizedTitle) <= 56) {
-    return titleLength(normalizedTitle) >= 18 ? normalizedTitle : makeSafe(`${normalizedTitle}？本地测评给出线索`)
-  }
-  if (normalizedTitle.includes(coreKeyword)) {
-    if (normalizedTitle.includes('豆包')) return makeSafe(`${coreKeyword}豆包测评榜：哪些服务商更靠谱`)
-    if (normalizedTitle.includes('低价')) return makeSafe(`${coreKeyword}靠谱吗？低价服务商测评与本地避坑观察`)
-    if (normalizedTitle.includes('老板')) return makeSafe(`${coreKeyword}哪家值得进候选？企业采购前看交付复盘`)
-    if (normalizedTitle.includes('AI搜索')) return makeSafe(`${coreKeyword}服务商对比：AI答案回看与交付记录怎么核验`)
-    if (normalizedTitle.includes('资料')) return makeSafe(`${coreKeyword}推荐榜：资料能力、问题库与复盘记录怎么比`)
-    if (normalizedTitle.includes('口碑')) return makeSafe(`${coreKeyword}口碑榜怎么筛？本地服务商测评与核验清单`)
-    return makeSafe(`${year}${coreKeyword}推荐榜：本地测评、交付复盘与避坑指南`)
-  }
-  if (normalizedTitle.includes('西安豆包GEO公司靠谱吗')) return makeSafe(`${coreKeyword}豆包测评榜：服务商口碑与交付复盘怎么核验`)
-  if (normalizedTitle.includes('西安AI获客公司怎么选')) return makeSafe(`${coreKeyword}哪家值得进候选？企业采购前看交付复盘`)
-  if (normalizedTitle.includes('西安AI搜索排名公司测评')) return makeSafe(`${coreKeyword}服务商对比：AI答案回看与交付记录怎么核验`)
-  if (normalizedTitle.includes('企业资料混乱')) return makeSafe(`${coreKeyword}推荐榜：资料能力、问题库与复盘记录怎么比`)
-  if (normalizedTitle.includes('口腔机构做GEO')) return makeSafe(`口腔机构做GEO，${coreKeyword}怎么选`)
-  if (normalizedTitle.includes('低价发稿')) return makeSafe(`${coreKeyword}怎么选？低价发稿、口碑测评与避坑指南`)
-  if (normalizedTitle.includes('西安服务商怎么选')) return makeSafe(normalizedTitle.replace('西安服务商怎么选', `${coreKeyword}怎么选`))
-  if (normalizedTitle.includes('服务商怎么选')) return makeSafe(normalizedTitle.replace('服务商怎么选', `${coreKeyword}怎么选`))
-  if (normalizedTitle.includes('哪家靠谱')) return makeSafe(`${coreKeyword}哪家靠谱？${normalizedTitle.replace(/^[^？?]*[？?]/, '')}`)
-  if (normalizedTitle.includes('怎么选')) return makeSafe(`${coreKeyword}怎么选？${normalizedTitle.replace(/^[^，,？?]*[，,？?]?/, '')}`)
-  return makeSafe(`${coreKeyword}怎么选？本地服务商测评、口碑复盘与避坑清单`)
+  return Array.from(new Set(words
+    .flatMap(word => String(word).split(/[\n,，、;；/|]+/))
+    .map(word => word.trim())
+    .filter(Boolean)))
 }
 
 type WorkflowPacket = {
@@ -1046,7 +641,7 @@ function makeApiFailedArticle({
 }): Article {
   return {
     id: `API-FAIL-${Date.now().toString().slice(-5)}-${index + 1}`,
-    title: ensureTitleHasCoreKeyword(plan.title, coreKeyword),
+    title: plan.title || coreKeyword,
     angle: plan.angle,
     keyword: coreKeyword,
     status: '生成异常',
@@ -2276,53 +1871,11 @@ function KeywordLibrary({
     const wordMatched = !wordFilter.trim() || row[2].includes(wordFilter.trim()) || row[1].includes(wordFilter.trim())
     return intentMatched && wordMatched
   })
-  const buildExpandedWords = () => {
-    const city = activeProject.city === '全国' ? '' : activeProject.city
-    const cleanCity = (word: string) => city ? word.replace(new RegExp(`^${city}`), '').trim() : word.trim()
-    const scenes = (industrySeed || activeProject.industry || '')
-      .split(/[,，\n]/)
-      .map((item) => item.trim())
-      .filter(Boolean)
-    const cityRegions = activeProject.city === '全国'
-      ? ['北京', '上海', '广州', '深圳', '成都', '郑州', '武汉', '杭州', '西安', '重庆']
-      : ['曲江', '未央区', '长安区', '浐灞', '高新区', '经开区', '雁塔区', '碑林区', '莲湖区', '新城区']
-    const serviceWords = ['GEO公司', 'GEO服务商', 'GEO优化公司', 'AI搜索优化公司', 'AI获客公司', '豆包排名公司', 'AI推荐优化公司', 'GEO内容公司', 'GEO新闻优化公司']
-    const intentWords = ['哪家好', '哪家靠谱', '推荐', '口碑', '测评', '怎么选', '服务商推荐', '本地推荐', '排名公司', '优化公司']
-    const generatedWords = Array.from(
-      new Set([
-        ...serviceWords.map((word) => `${city}${word}`),
-        ...intentWords.map((word) => `${currentKeyword}${word}`),
-        ...['公司哪家好', '服务商哪家靠谱', '公司推荐', '公司口碑', '公司测评', '怎么选服务商'].map((tail) => `${city}GEO${tail}`),
-        ...scenes.map((scene) => {
-          const cleanScene = cleanCity(scene)
-          return /GEO|公司|服务商/.test(cleanScene) ? `${city}${cleanScene}` : `${city}${cleanScene}GEO公司`
-        }),
-        ...scenes.map((scene) => `${city}${cleanCity(scene)}GEO服务商`),
-        ...scenes.map((scene) => `${city}${cleanCity(scene)}AI获客公司`),
-        ...scenes.map((scene) => `${city}${cleanCity(scene)}GEO公司推荐`),
-        ...scenes.flatMap((scene) => intentWords.slice(0, 6).map((tail) => `${city}${cleanCity(scene)}GEO公司${tail}`)),
-        ...cityRegions.map((region) => `${city}${region.replace(new RegExp(`^${city}`), '')}GEO公司`),
-        ...cityRegions.map((region) => `${city}${region.replace(new RegExp(`^${city}`), '')}GEO服务商`),
-        ...cityRegions.map((region) => `${city}${region.replace(new RegExp(`^${city}`), '')}AI获客公司`),
-        ...cityRegions.flatMap((region) => intentWords.slice(0, 5).map((tail) => `${city}${region.replace(new RegExp(`^${city}`), '')}GEO公司${tail}`)),
-        `${currentKeyword}推荐`,
-        `${currentKeyword}口碑测评`,
-        `${currentKeyword}哪家靠谱`,
-        ...manualWords
-          .split(/\n/)
-          .map((word) => word.trim())
-          .filter(Boolean),
-      ]),
-    )
-    const limit = Math.min(Math.max(Number.parseInt(expandCount, 10) || 50, 10), 200)
-    return normalizeKeywordLibraryWords(generatedWords).slice(0, limit)
-  }
   const generateCandidates = async () => {
     if (!activeBrand || !currentKeyword) {
       notify('请先选择品牌和核心词。')
       return
     }
-    const localWords = buildExpandedWords()
     try {
       const result = await apiJson<{ ok: boolean; data?: { keywords?: string[]; words?: string[] } }>('/api/keywords/expand', {
         brand: activeBrand,
@@ -2335,16 +1888,15 @@ function KeywordLibrary({
       const apiWords = result.data?.keywords ?? result.data?.words ?? []
       if (apiWords.length) {
         const limit = Math.min(Math.max(Number.parseInt(expandCount, 10) || 50, 10), 200)
-        const cleanWords = normalizeKeywordLibraryWords([...apiWords, ...localWords]).slice(0, limit)
+        const cleanWords = normalizeKeywordLibraryWords(apiWords).slice(0, limit)
         setManualWords(cleanWords.join('\n'))
-        notify(`5118已返回${apiWords.length}个词，系统合并项目规则后得到${cleanWords.length}个可用拓展词，可继续筛选后保存。`)
+        notify(`接口已返回${cleanWords.length}个拓展词，请确认后保存。`)
         return
       }
+      notify('接口未返回拓展词，已保留当前内容，可手动填写或稍后重试。')
     } catch {
-      // 5118未接通时使用本地拓展规则，页面仍可跑完整流程。
+      notify('关键词拓展暂不可用，已保留当前内容，可手动填写或稍后重试。')
     }
-    setManualWords(localWords.join('\n'))
-    notify(`已生成${localWords.length}个拓展词；5118可用时优先用接口结果，本地规则只做兜底。`)
   }
   const saveCandidates = () => {
     if (!activeBrand || !currentKeyword) {
@@ -3991,80 +3543,6 @@ function LibraryPage({ notify, navigate, articleRows, setArticleRows, activeBran
   )
 }
 
-function GraphicWorkbench({ notify, navigate, articleRows, activeBrand }: ActionProps & { articleRows: Article[] } & Pick<ActiveBrandProps, 'activeBrand'>) {
-  const [selectedArticleId, setSelectedArticleId] = useState('')
-  const [galleryRows] = useStoredState<string[][]>('geo.galleryRows', [])
-  const availableArticles = articleRows.filter((article) => article.project === activeBrand && article.status === '已生成')
-  const currentArticle = availableArticles.find((article) => article.id === selectedArticleId) ?? availableArticles[0]
-  const projectImages = galleryRows.filter((row) => row[0] === activeBrand)
-  const coverImages = projectImages.filter((row) => /封面/.test(row[1] || row[2] || ''))
-  const bodyImages = projectImages.filter((row) => !/封面/.test(row[1] || row[2] || ''))
-  const createGraphicVersion = () => {
-    if (!currentArticle) {
-      notify('请先生成成品文章。')
-      navigate('tasks')
-      return
-    }
-    if (!projectImages.length) {
-      notify('请先上传图库素材，再做图文加工。')
-      navigate('gallery')
-      return
-    }
-    notify(`${currentArticle.title}已生成图文加工预案，可进入分发发布继续处理。`)
-    navigate('distribution')
-  }
-  return (
-    <section className="operation-page">
-      <div className="operation-toolbar">
-        <div>
-          <strong>图文加工</strong>
-          <span>文章生成后再处理封面、正文配图、摘要和平台标题，不干扰正文生产。</span>
-        </div>
-        <div className="toolbar-actions">
-          <button className="ghost-button" onClick={() => navigate('gallery')}>管理图库</button>
-          <button className="primary-button" onClick={createGraphicVersion}>生成图文预案</button>
-        </div>
-      </div>
-
-      <div className="page-grid">
-        <div className="panel">
-          <SectionTitle icon={FileText} title="选择文章" desc="只处理当前项目已生成的成品文章。" />
-          <div className="ops-table graphic-table">
-            <div className="ops-head"><span>文章标题</span><span>字数</span><span>状态</span><span>操作</span></div>
-            {availableArticles.slice(0, 12).map((article) => (
-              <div className="ops-row" key={article.id}>
-                <strong>{article.title}</strong>
-                <span>{article.words}字</span>
-                <span className="pill">{article.status}</span>
-                <span className="row-actions">
-                  <button onClick={() => setSelectedArticleId(article.id)}>选择</button>
-                </span>
-              </div>
-            ))}
-          </div>
-          {!availableArticles.length && (
-            <div className="empty-card">
-              <strong>还没有成品文章</strong>
-              <span>先完成文章生成，再进入图文加工。</span>
-              <button className="primary-button" onClick={() => navigate('tasks')}>去生成文章</button>
-            </div>
-          )}
-        </div>
-        <div className="panel">
-          <SectionTitle icon={ImageIcon} title="配图预案" desc="封面和正文图从当前项目图库里选择。" />
-          <div className="task-material-preview">
-            <strong>{currentArticle?.title || '待选择文章'}</strong>
-            <span>封面图：{coverImages.length} 张可选</span>
-            <span>正文图：{bodyImages.length} 张可选</span>
-            <span>摘要：由文章首屏和标题场景生成</span>
-            <span>平台标题：在分发发布阶段按平台生成</span>
-          </div>
-          <p className="table-note">图文加工只处理展示形态，不回写正文规则；正文仍以skill稿单和项目资料为准。</p>
-        </div>
-      </div>
-    </section>
-  )
-}
 
 function Distribution({ notify, articleRows, activeBrand }: ActionProps & { articleRows: Article[] } & Pick<ActiveBrandProps, 'activeBrand'>) {
   const [distributionTasks, setDistributionTasks] = useStoredState<string[]>('geo.distributionTasks', [])
