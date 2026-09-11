@@ -26,6 +26,7 @@ try:
     service = run('systemctl show geo-content-api.service --property=ExecStart --value')
     if root + '/server/geo-api-server.mjs' not in service:
         raise RuntimeError('Unexpected service target')
+    run("python3 -c \"import pathlib,json,sys; rows=[json.loads(p.read_text()) for p in (pathlib.Path.home()/'.geoskill/jobs').glob('JOB-*.json')]; active=[r['job']['id'] for r in rows if r['job']['status'] in ('queued','running')]; print('Active jobs:',len(active)); sys.exit(1 if active else 0)\"")
     run(f'cd {root} && tar -czf {backup} server')
     print('Rollback backup: ' + backup, flush=True)
     client.open_sftp().put(archive, remote_archive)

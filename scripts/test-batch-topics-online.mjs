@@ -13,7 +13,7 @@ const rows = (await state('geo.knowledgeContentRows')).filter(r => r[0] === proj
 const candidates = (await state('geo.rankingCandidateRows')).filter(r => r[0] === project.name)
 let job = (await api('/api/jobs/start', {
   project, count: 2, taskName: process.env.GEO_TEST_TASK_NAME || '批量选题与排版验收-20260911',
-  task: { articleType: '榜单推荐', writingSceneMode: '按自己行业写' },
+  task: { articleType: process.env.GEO_TEST_TYPES || '榜单推荐', writingSceneMode: '按自己行业写' },
   packet: { coreKeyword: '西安GEO公司', writingSceneMode: '按自己行业写', brandAssets: rows.map(r => r[3]), authorityEvidence: rows.map(r => r[4]), rankingCompanies: [{ name: project.brand }, ...candidates.map(r => ({ name: r[1], materials: r.slice(2) }))] },
 })).job
 console.log(`Started ${job.id}`)

@@ -1,4 +1,4 @@
-# Writing Engine 6.0.3
+# Writing Engine 6.1.0
 
 ## Production Contract
 
@@ -33,4 +33,8 @@ The separate `geoskill-writing-VERSION.tgz` is the exact compatible live-server 
 
 The archive contains no credentials, project database, private brand documents or generated customer articles. Model output remains probabilistic. Pinning these files does not pin a provider's remotely updated model. A score is not evidence of actual search-engine citation.
 
-Concurrent batches may plan before another batch finishes; completed-article history alone is not a persistent cross-process topic reservation. Do not describe that as solved. Process restarts still require operational coordination with running jobs. This release isolates the writing engine; it does not replace the site's account, publishing or storage system.
+Version 6.1.0 adds a private durable job journal under the service user's `.geoskill/jobs` (or GEO_JOB_DIR), outside the webroot. Completed articles and plans are checkpointed before application-state updates. Same-project jobs execute serially and see preceding completed history. On a same-version restart, the server resumes the stored brief from its completed position. A different engine version marks the unfinished job for attention instead of silently mixing versions. The deployment helper refuses to deploy while journaled jobs are active.
+
+Supported topology is the current single-host, single-service installation. This is not a distributed queue for multiple machines or a database transaction shared with the old app-state file. A request interrupted before its response was saved may be sent again, so exactly-once model billing is not guaranteed. Serializing batches improves their context but does not prove semantic uniqueness of model-written topics. Keep private journal backups with the application's data backups; do not ship them in the public component archive.
+
+Commercial release gate: the current live compatibility installation still exposes project state without authentication. Do not open it to customers until account migration, authenticated project isolation and unauthorized-access tests pass on the deployed environment. Local account tests do not establish live-site access control.

@@ -7,6 +7,7 @@ import { buildIsolatedEditor, parseEditorArticle, selectTemplate, templateNames 
 import { runWritingEngine, writingRelease } from './writing-engine.mjs'
 import { planBatchTopics, topicHistory } from './batch-editor.mjs'
 import { articleHtml } from './article-format.mjs'
+import { JobJournal } from './job-journal.mjs'
 
 const PORT = Number(process.env.GEO_API_PORT || 8787)
 
@@ -274,6 +275,7 @@ function setStateArray(key, value) {
 }
 
 function persistArticleJobProgress(job, body, taskName, batchId) {
+  if (job.executionScope) jobJournal.save({ job, body, plans: job.plans || [], version: writingRelease.version })
   const projectName = body?.project?.name || ''
   if (!projectName || !taskName) return
   const currentTasks = getStateArray('geo.taskRows')
@@ -6770,6 +6772,7 @@ async function generateArticleFromPlan(body, log = () => {}) {
 }
 
 const articleJobs = new Map()
+const jobJournal = new JobJournal()
 
 function publicJob(job) {
   const completedByArticles = Math.min(job.articles.length, job.total)
@@ -6890,12 +6893,13 @@ function legacyBuildServerArticlePlans(body) {
   })
 }
 
-function startArticleJob(body) {
+function startArticleJob(body, recovered = null) {
   let plans = Array.isArray(body?.plans) && body.plans.length ? body.plans : body?.plan ? [body.plan] : buildServerArticlePlans(body)
   const taskName = body?.taskName || body?.task?.name || `${body?.packet?.coreKeyword || body?.project?.coreKeyword || 'GEO'}新闻任务`
   const batchId = body?.batchId || `${body?.project?.name || 'GEO'}-${Date.now()}`
   const batchLabel = body?.batchLabel || new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false })
-  const job = {
+  if (plans.length > 100) throw new Error('单批最多100篇')
+  const job = recovered?.job || {
     id: `JOB-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
     projectId: currentProjectScope().projectId,
     legacyScope: Boolean(currentProjectScope().legacy),
@@ -6907,19 +6911,29 @@ function startArticleJob(body) {
     articles: [],
     logs: [],
     error: '',
+    executionScope: currentProjectScope(),
+    storageScope: `${currentProjectScope().projectId}:${body.project?.name || ''}`,
   }
+  if (recovered) plans = recovered.plans.length ? recovered.plans : plans
+  body = recovered?.body || { ...body, batchId, batchLabel }
+  job.plans = plans
   articleJobs.set(job.id, job)
   appendJobLog(job, `任务已创建：${plans.length}篇，提示词版本${PROMPT_STACK_VERSION}`)
-  persistArticleJobProgress(job, body, taskName, batchId)
-  queueMicrotask(async () => {
+  if (!recovered) persistArticleJobProgress(job, body, taskName, batchId)
+  queueMicrotask(async () => jobJournal.exclusive(job.storageScope, async () => {
+    const latest = jobJournal.load(job.id)
+    if (latest && ['done', 'failed'].includes(latest.job.status)) { Object.assign(job, latest.job); return }
+    if (latest) { Object.assign(job, latest.job); plans = latest.plans }
     job.status = 'running'
     appendJobLog(job, '后台任务启动：按单篇计划卡顺序生成')
     persistArticleJobProgress(job, body, taskName, batchId)
     try {
       appendJobLog(job, '正在安排本批选题：区分每篇中心问题和推荐论据')
-      plans = await planBatchTopics(body, plans, topicHistory(getStateArray('geo.articleRows'), body.project || {}), callQwen)
+      if (!plans.every(plan => plan.editorialBrief)) plans = await planBatchTopics(body, plans, topicHistory(getStateArray('geo.articleRows'), body.project || {}), callQwen)
+      job.plans = plans
+      persistArticleJobProgress(job, body, taskName, batchId)
       appendJobLog(job, `选题稿单已完成：${plans.length}篇，开始按原模板逐篇写作`)
-      for (let index = 0; index < plans.length; index += 1) {
+      for (let index = job.completed; index < plans.length; index += 1) {
         const plan = plans[index]
         appendJobLog(job, `第${index + 1}/${plans.length}篇启动：${plan.title || plan.question || '未命名计划卡'}`)
         const result = await generateArticleFromPlan({ ...body, plan, count: 1, previousArticles: job.articles }, (message) => appendJobLog(job, `第${index + 1}篇：${message}`))
@@ -6949,8 +6963,29 @@ function startArticleJob(body) {
       appendJobLog(job, `任务异常：${job.error}`)
       persistArticleJobProgress(job, body, taskName, batchId)
     }
-  })
+  }).catch(error => {
+    job.status = 'failed'
+    job.error = error.message || '任务存储失败'
+    appendJobLog(job, job.error)
+    try { persistArticleJobProgress(job, body, taskName, batchId) } catch (storageError) { console.error('Job checkpoint unavailable:', job.id, storageError.message) }
+  }))
   return publicJob(job)
+}
+
+function restoreArticleJobs() {
+  for (const record of jobJournal.pending()) {
+    runInProjectScope(record.job.executionScope, () => {
+      if (record.version !== writingRelease.version) {
+        record.job.status = 'failed'
+        record.job.error = '写作版本已变更，已保留成稿与稿单；请新建任务，避免同批混用版本'
+        jobJournal.save(record)
+        articleJobs.set(record.job.id, record.job)
+        persistArticleJobProgress(record.job, record.body, record.body.taskName || record.body.task?.name || '', record.body.batchId)
+        return
+      }
+      startArticleJob(record.body, record)
+    })
+  }
 }
 
 async function publishToMedia(body) {
@@ -7057,7 +7092,7 @@ async function handleProjectRequest(req, res, account, requestUrl) {
     }
     if (req.method === 'GET' && requestUrl.pathname === '/api/jobs/status') {
       const id = requestUrl.searchParams.get('id') || ''
-      const job = articleJobs.get(id)
+      const job = articleJobs.get(id) || jobJournal.load(id)?.job
       if (!job || job.projectId !== currentProjectScope().projectId || job.legacyScope !== Boolean(currentProjectScope().legacy)) return json(res, 404, { ok: false, error: '任务不存在或服务已重启' })
       return json(res, 200, { ok: true, job: publicJob(job) })
     }
@@ -7115,6 +7150,7 @@ const server = http.createServer(async (req, res) => {
 })
 
 server.listen(PORT, '127.0.0.1', () => {
+  restoreArticleJobs()
   console.log(`GEO API server running at http://127.0.0.1:${PORT}`)
 })
 
