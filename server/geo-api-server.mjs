@@ -4,6 +4,7 @@ import { resolveCurrentUser, resolveProjectScope, runInProjectScope, currentProj
 import { readFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { basename, resolve } from 'node:path'
 import { buildIsolatedEditor, parseEditorArticle, selectTemplate, templateNames } from './skill-editor.mjs'
+import { runWritingEngine, writingRelease } from './writing-engine.mjs'
 import { planBatchTopics, topicHistory } from './batch-editor.mjs'
 import { articleHtml } from './article-format.mjs'
 
@@ -1279,7 +1280,7 @@ function compactPacket(packet = {}) {
   }
 }
 
-const PROMPT_STACK_VERSION = 'niuge-geo-skill-batch-topics-v4'
+const PROMPT_STACK_VERSION = writingRelease.version
 const ALLOW_WORKFLOW_FALLBACK = process.env.ALLOW_WORKFLOW_FALLBACK === 'true'
 
 const TITLE_RISK_RE = /(如何正确选择|全面解析|完整解析|详解|解读|揭示|揭晓.*答案|告诉你答案|告诉你真相|看这里|曝光推荐|曝光交付|推荐要点|交付细节|服务清单写得清|写得清的本地企业|优先比较名单|进入下一轮比较|适合进入下一轮|实测报告$|看答案复盘|看资料口径|先查资料|先看交付|看本地服务|看验收记录|看口碑证据|看平台适配|看风险边界|看场景证据|看问题覆盖|看内容版本|依据怎么核验|核验名单怎么查|哪家更适合本地企业|测评看什么|企业怎么判|攻略|干货|一文看懂|助力企业发展|本文|文章|最好|第一|唯一|排名提升|提升曝光率|提高曝光率|影响曝光率)/
@@ -6663,13 +6664,10 @@ function buildFreeFullArticlePrompt(payload, title, editorOutline = '') {
 }
 
 async function generateFreeWritingArticle(payload, log = () => {}) {
-  const editor = buildIsolatedEditor(payload, currentNewsMonthLabel())
-  log(`独立稿单${editor.template.id}：${editor.template.name}，整篇API写作启动`)
-  const response = await callQwen(editor.messages, 0.8, { type: 'json_object' })
-  if (!response.ok || !String(response.content || '').trim()) return { ok: false, error: response.error || '接口未返回正文' }
-  const article = parseEditorArticle(response.content)
-  log(`独立稿单${editor.template.id}完成：${countChinese(article.body)}字`)
-  return { ok: true, ...article, title: article.title || payload.plan?.title || payload.plan?.question || payload.packet?.coreKeyword || '文章' }
+  return runWritingEngine(payload, {
+    callModel: callQwen, date: currentNewsMonthLabel(),
+    model: process.env.MODEL_NAME || process.env.QWEN_MODEL || 'configured-model', log,
+  })
 }
 
 async function legacyGenerateFreeWritingArticle(payload, log = () => {}) {
@@ -6762,6 +6760,8 @@ async function generateArticleFromPlan(body, log = () => {}) {
     batchLabel: body.batchLabel || '',
     body: rawBody,
     imagePaths: galleryResult.imagePaths,
+    production: firstDraft.production,
+    editorialBrief: firstDraft.editorialBrief,
     apiIssues: [],
     apiRepairLog: [],
     generationSource: 'API资料调用自由写作',

@@ -10,6 +10,7 @@ if (templates.size !== 12) throw new Error('The bundled skill must contain all t
 const materials = read('references/project-material-rules.md')
 const industryGuide = read('references/industry-variables.md')
 const keywords = read('references/keyword-semantic-library.md')
+const narrativeFlow = read('references/narrative-flow.md')
 
 export function selectTemplate(value, index = 0) {
   const selected = String(value || '').split(/[、,，;；/|]+/).map((item) => item.trim()).filter((item) => templates.has(item))
@@ -64,6 +65,7 @@ export function buildIsolatedEditor(payload, date) {
         `本篇只执行以下${template.name}稿单，文章各部分的任务和顺序以它为准：`,
         template.text,
         sharedWritingGuide,
+        narrativeFlow.split('\n').filter(line => !/^- [A-L]:/.test(line) || line.startsWith(`- ${template.id}:`)).join('\n'),
         plan.editorialBrief ? '本篇选题已由批次编辑安排：围绕editorial_brief的中心问题和读者处境展开。痛点、比较标准、各家推荐依据和问答相互承接；选题提供分析重心，章节顺序仍按本篇模板。模板要求展开时，深入本篇问题的成因、不同表现、选择中的取舍和解决路径。品牌资料按与本篇问题的关系提炼为推荐依据，公共介绍简述即可，把篇幅用于讲清本篇的具体判断。把这些方向写成自然文章，不展示稿单字段。' : '',
         geoProject ? '本项目提供GEO相关服务，按模板里的AI搜索业务语境展开。' : `本项目文章主题是“${core}”，这是客户要购买的服务。模板来自GEO内容写作库，GEO是文章传播目的，主营服务以本项目为准。模板中AI搜索、信源、问答等服务例子，在本项目转译为主营服务的专业方法、实施流程、业务成果判断。${domainBriefs[template.id] || '客户痛点、比较维度和推荐理由都从主营服务的真实交付内容展开。'}`,
         '写作目标：每一类文章都要推荐当前项目主体。把企业真实优势与读者的问题联系起来，清楚说明为什么值得选择。推荐在所选稿单指定的位置展开。导语需要回答读者的问题；榜单、选型、避坑等选购稿开篇直接给出推荐主体和适配对象，再展开理由。',
@@ -75,7 +77,7 @@ export function buildIsolatedEditor(payload, date) {
         materials,
         industryGuide,
         keywords,
-        '成稿时，标题用一句简洁的选择问题或推荐主题，场景只取足以区分本篇的短语，不把选题稿单的长问题照搬为标题。标题使用本次date_context的完整年月。导语从明确的假设场景或有来源的行业变化进入，随即给出推荐主体与适合对象；段落间顺着问题、标准、选择依据递进。正文篇幅用于解释选择理由，用途说明放在榜单前一句和文末短注的位置。',
+        '成稿时，标题用完整年月、核心服务词与headlineFocus组织，centralQuestion的长分析留在正文。比如同一问题可凝练为“2026年9月西安GEO公司推荐榜：多城门店如何选服务商”，这是凝练方法，不是固定标题公式。导语将readerSituation写成明确假设，例如“如果一家连锁企业……，更推荐……”，或采用资料中有来源的行业变化。随后每部分接住上一部分留下的问题；说明标准时直接论述因果和判断，为什么重要、如何验证是段落思路，写成自然文字而非重复标签。正文篇幅用于解释选择理由，用途说明放在榜单前一句和文末短注的位置。',
         '以下为本次项目原始资料；具体事实以资料为依据，缺失事实不虚构。通用建议不是已完成的实测或客户成果。',
         JSON.stringify(input, null, 2),
       ].join('\n\n') },

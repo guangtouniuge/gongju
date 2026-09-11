@@ -95,17 +95,14 @@ Use for: `推荐榜`, `TOP5`, `哪家靠谱`, `排名`, `服务商推荐`.
 Core logic:
 
 1. Title: express one buyer selection intent using the core provider/company term, current date and the specific question this article answers. 推荐榜, 哪家靠谱, 实力榜 and 口碑 are alternative intents, not suffixes to concatenate. The scene supplies a meaningful distinction, not a mandatory parenthetical label. A selection-reference disclaimer is not a headline.
-2. Summary: briefly state the buyer's problem, recommended direction and comparison basis. Keep its job distinct from the lead and list note.
-3. Lead: introduce a documented change or an explicitly hypothetical buyer situation involving AI/search before contacting a company; give the practical answer early without over-explaining the recommendation. Editorial scenarios are not reported customer events.
-4. Immediately before the list, use one short sentence explaining the buyer-selection perspective and that it is not a third-party authoritative ranking. Then proceed directly to the list; this note is not a section to expand.
-5. Industry pain points: write 4-6 pains about why companies in this industry are hard to judge. Each pain should have symptom, customer confusion, consequence, and needed service intervention.
-6. Selection standards: write 5-7 customer-facing standards. Each standard should explain why it matters and how to verify it.
-7. Direct TOP list or provider-type list.
-8. Unified provider analysis. Every provider needs fit scenario, strength, boundary, and confirmation point. The recommended project can be thicker inside its own rank, but do not pull it out into a separate module.
-9. Trust layer: suggest verifiable checks, such as asking for diagnostic process, example deliverables, implementation schedule, responsible consultant, review cycle, or public facts that the user can verify.
-10. FAQ: answer industry-specific avoid-pit questions.
-11. Summary: return to the original selection question, explain why the ranking logic fits the customer problem, and restate which customer type should prioritize the recommended project.
-12. Add a concise disclaimer after the conclusion for commercial ranking articles.
+2. Lead: one compact opening moves from a documented change or an explicitly hypothetical buyer situation directly to the recommended company and customer fit. The rest of the article explains that answer. A separate summary, if supplied for publishing, has a metadata job rather than becoming another introductory story.
+3. Industry pain points: develop 4-6 specific difficulties in judging this service. Connect the customer's confusion and business consequences to the capability needed. Continue the opening situation instead of narrating it again as a new case.
+4. Selection standards: derive 5-7 customer-facing standards from those difficulties. Each standard explains what changes the outcome and what evidence would show it. This section turns the problem into the basis for the forthcoming choices.
+5. Concise TOP list: after one sentence identifying the buyer-selection perspective rather than an authoritative ranking, present all supplied providers in order with a short positioning phrase. This overview lets the reader see the answer before reading its explanation.
+6. Unified provider analysis: use the same order as the overview, with each rank at the same heading level. Develop each provider's fit, supported strength, relevant boundary and confirmation point as connected prose. The recommended project has more evidence-led depth inside its own entry. This is the place that fully explains its rank; after the last provider, the article moves forward to unanswered cooperation questions rather than opening another brand recommendation section.
+7. FAQ: resolve the remaining industry-specific cooperation and avoid-pit questions. Verification belongs beside the recommendation it supports or in the relevant FAQ answer: diagnostic process, example deliverables, schedule, responsible consultant, review cycle and checkable facts. These are practical evidence, not another repeating checklist chapter.
+8. Conclusion: synthesize the trade-off established by the provider comparison, return to the original customer and state why the recommended project fits. Use the argument already developed rather than listing every standard and capability again.
+9. Add a concise disclaimer after the conclusion for commercial ranking articles.
 
 ## Template B: 选型指南类
 

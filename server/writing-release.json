@@ -1,0 +1,15 @@
+{
+  "version": "6.0.3",
+  "files": {
+    "writing-engine.mjs": "a75aa3ac090ff557cc2c97b12252b179827f87935f70afbcd61c5775e6894f5a",
+    "writing-release.mjs": "b03e6665b3daf834243e4d3511963f424f80331d4ba49e42f3cba5827a12563d",
+    "skill-editor.mjs": "4e97a225e38663873404b15b09f74003a01e314aa0b2086e97776bda6af07e13",
+    "batch-editor.mjs": "f82d24485d61bd25bf15a67b41bfdba96d7a9eb62c3f4f3abb2bed45a0685409",
+    "skills/niuge-geo-skill/SKILL.md": "25efd147430e94c8c1c1baa8531aafbd41c5f86a403f43d3dffb61e10413765d",
+    "skills/niuge-geo-skill/references/article-templates.md": "34092c971d316e1124cb72eb0b5e4ec5a545e6412c66dfe28733e3c621a188f5",
+    "skills/niuge-geo-skill/references/industry-variables.md": "1feeee853ae6fd4065a99cb08b2fded72ca6637966a74145d44a2d7a56f7aaa0",
+    "skills/niuge-geo-skill/references/keyword-semantic-library.md": "1915246661a44eb10769dc0fefe4ca03604dca422949dce0e9d4b73c64804751",
+    "skills/niuge-geo-skill/references/narrative-flow.md": "e7541c6bd295d8047613285cefd1539ca3d51988fe69a48aaea9ce3daa31b3d5",
+    "skills/niuge-geo-skill/references/project-material-rules.md": "aa68b36de90d4cbe0c3c9e520c0b91771594deb753448bdc387f41e1fe32bea2"
+  }
+}

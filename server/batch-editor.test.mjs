@@ -9,12 +9,13 @@ test('batch plans preserve templates and modes, carry history, and reach the wri
   const model = async messages => {
     const input = JSON.parse(messages[1].content.split('项目资料：\n')[1])
     assert.equal(input.previousTopics[0].title, '历史文章')
-    assert.equal(input.plannedTopics.length, calls++ ? 8 : 0)
+    assert.equal(input.plannedTopics.length, calls++ * 3)
+    assert.ok(input.assignments.length <= 3)
     assert.ok(input.assignments.every(a => a.mode === '按自己行业写'))
     return { ok: true, content: JSON.stringify({ briefs: input.assignments.map(a => ({ id: a.id, centralQuestion: `问题${a.id}`, readerSituation: `处境${a.id}` })) }) }
   }
   const output = await planBatchTopics({ project: { name: '测试项目' } }, plans, [{ title: '历史文章' }], model)
-  assert.equal(calls, 2)
+  assert.equal(calls, 4)
   assert.equal(new Set(output.map(p => p.question)).size, 10)
   assert.ok(output.every(p => p.articleType === '榜单推荐'))
   const editor = buildIsolatedEditor({ plan: output[2] }, '2026年9月')
