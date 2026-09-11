@@ -13,7 +13,7 @@ const rows = articles.map((article, index) => {
   if (!article.ok) return { index: index + 1, ok: false, error: article.error }
   const parsed = tokens(article.body)
   for (const token of parsed.filter(t => t.type === 'paragraph')) {
-    const key = plain(token.text)
+    const key = plain((token.tokens || []).filter(item => item.type !== 'image').map(item => item.raw).join(''))
     if (key.length < 60) continue
     const owners = paragraphOwners.get(key) || new Set()
     owners.add(index + 1)
