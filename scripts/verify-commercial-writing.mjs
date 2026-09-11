@@ -57,6 +57,10 @@ if (process.env.GEO_REPLAY_ARTICLE_FILE) {
     industryScene: article.editorialBrief.customerIndustry || project.industry,
     editorialBrief: article.editorialBrief, question: article.editorialBrief.businessProblem, angle: article.editorialBrief.readerSituation }]
   await fs.writeFile(`${out}/replay-baseline.json`, JSON.stringify({ source: process.env.GEO_REPLAY_ARTICLE_FILE, index, articleId: article.id, title: article.title, production: article.production, plan: plans[0] }, null, 2))
+  if (process.env.GEO_REBUILD_REPLAY_BRIEF === '1') {
+    delete plans[0].editorialBrief
+    plans[0].lockTopic = true
+  }
 }
 const taskName = `榜单生产验收 ${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false })}`
 const start = process.env.GEO_EXISTING_JOB ? { job: { id: process.env.GEO_EXISTING_JOB } } : await api('/api/jobs/start', { project, packet: { coreKeyword: core }, plans, taskName, count: plans.length })

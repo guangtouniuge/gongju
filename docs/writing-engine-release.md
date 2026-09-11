@@ -1,4 +1,18 @@
-# Writing Engine 7.0.4
+# Writing Engine 7.0.5
+
+## Recommendation Judgment At Planning Time
+
+The topic editor starts from the customer's desired business improvement and
+connects it to the recommended company's supported service actions. Its opening
+answer gives a service-fit recommendation; verification remains a cooperation
+consideration rather than replacing the answer. Outcome and qualification claims
+still require source support. The original Skill and writer remain unchanged.
+
+A fixed-topic replay can now rebuild the brief while retaining the original question
+and reader situation. This diagnoses inherited weak recommendation language rather
+than reusing that language in every test. It uses current project sources and never
+rewrites an existing article. Version 7.0.5 passes 45 functional checks; live content
+assessment is separate.
 
 ## Readable Editorial Handoff
 

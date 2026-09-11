@@ -38,6 +38,19 @@ test('history belongs to the selected project only', () => {
   assert.deepEqual(topicHistory([{ project: 'a', title: 'a' }, { project: 'b', title: 'b' }], { name: 'a' }).map(x => x.title), ['a'])
 })
 
+test('fixed topic rebuilds recommendation judgment while preserving the customer problem', async () => {
+  const [plan] = await planBatchTopics({}, [{ articleType: '榜单推荐', lockTopic: true, question: '投入进展如何看清', angle: '负责人需要了解执行进展' }], [], async messages => {
+    const input = JSON.parse(messages[1].content.split('项目资料：\n')[1])
+    assert.equal(input.assignments[0].fixedTopic, true)
+    assert.equal(input.assignments[0].readerSituation, '负责人需要了解执行进展')
+    return { ok: true, content: JSON.stringify({ briefs: [{ id: 0, businessProblem: '偏移的问题', readerSituation: '偏移的场景', openingAnswer: '推荐能展示执行进展的服务', reasoningPath: '由进展不清解释过程可见的用途' }] }) }
+  })
+  assert.equal(plan.question, '投入进展如何看清')
+  assert.equal(plan.editorialBrief.businessProblem, '投入进展如何看清')
+  assert.equal(plan.editorialBrief.readerSituation, '负责人需要了解执行进展')
+  assert.equal(plan.editorialBrief.openingAnswer, '推荐能展示执行进展的服务')
+})
+
 test('same-type batch carries distinct editorial decisions without replacing the template', async () => {
   const assignments = Array.from({ length: 3 }, (_, planIndex) => ({ articleType: '榜单推荐', planIndex, writingSceneMode: '按自己行业写' }))
   const history = [{ title: '旧标题', brief: { centralQuestion: '旧问题', decisionFocus: '旧决策', titleAngle: '旧角度' } }]
