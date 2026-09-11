@@ -16,7 +16,7 @@ export async function runWritingEngine(payload, { callModel, date, model, log = 
     if (!article.title || !article.body) return { ok: false, error: '写作接口缺少标题或完整正文' }
     return {
       ok: true, ...article, editorialBrief: plan.editorialBrief,
-      production: { ...writingRelease, template: editor.template.id, model, date, promptHash: contentHash(JSON.stringify(editor.messages)) },
+      production: { ...writingRelease, template: editor.template.id, model, resolvedModel: response.raw?.model || model, date, promptHash: contentHash(JSON.stringify(editor.messages)) },
     }
   } catch (error) {
     return { ok: false, error: error.message || '写作接口异常' }

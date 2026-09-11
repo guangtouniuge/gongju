@@ -8,7 +8,7 @@ These are reusable article structures for any project or brand. They are not rig
 - The industry is the scene; the selected keyword and user intent decide the main topic.
 - Recommendation must be earned through scene, pain, comparison, fit, and provided materials.
 - Every article must recommend the selected project/brand naturally.
-- If evidence is missing, use verifiable actions instead of fake facts.
+- Explain the service facts that are available. Missing evidence is not a basis for invented achievements or for replacing the whole recommendation with verification homework.
 - Keep paragraphs short. One paragraph should carry one core idea.
 - Increase article depth by adding useful explanation inside the core modules, not by adding unrelated sections.
 - A strong paragraph usually answers one of these: what the customer is facing, why it matters, how to judge it, what a provider should do, what boundary must be checked.
@@ -123,12 +123,12 @@ Use for: `测评`, `实测`, `横评`, `哪家更稳`.
 
 Core logic:
 
-1. Lead with what is being measured and why the industry needs measurement.
-2. Define the test scene and customer questions.
-3. Compare by dimensions: scene understanding, material organization, content quality, service boundary, review logic, fit scenario.
-4. For each provider or provider type, write strengths, weak spots, and best-fit customers.
-5. Explain why the recommended project fits the selected scene if supported by materials.
-6. End with practical conclusion.
+1. Open on a concrete customer task and the recommended project. Explain what this review compares: service capabilities documented in the supplied materials, or actual results if test records exist.
+2. Explain the task's difficulties and derive the comparison dimensions from them. Give the reader a substantive finding under each dimension using available service information, not only a question to ask providers.
+3. Show a compact overview of all supplied providers and their relevant service focus. Briefly identify the buyer-selection perspective.
+4. Analyse all providers together, in overview order and at the same heading level. Inside the main project's own entry, demonstrate how one or two documented services would handle the current task and what the resulting work would contain. Other entries connect documented services to concrete uses and customer fit in several short paragraphs. Describe known value rather than inferring missing capabilities.
+5. Answer remaining cooperation questions that the comparison has not already resolved.
+6. Conclude with the recommended choice for this customer using the findings already developed. The main project has no second standalone recommendation chapter after the provider section.
 
 Avoid fake scores unless the user explicitly asks for scoring.
 
@@ -138,12 +138,11 @@ Use for: `口碑`, `靠不靠谱`, `怎么核验`, `真实评价`.
 
 Core logic:
 
-1. Start with trust problem.
-2. Write口碑核查 path: name consistency, public materials, case explanation, service flow, customer question coverage, contract boundary.
-3. Explain why口碑 is not just user comments; it is whether AI/search can explain the fit reason.
-4. Include provider or provider-type口碑核查.
-5. Recommend the selected project when materials support it.
-6. End with verification checklist.
+1. Start with a concrete trust question from the selected customer industry and give the main project recommendation in the opening paragraph.
+2. Explain what reliable service means for this customer: accurate service description, consistent entity information, understandable workflow and continuity of delivery. Distinguish actual customer reviews from a service-material analysis; do not redefine reputation as an AI ranking.
+3. Introduce the supplied providers in a concise buyer-oriented overview, followed by one unified analysis section in that order. Each company's heading has the same level. Explain the main project's documented service arrangements deeply inside its own entry, including a worked example specific to this industry; connect the other companies' known services to specific customer needs in several short paragraphs.
+4. Give a small set of useful cooperation questions arising from unresolved practical matters, such as information handover or ongoing updates. The analysis has already explained why the reader should choose; this is not a second provider audit.
+5. Synthesize why the main project fits this customer's trust concern. Close with a brief scope note. Do not create another main-brand chapter before or after the unified provider section.
 
 ## Template E: 避坑指南类
 
@@ -207,12 +206,12 @@ Use for: `A和B哪个好`, `对比`, `区别`, `谁更适合`.
 
 Core logic:
 
-1. State that the answer depends on stage, materials, budget, and industry complexity.
-2. Compare providers by scenario, strengths, boundaries, and verification points.
-3. Use a table only if helpful.
-4. When comparing the recommended project, focus on fit and project materials.
-5. Avoid attacking competitors without evidence.
-6. End with selection recommendation by customer type.
+1. Open with the customer's specific trade-off and recommend the main project for the relevant need.
+2. Establish the meaningful comparison dimensions for this task, explaining their different consequences for the reader. Compare documented service approaches, not imagined rival deficiencies.
+3. Give a compact overview of the supplied companies and their known service focus.
+4. Analyse each company once, in a unified provider section. Inside the main project entry, use its documented services to demonstrate how the chosen approach would work. Other companies receive complete explanations of known services, concrete uses and customer fit. Compare these documented values; the amount of information supplied does not demonstrate relative service coverage or actual performance.
+5. Resolve remaining questions about collaboration or implementation. Avoid repeating the earlier dimensions as a checklist.
+6. End with the choice and its reason, reflecting the trade-off introduced at the start. Do not reopen a separate main-brand analysis.
 
 ## Template J: 资质/实力解析类
 
@@ -220,12 +219,11 @@ Use for: `实力`, `资质`, `团队`, `系统`, `公司介绍但要有推荐力
 
 Core logic:
 
-1. Start from why buyers care about strength.
-2. Define strength in this industry: service model, workflow, content understanding, industry fit, review ability, real materials.
-3. Use confirmed project facts only.
-4. Compare how provider types show strength.
-5. Recommend the selected project when materials support it.
-6. End with how readers can verify strength.
+1. Show which work the customer needs a provider to handle and give the main project recommendation early.
+2. Explain the kinds of delivery capability that matter in this industry. Use the supplied systems, people, services and processes as evidence of service design, not proof of market superiority or guaranteed results.
+3. Present a concise overview of supplied companies, then analyse each company once at the same heading level. Main-project depth stays inside its own entry: show how one or two documented capabilities would be used on the reader's materials, what work they support and why that is useful.
+4. Explain the other companies' known services, potential use for this customer and fit in several short paragraphs. A detail absent from their provided materials is not a missing capability.
+5. Address practical cooperation questions not answered in the capability analysis, then conclude with why this project fits the reader. No separate brand-strength or why-choose-brand chapter outside the provider analysis.
 
 ## Template K: 行业场景解决方案类
 

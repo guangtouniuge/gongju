@@ -9,7 +9,7 @@ const entries = [
   ...Object.keys(manifest.files).map(file => `server/${file}`),
   'server/writing-release.json', 'server/writing-engine.test.mjs', 'server/skill-editor.test.mjs',
   'server/batch-editor.test.mjs', 'server/article-format.mjs', 'server/article-format.test.mjs', 'server/job-journal.test.mjs',
-  'scripts/seal-writing-release.mjs',
+  'scripts/seal-writing-release.mjs', 'server/model-request.test.mjs',
   'docs/writing-engine-release.md',
 ]
 // Explicit allowlist excludes environment files, databases and private project facts.

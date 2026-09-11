@@ -8,6 +8,7 @@ import { runWritingEngine, writingRelease } from './writing-engine.mjs'
 import { planBatchTopics, topicHistory } from './batch-editor.mjs'
 import { articleHtml } from './article-format.mjs'
 import { JobJournal } from './job-journal.mjs'
+import { modelRequestOptions } from './model-request.mjs'
 
 const PORT = Number(process.env.GEO_API_PORT || 8787)
 
@@ -542,7 +543,7 @@ async function callQwen(messages, temperature = 0.78, responseFormat) {
   const maxAttempts = Math.max(1, Number(process.env.QWEN_RETRY_ATTEMPTS || 3))
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), Number(process.env.QWEN_TIMEOUT_MS || 120000))
+    const timeout = setTimeout(() => controller.abort(), Number(process.env.MODEL_TIMEOUT_MS || process.env.QWEN_TIMEOUT_MS || 120000))
     try {
     const response = await fetch(baseUrl, {
       method: 'POST',
@@ -552,11 +553,8 @@ async function callQwen(messages, temperature = 0.78, responseFormat) {
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model,
-        temperature,
-    max_tokens: Math.min(Number(process.env.QWEN_MAX_TOKENS || 8192), 8192),
+        ...modelRequestOptions(process.env, temperature, responseFormat),
         messages: guardedMessages,
-        ...(responseFormat ? { response_format: responseFormat } : {}),
       }),
     })
     const data = await response.json().catch(() => ({}))
@@ -6747,7 +6745,7 @@ async function generateArticleFromPlan(body, log = () => {}) {
   }
   const fallbackTitle = nextBody.plan.title || nextBody.plan.question || `${body.packet?.coreKeyword || body.project?.coreKeyword || ''}文章`
   const title = firstDraft.title || extractFreeArticleTitle(rawBody, fallbackTitle)
-  rawBody = stripFreeArticleTitle(rawBody, title)
+  // The sealed engine has already separated the title from the original body.
   const galleryResult = insertGalleryImagesIntoArticle(rawBody, body?.packet?.galleries || [])
   rawBody = galleryResult.body
   log(`API自由写作完成：${countChinese(rawBody)}字`)
@@ -6932,7 +6930,7 @@ function startArticleJob(body, recovered = null) {
     persistArticleJobProgress(job, body, taskName, batchId)
     try {
       appendJobLog(job, '正在安排本批选题：区分每篇中心问题和推荐论据')
-      if (!plans.every(plan => plan.editorialBrief)) plans = await planBatchTopics(body, plans, topicHistory(getStateArray('geo.articleRows'), body.project || {}), callQwen)
+      if (!plans.every(plan => plan.editorialBrief)) plans = await planBatchTopics(body, plans, topicHistory(getStateArray('geo.articleRows'), body.project || {}), callQwen, message => appendJobLog(job, message))
       job.plans = plans
       persistArticleJobProgress(job, body, taskName, batchId)
       appendJobLog(job, `选题稿单已完成：${plans.length}篇，开始按原模板逐篇写作`)

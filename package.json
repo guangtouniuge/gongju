@@ -11,7 +11,7 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "test": "npm run build && npm run test:auth && npm run test:project-isolation && npm run test:writing",
-    "test:writing": "node --test server/skill-editor.test.mjs server/batch-editor.test.mjs server/article-format.test.mjs server/writing-engine.test.mjs server/writing-integration.test.mjs server/job-journal.test.mjs server/gallery-placement.test.mjs",
+    "test:writing": "node --test server/skill-editor.test.mjs server/batch-editor.test.mjs server/article-format.test.mjs server/writing-engine.test.mjs server/writing-integration.test.mjs server/job-journal.test.mjs server/gallery-placement.test.mjs server/model-request.test.mjs",
     "test:auth": "node --test server/auth.test.mjs",
     "test:project-isolation": "node --test server/project-scope.test.mjs server/project-ui.test.mjs server/frontend-production.test.mjs"
   },

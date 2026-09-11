@@ -20,13 +20,14 @@ test('all twelve engine routes preserve the whole article with one writing call'
         assert.equal((prompt.match(/^## Template [A-L]:/gm) || []).length, 1)
         assert.equal((prompt.match(/^- [A-L]:/gm) || []).length, 1)
         assert.ok(!prompt.includes('OLD_INJECTION'))
-        return { ok: true, content: JSON.stringify({ title: '测试标题', body }) }
+        return { ok: true, content: JSON.stringify({ title: '测试标题', body }), raw: { model: 'provider-resolved-model' } }
       },
     })
     assert.equal(calls, 1)
     assert.equal(result.body, body)
     assert.equal(result.production.template, String.fromCharCode(65 + index))
     assert.equal(result.production.version, writingRelease.version)
+    assert.equal(result.production.resolvedModel, 'provider-resolved-model')
     assert.equal(result.production.promptHash.length, 64)
   }
 })
@@ -36,7 +37,7 @@ test('single article without a brief plans first and never repairs model output'
   const result = await runWritingEngine({ ...payload, plan: { articleType: '榜单推荐' } }, {
     date: '2026年9月', model: 'test', callModel: async () => {
       calls++
-      if (calls === 1) return { ok: true, content: JSON.stringify({ briefs: [{ id: 0, ...payload.plan.editorialBrief }] }) }
+      if (calls === 1) return { ok: true, content: JSON.stringify({ briefs: [{ id: 0, businessProblem: '经营问题', readerSituation: '连锁企业' }] }) }
       return { ok: false, error: 'transport failure' }
     },
   })
