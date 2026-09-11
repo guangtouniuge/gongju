@@ -1,4 +1,18 @@
-# Writing Engine 7.0.3
+# Writing Engine 7.0.4
+
+## Readable Editorial Handoff
+
+The writing adapter now renders the existing topic, opening answer, reasoning path
+and validated source excerpts as one readable editor assignment instead of a JSON
+field dump. Each excerpt appears once next to its relevance note. Company identity,
+reader roles, title intent, keyword context and optional provider facts are retained.
+The original Skill files and selected original template remain unmodified.
+
+The live runner can replay one saved article brief against current project materials
+with an explicit scene mode. This isolates handoff changes from new topic planning;
+it does not feed the old article body back to the model or rewrite the new result.
+Version 7.0.4 passes 44 functional checks. A single replay is diagnostic, not proof
+of stable quality across all templates or batches.
 
 ## Batch Editorial Decisions
 

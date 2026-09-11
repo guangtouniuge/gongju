@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises'
 import { articleHtml } from '../server/article-format.mjs'
+import { templateNames } from '../server/skill-editor.mjs'
 
 const base = 'https://geoskill.7chacha.com'
 const credentials = JSON.parse(await fs.readFile('.tmp/commercial-credentials.json', 'utf8'))
@@ -40,10 +41,23 @@ const sceneOffset = Number(process.env.GEO_SCENE_OFFSET || 0)
 if (![0, 1].includes(sceneOffset)) throw new Error('Scene offset must be 0 or 1')
 const fixedMode = process.env.GEO_LIVE_SCENE_MODE
 if (fixedMode && !['按自己行业写', '按实际场景写'].includes(fixedMode)) throw new Error('Unknown scene mode')
-const plans = types.map((articleType, planIndex) => {
+let plans = types.map((articleType, planIndex) => {
   const writingSceneMode = fixedMode || ((planIndex + sceneOffset) % 2 ? '按实际场景写' : '按自己行业写')
   return { articleType, planIndex, writingSceneMode, industryScene: writingSceneMode === '按实际场景写' ? '根据项目真实服务范围自动拓展客户行业' : project.industry }
 })
+if (process.env.GEO_REPLAY_ARTICLE_FILE) {
+  if (process.env.GEO_SYNC_CONFIRMED_PROVIDERS === '1') throw new Error('Replay must not change provider data')
+  const articles = JSON.parse(await fs.readFile(process.env.GEO_REPLAY_ARTICLE_FILE, 'utf8'))
+  const index = Number(process.env.GEO_REPLAY_ARTICLE_INDEX || 0)
+  const article = Number.isInteger(index) && index >= 0 ? articles[index] : undefined
+  if (!article?.editorialBrief || article.projectId !== project.projectId || article.keyword !== core || !fixedMode) throw new Error('Replay needs a matching project, keyword, stored brief and explicit scene mode')
+  const templateIndex = 'ABCDEFGHIJKL'.indexOf(article.production?.template)
+  if (templateIndex < 0) throw new Error('Unknown replay template')
+  plans = [{ articleType: templateNames[templateIndex], planIndex: 0, writingSceneMode: fixedMode,
+    industryScene: article.editorialBrief.customerIndustry || project.industry,
+    editorialBrief: article.editorialBrief, question: article.editorialBrief.businessProblem, angle: article.editorialBrief.readerSituation }]
+  await fs.writeFile(`${out}/replay-baseline.json`, JSON.stringify({ source: process.env.GEO_REPLAY_ARTICLE_FILE, index, articleId: article.id, title: article.title, production: article.production, plan: plans[0] }, null, 2))
+}
 const taskName = `榜单生产验收 ${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false })}`
 const start = process.env.GEO_EXISTING_JOB ? { job: { id: process.env.GEO_EXISTING_JOB } } : await api('/api/jobs/start', { project, packet: { coreKeyword: core }, plans, taskName, count: plans.length })
 await fs.writeFile(`${out}/job-start.json`, JSON.stringify(start, null, 2))

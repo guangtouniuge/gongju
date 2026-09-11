@@ -41,6 +41,51 @@ export function selectTemplate(value, index = 0) {
   return { name, ...templates.get(name) }
 }
 
+function renderEditorialAssignment(input) {
+  const topic = input.topic
+  const line = (label, value) => materialText(value).trim() ? `${label}：${materialText(value).trim()}` : ''
+  const source = input.primary_company_materials
+  const facts = []
+  for (const [kind, label, value] of [['brand', '品牌提供资料', source.brand_assets], ['evidence', '引证及补充资料', source.authority_evidence]]) {
+    const entries = Array.isArray(value) ? value : value ? [value] : []
+    for (const [index, entry] of entries.entries()) {
+      const connection = input.material_connections.find(item => item.source === kind && item.source_index === index)
+      facts.push([`${label}${index + 1}原文：`, materialText(entry), line('本篇使用思路（编辑判断，事实以原文为依据）', connection?.relevance)].filter(Boolean).join('\n'))
+    }
+  }
+  return [
+    '本篇编辑稿单',
+    line('日期', input.date_context), line('项目', input.project_name),
+    line('推荐主体全称', input.recommended_company), line('推荐名称', input.recommended_short_name),
+    line('地域', input.city_or_area), line('项目主营行业', input.project_industry),
+    line('文章类型', input.article_intent), line('服务选择主词', input.core_keyword),
+    line('写作模式', input.writing_mode), line('读者范围', input.reader_identity.scope),
+    line('服务购买方', input.participants.service_buyer || input.reader_identity.reader),
+    line('购买方自己的客户', input.participants.buyers_customers), line('实际客户行业', input.customer_scene),
+    '\n本篇要回答的问题',
+    line('读者现在的处境', topic.readerSituation), line('中心问题', topic.businessProblem || topic.question),
+    line('客户的原生问法', topic.customerQuestion), line('本篇比较重点', topic.decisionFocus),
+    line('标题要表达的选择问题', topic.titleAngle), line('用户已确定的标题', input.locked_title),
+    '\n将本篇问题落实到原稿单',
+    line('原稿单开头的回答任务', topic.openingAnswer),
+    line('原稿单各部分的承接与推荐论证', topic.reasoningPath),
+    '沿所选原稿单展开：开头需要直接答案的位置，把上面的选择判断写进读者场景；正文解释为什么这个问题值得关心、相应服务如何解决、哪些资料支持推荐。原稿单中的问题、比较、服务商分析和结尾都围绕这一个客户问题承接。这里的任务融入原文，不另起一套目录。',
+    '\n推荐主体的写作依据',
+    '以下原文用于理解服务范围、产品和交付方式，使用思路用于解释它们与客户需求的联系。服务适配可以形成推荐判断，效果、资质和案例按各自实际出处表达。资料说明不是逐段插入文章的旁白。',
+    line('资料来源', source.provenance), ...facts,
+    ...(input.competitor_or_provider_list?.length ? [
+      '\n本篇可用服务商资料（按所选原稿单组织）',
+      ...input.competitor_or_provider_list.map(row => [
+        `${row.order}. ${row.company || ''}${row.shortName ? `（${row.shortName}）` : ''}`,
+        row.materials?.reference === 'primary_company_materials' ? '使用上方推荐主体资料。' : JSON.stringify(row.materials),
+      ].join('\n')),
+    ] : []),
+    '\n语境资料', line('用户疑问', input.distilled_questions), line('语义词', input.expanded_keywords),
+    line('已写标题，供本篇拟题区分', input.previous_titles),
+    '下面是本篇使用的原版模板。其文章顺序和写作任务保持原样，上方选题与资料用于完成这些任务。',
+  ].filter(Boolean).join('\n\n')
+}
+
 export function buildIsolatedEditor(payload, date) {
   const project = payload.project || {}
   const packet = payload.packet || {}
@@ -97,7 +142,7 @@ export function buildIsolatedEditor(payload, date) {
       { role: 'user', content: [
         '一、完整Skill主文件', skillSource, sharedWritingGuide,
         '二、Skill资料与行业使用方法', materials, industryGuide, keywords,
-        '三、本篇选题及项目资料', JSON.stringify(input, null, 2),
+        '三、本篇完整编辑交接', renderEditorialAssignment(input),
         '四、按这份完整模板写本篇文章', template.text,
       ].join('\n\n') },
     ],

@@ -12,7 +12,7 @@ test('reader identity separates the service provider industry from the customer 
     assert.ok(readerIdentity(core, '按实际场景写').scope.includes('具体客户行业'))
     const prompt = buildIsolatedEditor({ project: { industry: 'GEO行业' }, packet: { coreKeyword: core }, plan: { articleType: '榜单推荐', writingSceneMode: '按自己行业写', industryScene: 'GEO行业' } }, '2026年9月').messages[1].content
     assert.ok(!prompt.includes('"customer_scene": "GEO行业"'))
-    assert.ok(prompt.includes('"project_industry": "GEO行业"'))
+    assert.ok(prompt.includes('项目主营行业：GEO行业'))
   }
 })
 
@@ -70,6 +70,26 @@ test('article output preserves model language and heading hierarchy', () => {
   assert.equal(result.title, '示例标题')
   assert.equal(result.body, '## 第1名：测试咨询\n\n技术团队保障落地。\n\n### 推荐理由\n\n首先，客户案例说明专业能力。')
   assert.deepEqual(parseEditorArticle(JSON.stringify(result)), result)
+})
+
+test('editor handoff connects the opening and sources in readable prose without duplicating facts', () => {
+  const editor = buildIsolatedEditor({
+    project: { brand: '项目公司' },
+    packet: { brandAssets: ['提供独立后台。'], rankingCompanies: [{ name: '项目公司' }, { name: '同行', note: '同行事实' }] },
+    plan: { articleType: '榜单推荐', editorialBrief: {
+      businessProblem: '交付如何看清', openingAnswer: '选择能展示交付过程的服务，项目公司提供后台。',
+      reasoningPath: '由交付不清引出过程可见性，再说明后台如何帮助客户了解进度。',
+      materialQuotes: [{ source: 'brand', quote: '提供独立后台。', relevance: '帮助客户查看进度' }],
+    } },
+  }, '2026年9月')
+  const text = editor.messages[1].content
+  assert.ok(text.includes('原稿单开头的回答任务：选择能展示交付过程的服务'))
+  assert.ok(text.includes('原稿单各部分的承接与推荐论证：由交付不清'))
+  assert.ok(text.includes('提供独立后台。\n本篇使用思路（编辑判断，事实以原文为依据）：帮助客户查看进度'))
+  assert.equal(text.split('提供独立后台。').length - 1, 1)
+  assert.ok(!text.includes('"openingAnswer":'))
+  assert.ok(text.includes('同行事实'))
+  assert.ok(text.endsWith(selectTemplate('榜单推荐').text))
 })
 
 test('provider writing direction is isolated from non-provider templates and has no fixed opener', () => {

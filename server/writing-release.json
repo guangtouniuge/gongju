@@ -1,10 +1,10 @@
 {
-  "version": "7.0.3",
+  "version": "7.0.4",
   "files": {
     "writing-engine.mjs": "1957ee5bdecaf7a4db4f049db59680476c420d9f5e5e79d1d6a36d3a07c3991b",
     "writing-release.mjs": "bda729304b4939f530080ee1ba5484d65bf2ec935daad33524a89ad47598189f",
     "approved-skill.json": "20372aedf02f611346ee22ed9c2280dae942bbf4085dc571c1f5122216d3bc71",
-    "skill-editor.mjs": "fc9904377425a7cf0c99ca38cd3e3d15d10b75e1c6a4a61395c2176c75d03983",
+    "skill-editor.mjs": "5581ff1ed0bb47eb262194e785c35d5ea71530caedb692e80a1a78ab1eea83ec",
     "batch-editor.mjs": "7ea2463b8510700146012a4b4ebc3d78664717d5102f38f2a68f4dda77432bef",
     "job-journal.mjs": "5858e4e2678258971b2436ce4767444ba6bc6aa4d3b7181cbcd5049c1a0dd10f",
     "model-request.mjs": "96d853ebe5978dc90ff8605cb2a312febb8ebc7cc376311e0d2901a1374840fc",
