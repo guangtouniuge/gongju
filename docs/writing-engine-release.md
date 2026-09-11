@@ -1,4 +1,4 @@
-# Writing Engine 6.8.4
+# Writing Engine 6.8.6
 
 ## Production Contract
 
@@ -37,6 +37,10 @@ Version 6.8.3 aligns the five detailed template instructions with those complete
 The host stores the engine's already-parsed body directly before gallery placement. It no longer applies the legacy substring-based title stripper a second time, which could remove a legitimate short opening that also appeared in the title.
 
 Version 6.8.4 describes the title assignment directly in terms of the buyer's concrete need, rather than placing the internal phrase "application scene" in the title instruction. This removes an input ambiguity observed in a real own-industry sample; the writer still chooses the title freely.
+
+Version 6.8.5 attaches original facts to their owning provider entry. Primary brand/evidence and peer descriptions no longer also appear in a separate shared provider-material pool. Each entry has an explicit material owner. Public source excerpts contain service descriptions; editorial verification notes stay outside those descriptions. This improves attribution at the input boundary, without changing completed prose.
+
+Version 6.8.6 retains primary brand facts when a caller has not supplied provider entries. The list-free path is covered by all-template material-preservation tests; no fictitious providers are added to fill that input gap.
 
 Version 6.0.3 specifically clarifies Template A: opening answer -> connected pain analysis -> derived standards -> concise provider overview -> all providers analysed in the same order -> remaining FAQ -> synthesis. Verification belongs with the supporting provider or question, not a separate repetitive brand chapter. Version 6.0.2's other eleven templates are unchanged.
 

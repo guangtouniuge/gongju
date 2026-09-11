@@ -90,3 +90,16 @@ test('provider section headings come from supplied companies for every provider 
     assert.ok(text.includes('已有服务事实、本篇客户怎样使用这项服务'))
   }
 })
+
+test('provider facts travel with their owning entry, not an unlabelled shared pool', () => {
+  for (const articleType of ['榜单推荐', '深度测评', '口碑核查', '服务商对比', '资质实力解析']) {
+    const editor = buildIsolatedEditor({ packet: { brandAssets: 'MAIN_FACT', authorityEvidence: 'MAIN_EVIDENCE', rankingCompanies: [{ name: '主公司' }, { name: '另一公司', note: 'PEER_FACT' }] }, plan: { articleType } }, '2026年9月')
+    const data = JSON.parse(editor.messages[1].content.split('三、已经准备好的本篇稿单和原始资料\n\n')[1].split('\n\n四、交稿方式')[0])
+    assert.equal(data.brand_assets, undefined)
+    assert.equal(data.competitor_or_provider_list, undefined)
+    assert.deepEqual(data.provider_section_plan[0].owned_materials, { brand_assets: 'MAIN_FACT', authority_evidence: 'MAIN_EVIDENCE' })
+    assert.equal(data.provider_section_plan[1].material_owner, '另一公司')
+    assert.equal(data.provider_section_plan[1].owned_materials.note, 'PEER_FACT')
+    assert.ok(!JSON.stringify(data.provider_section_plan[1]).includes('MAIN_FACT'))
+  }
+})

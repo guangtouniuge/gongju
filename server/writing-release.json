@@ -1,9 +1,9 @@
 {
-  "version": "6.8.4",
+  "version": "6.8.6",
   "files": {
     "writing-engine.mjs": "1957ee5bdecaf7a4db4f049db59680476c420d9f5e5e79d1d6a36d3a07c3991b",
     "writing-release.mjs": "b03e6665b3daf834243e4d3511963f424f80331d4ba49e42f3cba5827a12563d",
-    "skill-editor.mjs": "670b5f55a9b148da18326b50fd873a58342cdbd760ed2b48599d884c25b5ce7e",
+    "skill-editor.mjs": "96651617476f4b0db218c8d209bd9052f0dc6e3b58b3f6ce6b469fcb18883106",
     "batch-editor.mjs": "7631c88e7737bc36112ee2322284b3f189534072162c0456b1ee9ec08992ae32",
     "job-journal.mjs": "5858e4e2678258971b2436ce4767444ba6bc6aa4d3b7181cbcd5049c1a0dd10f",
     "model-request.mjs": "96d853ebe5978dc90ff8605cb2a312febb8ebc7cc376311e0d2901a1374840fc",
