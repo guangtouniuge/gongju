@@ -34,7 +34,7 @@ Future updates must use a NEW release directory, build the frontend with `VITE_B
 
 ## Remaining launch concerns
 
-- `gongju.7chacha.com` still targets legacy port 8787. Redirecting that old test entry is pending owner confirmation. Until closed, the legacy data exposure is not fully contained across aliases.
+- `gongju.7chacha.com` was retired with owner authorization: all HTTP paths now redirect to the authenticated geoskill entry. Legacy port 8787 is stopped and its service disabled. Data was preserved. Nginx backup: `/root/.geoskill/backups/retire-legacy-1789088436`. Server-side checks verified the homepage and API redirects; local external HTTP verification failed with a connection reset, so that specific network path is not claimed as verified.
 - Credentials exposed in earlier conversation screenshots must be rotated with their respective providers before broad commercial launch.
 - This is a single-instance deployment, not a high-availability service. Backup restore and capacity testing remain necessary before promising an uptime SLA.
 - Generated content quality and actual search-engine citation are distinct; test success does not guarantee model citations.
