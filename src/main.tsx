@@ -718,6 +718,9 @@ function getArticleAuditFailures(article: Article) {
 function useStoredState<T>(key: string, initialValue: T) {
   const mountedScope = useRef(identityKey()).current
   const localWriteVersion = useRef(0)
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
+  const [loadAttempt, setLoadAttempt] = useState(0)
   const [value, setValue] = useState<T>(() => {
     if (typeof window === 'undefined') return initialValue
     const saved = projectStorage.getItem(key)
@@ -731,8 +734,10 @@ function useStoredState<T>(key: string, initialValue: T) {
 
   useEffect(() => {
     let active = true
+    setLoading(true)
+    setLoadError('')
     const requestedAtVersion = localWriteVersion.current
-    apiJson<{ ok: boolean; value: T | null }>(`/api/state?key=${encodeURIComponent(key)}`, undefined, 5000)
+    apiJson<{ ok: boolean; value: T | null }>(`/api/state?key=${encodeURIComponent(key)}`, undefined, key === 'geo.articleRows' ? 60000 : 30000)
       .then((result) => {
         if (!active) return
         if (localWriteVersion.current !== requestedAtVersion) return
@@ -740,11 +745,12 @@ function useStoredState<T>(key: string, initialValue: T) {
         setValue(loaded)
         projectStorage.setItem(key, JSON.stringify(loaded))
       })
-      .catch(() => undefined)
+      .catch(() => { if (active) setLoadError('资料加载失败，请重试。') })
+      .finally(() => { if (active) setLoading(false) })
     return () => {
       active = false
     }
-  }, [key])
+  }, [key, loadAttempt])
 
   const setStoredValue: Dispatch<SetStateAction<T>> = (nextValue) => {
     if (mountedScope !== identityKey()) return
@@ -759,7 +765,7 @@ function useStoredState<T>(key: string, initialValue: T) {
     })
   }
 
-  return [value, setStoredValue] as const
+  return [value, setStoredValue, { loading, error: loadError, retry: () => setLoadAttempt(value => value + 1) }] as const
 }
 
 type ActionProps = {
@@ -804,7 +810,7 @@ function App() {
   }, [identityRole, route.kind])
   const [expandedNav, setExpandedNav] = useState<string[]>([])
   const [notice, setNotice] = useState('')
-  const [articleRows, setArticleRows] = useStoredState<Article[]>('geo.articleRows', articles)
+  const [articleRows, setArticleRows, articleLoad] = useStoredState<Article[]>('geo.articleRows', articles)
   const [projectRows, setProjectRows] = useStoredState<ProjectRow[]>('geo.projectRows', projects)
   const [activeBrand, setActiveBrand] = useStoredState('geo.activeBrand', '')
   const [activeKeyword, setActiveKeyword] = useStoredState('geo.activeKeyword', '')
@@ -902,7 +908,7 @@ function App() {
         {active === 'gallery' && <Gallery notify={notify} projectRows={projectRows} activeBrand={activeBrand} setActiveBrand={selectActiveBrand} />}
         {active === 'tasks' && <Tasks navigate={setActive} notify={notify} projectRows={projectRows} activeBrand={activeBrand} setActiveBrand={selectActiveBrand} articleRows={articleRows} setArticleRows={setArticleRows} activeBatchId={activeBatchId} setActiveBatchId={setActiveBatchId} />}
         {active === 'audit' && <Audit navigate={setActive} notify={notify} articleRows={articleRows} setArticleRows={setArticleRows} activeBrand={activeBrand} activeBatchId={activeBatchId} />}
-        {active === 'library' && <LibraryPage navigate={setActive} notify={notify} articleRows={articleRows} setArticleRows={setArticleRows} activeBrand={activeBrand} activeBatchId={activeBatchId} setActiveBatchId={setActiveBatchId} />}
+        {active === 'library' && <LibraryPage navigate={setActive} notify={notify} articleRows={articleRows} setArticleRows={setArticleRows} activeBrand={activeBrand} activeBatchId={activeBatchId} setActiveBatchId={setActiveBatchId} articleLoad={articleLoad} />}
         {active === 'distribution' && <Distribution navigate={setActive} notify={notify} articleRows={articleRows} activeBrand={activeBrand} />}
         {active === 'data' && <DataCenter navigate={setActive} notify={notify} />}
         {active === 'model' && <ModelConfig navigate={setActive} notify={notify} />}
@@ -3230,7 +3236,7 @@ function Audit({ notify, navigate, articleRows, setArticleRows, activeBrand, act
   )
 }
 
-function LibraryPage({ notify, navigate, articleRows, setArticleRows, activeBrand, activeBatchId, setActiveBatchId }: ActionProps & ArticleStateProps & Pick<ActiveBrandProps, 'activeBrand'> & ActiveBatchProps) {
+function LibraryPage({ notify, navigate, articleRows, setArticleRows, activeBrand, activeBatchId, setActiveBatchId, articleLoad }: ActionProps & ArticleStateProps & Pick<ActiveBrandProps, 'activeBrand'> & ActiveBatchProps & { articleLoad: { loading: boolean; error: string; retry: () => void } }) {
   const [previewId, setPreviewId] = useState('')
   const [selectedArticles, setSelectedArticles] = useState<string[]>([])
   const [showAllArticles, setShowAllArticles] = useState(false)
@@ -3404,6 +3410,8 @@ function LibraryPage({ notify, navigate, articleRows, setArticleRows, activeBran
           </div>
         </div>
       </div>
+      {articleLoad.loading && <p role="status">正在加载文章库，请稍候…</p>}
+      {articleLoad.error && <div role="alert"><span>文章库加载失败，已有文章未删除。</span> <button className="ghost-button" onClick={articleLoad.retry}>重新加载</button></div>}
       <div className="panel">
         <SectionTitle icon={ListChecks} title="文章任务列表" desc="一次生成任务对应一批文章；没有批次号的旧成品已归到历史成品，点击即可查看。" />
         <div className="ops-table task-batch-table">

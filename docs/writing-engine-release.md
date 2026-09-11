@@ -1,4 +1,39 @@
-# Writing Engine 7.0.8
+# Writing Engine 7.1.3
+
+## Current Release: 2026-09-12
+
+The approved six-file Skill is unchanged. The system now plans article-specific
+progression against the numbered tasks of the selected original template.
+`sectionFocus` cannot create a new outline: task identifiers are resolved against
+that template, and original task text comes from the sealed source.
+
+Topic planning uses groups of at most four briefs. Earlier groups are included
+as topic history for later groups. This fixes the observed twelve-brief output
+truncation without shortening the article, adding a score gate, or rewriting
+finished paragraphs. Each article still receives one whole-article writing call.
+
+The article library now distinguishes loading, load failure, and loaded content.
+Its read timeout accommodates the observed seven-second response; retry is
+available instead of silently presenting an empty library. Browser regression
+tests cover an initial failure and a subsequent response slower than five seconds.
+Commercial UI builds use `npm run build -- --base=/`. Deployment checks the
+archive's asset paths before changing the site, and live asset responses after
+deployment, rolling back if those checks fail.
+
+Version 7.1.2 binds the supplied comparison roster in the system-level assignment
+so that the shared five-provider example is instantiated with the actual project
+companies. Its live C sample retained the four supplied companies. Version 7.1.3
+adds a short prose demonstration only to the L handoff, without changing the
+approved Skill. The live L replay still repeated judgment/boundary sentence
+patterns, so this must not be described as complete readability acceptance.
+
+Verification: repository tests 49/49, standalone component tests 37/37. Live
+authenticated login, article rendering, image pixels, and Word download passed.
+These are functional results, not proof of prose parity or search-engine citation.
+Real API originals and the comparison record are retained under `outputs/api-tests`.
+
+The versioned notes below are historical. Where they differ from this section,
+this current release and the sealed source define the active production path.
 
 ## Topic Angle Is Not A Prewritten Headline
 

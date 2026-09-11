@@ -3,23 +3,24 @@ import assert from 'node:assert/strict'
 import { planBatchTopics, topicHistory } from './batch-editor.mjs'
 import { buildIsolatedEditor, selectTemplate, templateNames } from './skill-editor.mjs'
 
-test('one batch topic call preserves ten isolated writing templates and history', async () => {
+test('bounded batch topic calls preserve ten isolated templates and carry preceding briefs', async () => {
   const assignments = Array.from({ length: 10 }, (_, planIndex) => ({ articleType: templateNames[planIndex], planIndex, writingSceneMode: planIndex % 2 ? '按实际场景写' : '按自己行业写', industryScene: 'GEO行业' }))
   let calls = 0
   const progress = []
   const plans = await planBatchTopics({ packet: { coreKeyword: '西安GEO公司' } }, assignments, [{ title: '历史文章', brief: { centralQuestion: '旧问题', readerSituation: 'DO_NOT_COPY_OLD_STORY' } }], async messages => {
     calls++
     const input = JSON.parse(messages[1].content.split('项目资料：\n')[1])
-    assert.equal(input.previousTopics[0].title, '历史文章')
+    assert.ok(input.previousTopics.some(row => row.title === '历史文章'))
     assert.equal(input.previousTopics[0].question, undefined)
     assert.ok(!JSON.stringify(messages).includes('DO_NOT_COPY_OLD_STORY'))
-    assert.equal(input.assignments.length, 10)
+    assert.equal(input.assignments.length, calls < 3 ? 4 : 2)
+    if (calls > 1) assert.ok(input.previousTopics.some(row => row.businessProblem === '问题0'))
     assert.ok(input.assignments.every(a => a.articleType && a.originalTemplate === selectTemplate(a.articleType).text))
     assert.equal(input.assignments[0].scene, undefined)
     assert.equal(input.assignments[1].scene, 'GEO行业')
-    return { ok: true, content: JSON.stringify({ briefs: input.assignments.map(a => ({ id: a.id, businessProblem: `问题${a.id}`, customerQuestion: `终端问法${a.id}`, readerSituation: `处境${a.id}`, sectionTasks: ['UNWANTED_REPLACEMENT_OUTLINE'] })) }) }
+    return { ok: true, content: JSON.stringify({ briefs: input.assignments.map(a => ({ id: a.id, businessProblem: `问题${(calls - 1) * 4 + a.id}`, customerQuestion: `终端问法${(calls - 1) * 4 + a.id}`, readerSituation: `处境${a.id}`, sectionTasks: ['UNWANTED_REPLACEMENT_OUTLINE'] })) }) }
   }, message => progress.push(message))
-  assert.equal(calls, 1)
+  assert.equal(calls, 3)
   assert.equal(new Set(plans.map(p => p.question)).size, 10)
   assert.ok(progress.some(message => message.includes('直接执行对应Skill稿单')))
   for (const [index, plan] of plans.entries()) {
@@ -36,6 +37,18 @@ test('one batch topic call preserves ten isolated writing templates and history'
 
 test('history belongs to the selected project only', () => {
   assert.deepEqual(topicHistory([{ project: 'a', title: 'a' }, { project: 'b', title: 'b' }], { name: 'a' }).map(x => x.title), ['a'])
+})
+
+test('batch plans article progression within the original tasks in the same planning call', async () => {
+  let calls = 0
+  const [plan] = await planBatchTopics({}, [{ articleType: '问答解释' }], [], async messages => {
+    calls++
+    assert.ok(messages.at(-1).content.includes('sectionFocus'))
+    return { ok: true, content: JSON.stringify({ briefs: [{ id: 0, businessProblem: '已有内容如何更新', readerSituation: '服务范围刚刚变化', sectionFocus: [{ task: 3, focus: '回答新旧服务范围如何分开表达' }, { task: 12, focus: 'OUTSIDE_TEMPLATE' }] }] }) }
+  })
+  assert.equal(calls, 1)
+  assert.deepEqual(plan.editorialBrief.sectionFocus, [{ task: 3, focus: '回答新旧服务范围如何分开表达' }])
+  assert.ok(buildIsolatedEditor({ plan }, '2026年9月').messages[1].content.includes('回答新旧服务范围如何分开表达'))
 })
 
 test('fixed topic rebuilds recommendation judgment while preserving the customer problem', async () => {

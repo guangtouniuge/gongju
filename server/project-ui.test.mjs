@@ -22,6 +22,7 @@ test('browser: view, edit, insert own image, download and switch project without
     stores.a['geo.keywordLibraryRows'] = [['品牌一', '核心词', 'A'], ['品牌二', '核心词', 'B']]
     stores.a['geo.taskRows'] = [{ project: '品牌二', name: '任务提到品牌一及核心词' }]
     await page.addInitScript(() => { window.__geoIdentity = { userId: 'user-a', role: 'project_admin', projectId: 'a' } })
+    let retryArticleLoad = false
     await page.route('**/api/**', async route => {
       const request = route.request()
       const id = request.headers()['x-geo-project-id']
@@ -32,6 +33,10 @@ test('browser: view, edit, insert own image, download and switch project without
           const { key, value } = request.postDataJSON()
           stores[id][key] = value
           return route.fulfill({ json: { ok: true, value } })
+        }
+        if (id === 'a' && url.searchParams.get('key') === 'geo.articleRows') {
+          if (!retryArticleLoad) return route.fulfill({ status: 503, json: { ok: false, error: 'temporary load failure' } })
+          await new Promise(resolve => setTimeout(resolve, 6100))
         }
         return route.fulfill({ json: { ok: true, value: stores[id][url.searchParams.get('key')] ?? null } })
       }
@@ -46,6 +51,10 @@ test('browser: view, edit, insert own image, download and switch project without
     await page.goto(vite.resolvedUrls.local[0])
     await page.getByRole('button', { name: '品牌文章系统', exact: true }).click()
     await page.getByRole('button', { name: '成品文章库', exact: true }).click()
+    await page.getByRole('alert').filter({ hasText: '文章库加载失败' }).waitFor()
+    retryArticleLoad = true
+    await page.getByRole('button', { name: '重新加载', exact: true }).click()
+    await page.getByRole('status').filter({ hasText: '正在加载文章库' }).waitFor()
     await page.getByText('项目A的文章', { exact: true }).waitFor()
     assert.equal(await page.getByText('其他品牌的文章', { exact: true }).count(), 0)
     await page.getByRole('button', { name: '全文查看', exact: true }).click()

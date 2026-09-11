@@ -56,11 +56,16 @@ try {
   await page.locator('input[name=password]').fill(credentials.project.password)
   await page.getByRole('button', { name: '登录', exact: true }).click()
   await page.getByRole('button', { name: '退出登录', exact: true }).waitFor()
+  await page.getByLabel('当前品牌', { exact: true }).selectOption({ label: '曝光率GEO' })
   await page.goto(base + '/#/project/library')
   await page.getByRole('button', { name: '全文查看', exact: true }).first().click()
   const article = page.locator('.article-reader')
   await article.waitFor()
   assert.ok(await article.locator('h2,h3').count() > 0)
+  await page.waitForFunction(() => {
+    const images = [...document.querySelectorAll('.article-reader img')]
+    return images.length > 0 && images.every(image => image.complete && image.naturalWidth > 0)
+  })
   await page.screenshot({ path: out + '/authenticated-reader.png' })
   const downloadPromise = page.waitForEvent('download')
   await page.getByRole('button', { name: '下载本文', exact: true }).click()
@@ -69,6 +74,13 @@ try {
   assert.ok((await fs.stat(out + '/authenticated-article.doc')).size > 1000)
   assert.deepEqual(errors, [])
   console.log('PASS: real browser login, article rendering and authenticated Word download.')
+} catch (error) {
+  const page = browser.contexts()[0]?.pages()[0]
+  if (page) {
+    await page.screenshot({ path: out + '/browser-failure.png', fullPage: true })
+    await fs.writeFile(out + '/browser-failure.txt', await page.locator('body').innerText())
+  }
+  throw error
 } finally { await browser.close() }
 await fs.mkdir('outputs/private', { recursive: true })
 await fs.writeFile('outputs/private/geoskill-login.txt', `网站：https://geoskill.7chacha.com\n\n总后台账号：${credentials.admin.username}\n密码：${credentials.admin.password}\n\n曝光率项目账号：${credentials.project.username}\n密码：${credentials.project.password}\n\n登录后可在右上角修改密码。请勿公开或转发此文件。\n`, { mode: 0o600 })

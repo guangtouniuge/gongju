@@ -2,11 +2,21 @@
 import os
 import re
 import time
+import tarfile
+from pathlib import PurePosixPath
 import paramiko
 
 root = '/www/wwwroot/geoskill.7chacha.com'
 release = root + '/releases/ui-cleanup-' + str(int(time.time()))
 config = '/etc/nginx/conf.d/geoskill.7chacha.com.conf'
+with tarfile.open('deploy/commercial-ui-cleanup.tgz') as archive:
+    index = archive.extractfile('dist/index.html').read().decode()
+    assets = re.findall(r'(?:src|href)="(/[^"?#]+\.(?:js|css))"', index)
+    if not assets or any(not path.startswith('/assets/') for path in assets):
+        raise RuntimeError('Commercial UI must be built with npm run build -- --base=/')
+    for path in assets:
+        archive.getmember(str(PurePosixPath('dist') / path.lstrip('/')))
+
 client = paramiko.SSHClient()
 client.load_system_host_keys()
 client.connect('geoskill.7chacha.com', username='root', password=os.environ['GEO_DEPLOY_PASSWORD'], timeout=20)
@@ -43,6 +53,10 @@ try:
     status = run("curl -s -o /dev/null -w '%{http_code}' https://geoskill.7chacha.com/api/state?key=geo.projectRows").strip()
     if status != '401':
         raise RuntimeError('Authentication regression')
+    for path in assets:
+        status = run("curl -s -o /dev/null -w '%{http_code}' https://geoskill.7chacha.com" + path).strip()
+        if status != '200':
+            raise RuntimeError('UI asset unavailable: ' + path)
     print('UI release deployed: ' + release + '; API service and data unchanged.')
 except Exception:
     if changed:

@@ -57,6 +57,22 @@ test('the four reviewed templates receive only their own original-task applicati
   }
 })
 
+test('all twelve task-focus handoffs bind to the selected original steps, not new outlines', () => {
+  for (const articleType of templateNames) {
+    const editor = buildIsolatedEditor({ plan: { articleType, editorialBrief: { sectionFocus: [
+      { task: 2, focus: '先说明本篇第二步的新判断', originalTask: 'UNTRUSTED_REPLACEMENT' },
+      { task: 1, focus: '用本篇客户的问题开始' },
+      { task: 2, focus: 'DUPLICATE_FOCUS' },
+      { task: 999, focus: 'INVENTED_CHAPTER' },
+    ] } } }, '2026年9月')
+    assert.deepEqual(editor.input.section_focus.map(row => row.task), [1, 2])
+    assert.ok(editor.input.section_focus.every(row => editor.template.text.includes(`${row.task}. ${row.originalTask}`)))
+    assert.ok(editor.messages[1].content.includes('本篇在此推进的新信息'))
+    assert.ok(!/UNTRUSTED_REPLACEMENT|DUPLICATE_FOCUS|INVENTED_CHAPTER/.test(editor.messages[1].content))
+    assert.ok(editor.messages[1].content.endsWith(editor.template.text))
+  }
+})
+
 test('two hundred topic assignments retain their selected template without legacy outlines', () => {
   for (let index = 0; index < 200; index++) {
     const editor = buildIsolatedEditor({
@@ -134,7 +150,16 @@ test('all provider templates receive ordered companies without a second writing 
     assert.ok(!text.includes('article_section_plan'))
     assert.ok(result.messages[0].content.includes('标题以“西安GEO公司”为选择对象'))
     assert.ok(result.messages[0].content.includes('带上2026年9月'))
+    assert.ok(result.messages[0].content.includes('本次比较对象确定为资料中的3家：主品牌、对照甲、对照乙'))
     assert.equal((text.match(/^## Template [A-L]:/gm) || []).length, 1)
+  }
+})
+
+test('non-provider articles do not inherit a forced comparison roster', () => {
+  for (const articleType of ['实战案例', '技术解析', '趋势白皮书', '问答解释']) {
+    const editor = buildIsolatedEditor({ packet: { rankingCompanies: ['主公司', '另一公司'] }, plan: { articleType } }, '2026年9月')
+    assert.ok(!editor.messages[0].content.includes('本次比较对象'))
+    assert.ok(editor.messages[1].content.endsWith(editor.template.text))
   }
 })
 

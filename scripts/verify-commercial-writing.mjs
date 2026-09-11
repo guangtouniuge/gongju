@@ -1,4 +1,5 @@
 import fs from 'node:fs/promises'
+import { parseDocument, DomUtils } from 'htmlparser2'
 import { articleHtml } from '../server/article-format.mjs'
 import { templateNames } from '../server/skill-editor.mjs'
 
@@ -97,8 +98,9 @@ for (;;) {
       if (!download.ok) throw new Error(`Download HTTP ${download.status}`)
       const content = Buffer.from(await download.arrayBuffer())
       await fs.writeFile(`${out}/articles.doc`, content)
-      const text = content.toString('utf8')
-      if (complete.some(article => !text.includes(article.title.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')))) throw new Error('Downloaded document is missing an article title')
+      const document = parseDocument(content.toString('utf8'))
+      const headings = DomUtils.getElementsByTagName('h1', document.children).map(node => DomUtils.textContent(node))
+      if (headings.length !== complete.length || complete.some((article, index) => !headings[index].endsWith(article.title))) throw new Error('Downloaded document is missing an article title')
       await fs.writeFile(`${out}/download-check.json`, JSON.stringify({ count: exported.count, bytes: content.length, allTitlesPresent: true }, null, 2))
     }
     console.log(JSON.stringify({ status: job.status, completed: job.completed, failed: job.failed, versions: results.map(article => article.production?.version), titles: results.map(article => article.title) }))
