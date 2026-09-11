@@ -12,7 +12,7 @@ test('账号全流程、权限与工作空间隔离', async () => {
   await new Promise((done) => listener.listen(0, '127.0.0.1', done))
   const port = listener.address().port
   await new Promise((done) => listener.close(done))
-  const child = spawn(process.execPath, [resolve('server/geo-api-server.mjs')], { cwd: directory, env: { ...process.env, GEO_API_PORT: String(port), GEO_AUTH_DATA_DIR: join(directory, 'auth'), GEO_ADMIN_USERNAME: 'admin', GEO_ADMIN_PASSWORD: 'Safe-admin-password-1', GEO_APP_ORIGIN: 'http://localhost:5173' }, stdio: ['ignore', 'pipe', 'pipe'] })
+  const child = spawn(process.execPath, [resolve('server/geo-api-server.mjs')], { cwd: directory, env: { ...process.env, GEO_ALLOW_HEADER_IDENTITY: 'false', GEO_ALLOW_UNREGISTERED_AUTH_PROJECT: 'false', GEO_API_PORT: String(port), GEO_AUTH_DATA_DIR: join(directory, 'auth'), GEO_ADMIN_USERNAME: 'admin', GEO_ADMIN_PASSWORD: 'Safe-admin-password-1', GEO_APP_ORIGIN: 'http://localhost:5173' }, stdio: ['ignore', 'pipe', 'pipe'] })
   try {
     await new Promise((done, reject) => { child.stdout.once('data', done); child.once('error', reject); child.once('exit', (code) => reject(new Error(`server exited ${code}`))) })
     const call = async (path, body, cookie = '', extraHeaders = {}) => {
@@ -20,6 +20,7 @@ test('账号全流程、权限与工作空间隔离', async () => {
       return { status: res.status, data: await res.json(), cookie: res.headers.get('set-cookie')?.split(';')[0], headers: res.headers }
     }
     assert.equal((await call('/api/state?key=geo.projectRows')).status, 401)
+    assert.equal((await call('/api/state?key=geo.projectRows', undefined, '', { 'x-geo-role': 'super_admin', 'x-geo-user-id': 'admin', 'x-geo-project-id': 'platform' })).status, 401)
     const login = await call('/api/auth/login', { username: 'admin', password: 'Safe-admin-password-1' })
     assert.equal(login.status, 200)
     assert.match(login.headers.get('set-cookie'), /HttpOnly; SameSite=Strict/)
@@ -68,6 +69,9 @@ test('账号全流程、权限与工作空间隔离', async () => {
     assert.equal(teammateUser.status, 201)
     assert.equal(teammateUser.data.user.projectId, managerUser.data.user.projectId)
     assert.equal(teammateUser.data.user.agentId, managerUser.data.user.agentId)
+    assert.equal((await call('/api/state?key=geo.projectRows', undefined, manager, { 'x-geo-project-id': registration.data.user.projectId })).status, 403)
+    assert.equal((await call('/api/admin/users/update', { id: teammateUser.data.user.id, status: 'disabled' }, manager)).status, 200)
+    assert.equal((await call('/api/state?key=geo.projectRows', undefined, manager)).status, 200)
     assert.equal((await call('/api/admin/users', { username: 'escalation', password: 'Safe-manager-password', role: 'agent' }, manager)).status, 403)
     assert.equal((await call('/api/admin/users/update', { id: login.data.user.id, status: 'disabled' }, admin)).status, 403)
     assert.equal((await call('/api/auth/password', { currentPassword: 'wrong', newPassword: 'New-operator-password' }, operator)).status, 400)

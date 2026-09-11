@@ -79,6 +79,7 @@ export function createAuth({ json, readJson }) {
     if (!['project_admin', 'project_operator'].includes(user.role) || !user.projectId) return
     const rows = readProjectRegistry()
     const existing = rows.find((row) => row.projectId === user.projectId)
+    if (existing && user.role === 'project_operator') return
     const now = new Date().toISOString()
     const next = {
       projectId: user.projectId,
@@ -156,7 +157,8 @@ export function createAuth({ json, readJson }) {
   }
   const attempts = new Map()
   const rateLimit = (req) => {
-    const key = req.socket.remoteAddress
+    const localProxy = ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress)
+    const key = process.env.GEO_TRUST_PROXY === 'true' && localProxy ? String(req.headers['x-real-ip'] || req.socket.remoteAddress) : req.socket.remoteAddress
     const now = Date.now()
     for (const [ip, item] of attempts) if (item.until < now) attempts.delete(ip)
     const item = attempts.get(key) || { count: 0, until: now + 15 * 60_000 }

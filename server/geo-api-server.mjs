@@ -7022,6 +7022,7 @@ function hasTrustedProjectHeaders(req) {
 
 function projectUserFromAccount(account, req) {
   const projectId = String(req.headers['x-geo-project-id'] || account.projectId || account.workspaceId || account.id)
+  if (!['super_admin', 'agent'].includes(account.role) && projectId !== (account.projectId || account.workspaceId)) throw scopeError('无权访问其他项目')
   const agentId = String(account.agentId || (account.role === 'agent' ? account.workspaceId : '') || '')
   return {
     userId: account.id,

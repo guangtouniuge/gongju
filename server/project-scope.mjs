@@ -45,6 +45,9 @@ export function visibleProjectAccounts(user) {
 export function resolveProjectScope(user) {
   if (!user) return { projectId: 'legacy', agentId: '', ownerUserId: '', legacy: true }
   const projectId = identifier(user.projectId)
+  if ((user.role === 'super_admin' && projectId === 'platform') || (user.role === 'agent' && projectId === user.agentId)) {
+    return { currentUser: user, projectId, agentId: user.agentId || '', ownerUserId: user.userId }
+  }
   const project = listProjectAccounts().find(row => row.projectId === projectId)
   if (!project && process.env.GEO_ALLOW_UNREGISTERED_AUTH_PROJECT !== 'false') {
     return { currentUser: user, projectId, agentId: user.agentId || '', ownerUserId: user.userId }
@@ -52,6 +55,7 @@ export function resolveProjectScope(user) {
   if (!project || (!user.isSuperAdmin && (user.role === 'agent' ? !user.agentId || project.agentId !== user.agentId : project.projectId !== user.projectId))) {
     throw scopeError('无权访问此项目')
   }
+  if (String(project.status || '').toLowerCase() !== 'active') throw scopeError('项目已停用', 403)
   return { currentUser: user, projectId, agentId: project.agentId || '', ownerUserId: user.userId }
 }
 

@@ -23,6 +23,7 @@ def run(command):
 
 changed = False
 try:
+    run("if systemctl is-active --quiet geoskill-commercial-api.service; then echo 'Commercial service is active; legacy deployment is disabled.' >&2; exit 1; fi")
     service = run('systemctl show geo-content-api.service --property=ExecStart --value')
     if root + '/server/geo-api-server.mjs' not in service:
         raise RuntimeError('Unexpected service target')
