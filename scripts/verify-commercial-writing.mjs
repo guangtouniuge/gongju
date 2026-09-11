@@ -62,7 +62,17 @@ if (process.env.GEO_REPLAY_ARTICLE_FILE) {
     plans[0].lockTopic = true
   }
 }
-const taskName = `榜单生产验收 ${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false })}`
+if (process.env.GEO_LIVE_PLANS_FILE) {
+  if (process.env.GEO_REPLAY_ARTICLE_FILE || process.env.GEO_SYNC_CONFIRMED_PROVIDERS === '1') throw new Error('Explicit plans cannot be combined with replay or provider edits')
+  const submitted = JSON.parse(await fs.readFile(process.env.GEO_LIVE_PLANS_FILE, 'utf8'))
+  if (!Array.isArray(submitted) || !submitted.length || submitted.length > 12) throw new Error('Expected 1-12 test plans')
+  plans = submitted.map((plan, planIndex) => {
+    if (!templateNames.includes(plan.articleType) || !['按自己行业写', '按实际场景写'].includes(plan.writingSceneMode) || !plan.question || !plan.angle) throw new Error('Test plan missing type, mode or topic')
+    return { articleType: plan.articleType, writingSceneMode: plan.writingSceneMode, industryScene: plan.industryScene, question: plan.question, angle: plan.angle, lockTopic: true, planIndex }
+  })
+  await fs.writeFile(`${out}/submitted-plans.json`, JSON.stringify(plans, null, 2))
+}
+const taskName = `${process.env.GEO_TEST_TASK_LABEL || '榜单生产验收'} ${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false })}`
 const start = process.env.GEO_EXISTING_JOB ? { job: { id: process.env.GEO_EXISTING_JOB } } : await api('/api/jobs/start', { project, packet: { coreKeyword: core }, plans, taskName, count: plans.length })
 await fs.writeFile(`${out}/job-start.json`, JSON.stringify(start, null, 2))
 console.log(`Website job ${start.job.id}: ${out}`)
