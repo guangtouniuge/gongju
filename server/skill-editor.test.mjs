@@ -21,6 +21,7 @@ test('all twelve briefs are independently routed and retain the recommended subj
     const prompt = messages[1].content
     assert.equal(template.name, name)
     assert.equal((prompt.match(/^## Template [A-L]:/gm) || []).length, 1)
+    assert.ok(prompt.endsWith(template.text))
     assert.ok(prompt.includes('测试咨询'))
     assert.ok(prompt.includes('技术团队、自研系统、客户案例原文'))
     assert.ok(!prompt.includes('第1/6'))

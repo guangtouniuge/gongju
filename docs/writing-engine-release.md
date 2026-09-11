@@ -1,10 +1,12 @@
-# Writing Engine 6.9.0
+# Writing Engine 6.9.1
 
 ## Current Production Path
 
 Version 6.9.0 replaces both writing adapters with one path for all twelve templates: shared Skill writing/depth guidance, exactly one complete selected template, the Skill's material/industry/keyword references, and the current topic plus project facts. It no longer injects provider-editorial, reader-tone, narrative-flow, a second chapter plan, fixed provider headings, or repeated handoff instructions. Those historical reference files remain archived but are not read by the active writer.
 
 The adapter supplies ordered company data and preserves fact ownership; the selected template decides the article structure. Topic planning stays separate from writing. There is no score gate, word replacement, generated-paragraph repair, or second drafting call. Tests cover all twelve routes and preservation of the original model body. Earlier version notes below describe development history, not additional active instructions.
+
+Version 6.9.1 places the selected full template after the source materials, as the final writing assignment. No content is added or removed in this ordering change. The twelve-type live test in 6.9.0 verified routing and downloads, but exposed writing deviations in the strength and case samples; those samples are not a publication-quality certification.
 
 ## Production Contract
 
