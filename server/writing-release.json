@@ -1,11 +1,11 @@
 {
-  "version": "7.0.5",
+  "version": "7.0.8",
   "files": {
     "writing-engine.mjs": "1957ee5bdecaf7a4db4f049db59680476c420d9f5e5e79d1d6a36d3a07c3991b",
     "writing-release.mjs": "bda729304b4939f530080ee1ba5484d65bf2ec935daad33524a89ad47598189f",
     "approved-skill.json": "20372aedf02f611346ee22ed9c2280dae942bbf4085dc571c1f5122216d3bc71",
-    "skill-editor.mjs": "5581ff1ed0bb47eb262194e785c35d5ea71530caedb692e80a1a78ab1eea83ec",
-    "batch-editor.mjs": "8ff68a83bcd47e048e72c5f0f638878e3548e458b7d4da2626f63ab6f6ee3e19",
+    "skill-editor.mjs": "5f040adae5c2b446d51f037e2301e33f4fdb45e5d3c34d54bc22b7d80ec89d2f",
+    "batch-editor.mjs": "52d73ae0adda65f4b6e470bc1b7371c8319fe12accb03d59070a2df8d1cae19b",
     "job-journal.mjs": "5858e4e2678258971b2436ce4767444ba6bc6aa4d3b7181cbcd5049c1a0dd10f",
     "model-request.mjs": "96d853ebe5978dc90ff8605cb2a312febb8ebc7cc376311e0d2901a1374840fc",
     "skills/niuge-geo-skill/SKILL.md": "25efd147430e94c8c1c1baa8531aafbd41c5f86a403f43d3dffb61e10413765d",

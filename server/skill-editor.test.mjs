@@ -43,6 +43,20 @@ test('empty selection rotates all types; explicit selection rotates only chosen 
   assert.equal(selectTemplate('榜单推荐、避坑指南', 2).id, 'A')
 })
 
+test('the four reviewed templates receive only their own original-task application', () => {
+  const expected = { 榜单推荐: '先列简约名单', 选型指南: '选择框架解释应该怎样判断', 深度测评: '同一组客户决策维度', 问答解释: '把服务动作及用途放在那个答案里' }
+  for (const articleType of templateNames) {
+    const editor = buildIsolatedEditor({ project: { brand: '项目主体' }, plan: { articleType } }, '2026年9月')
+    const text = editor.messages[1].content
+    for (const [name, instruction] of Object.entries(expected)) assert.equal(text.includes(instruction), articleType === name)
+    assert.ok(text.endsWith(selectTemplate(articleType).text))
+    assert.equal((text.match(/^## Template [A-L]:/gm) || []).length, 1)
+    assert.ok(editor.messages[0].content.includes(`由最后的Template ${selectTemplate(articleType).id}决定`))
+    assert.ok(text.includes('编辑问题不是需要逐字使用的成品标题'))
+    assert.ok(text.includes('资料没有说明某项能力，不代表该公司缺乏能力'))
+  }
+})
+
 test('two hundred topic assignments retain their selected template without legacy outlines', () => {
   for (let index = 0; index < 200; index++) {
     const editor = buildIsolatedEditor({

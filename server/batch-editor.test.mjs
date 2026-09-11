@@ -55,6 +55,8 @@ test('same-type batch carries distinct editorial decisions without replacing the
   const assignments = Array.from({ length: 3 }, (_, planIndex) => ({ articleType: '榜单推荐', planIndex, writingSceneMode: '按自己行业写' }))
   const history = [{ title: '旧标题', brief: { centralQuestion: '旧问题', decisionFocus: '旧决策', titleAngle: '旧角度' } }]
   const plans = await planBatchTopics({}, assignments, history, async messages => {
+    assert.ok(messages[2].content.includes('一个简洁的选题切入点'))
+    assert.ok(messages[2].content.includes('不是成品标题'))
     const input = JSON.parse(messages[1].content.split('项目资料：\n')[1])
     assert.equal(input.topicExamples, undefined)
     assert.equal(input.previousTopics[0].businessProblem, '旧问题')

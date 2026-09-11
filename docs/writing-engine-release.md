@@ -1,4 +1,57 @@
-# Writing Engine 7.0.5
+# Writing Engine 7.0.8
+
+## Topic Angle Is Not A Prewritten Headline
+
+The 7.0.6 and 7.0.7 samples copied the planner's long `titleAngle` verbatim. Asking
+the writer to distill it did not address the upstream source. The planner now
+supplies one concise editorial hook, leaving date, city and service-word assembly
+to the original template's writer. Detailed business questions remain available
+for the body. No title-length filter or finished-title replacement is added.
+
+The 7.0.7 live A sample now has a concise four-company list followed by unified
+analysis, without a separate detailed primary-brand recommendation chapter. C
+uses the four supplied companies without adding a generic fifth category. These
+are narrow improvements, not full prose acceptance: the samples still contain
+repetition, long headlines and some unsupported market generalizations. The
+7.0.6 L sample also over-expanded brand mentions and question count. Original
+outputs remain preserved for review; no post-generation fixes are applied.
+
+## Template Precedence
+
+The 7.0.6 live A sample still added a separate primary-brand recommendation
+chapter, and C added a generic fifth provider type despite four supplied entities.
+The shared depth notes mention five providers and a recommendation section, while
+Template A specifically keeps detailed recommendation inside the provider entry.
+The handoff now resolves this ambiguity explicitly: the selected template owns
+chapter order and recommendation placement, the project list owns entities/count,
+and shared depth notes elaborate those tasks. The original Skill remains intact.
+The A handoff distinguishes the concise list from the following detailed analysis.
+This is input precedence, not a body rearrangement or post-generation filter.
+
+## Four Reviewed Template Handoffs
+
+The software-outsourcing A/B/C/L samples exposed different execution gaps, not
+one missing universal outline. The adapter now maps the topic into the selected
+original template's tasks:
+
+- A, items 3/7/8/11: early answer, concise list before unified provider analysis,
+  then a conclusion grounded in the comparison.
+- B, items 1-6: answer, wrong selection methods, practical framework, and the
+  recommended service's fit inside that framework. No mandatory TOP list.
+- C, items 2-6: shared decision dimensions and supported provider differences.
+  Missing source information is not evidence of a provider's weakness.
+- L, items 1/3/4/5: short answer and relevant service recommendations inside
+  individual answers, rather than only a closing company profile.
+
+Title handoff asks for one distilled selection point instead of copying the full
+editorial question. Source handoff connects customer problem, service action and
+use, distinguishing expected use from documented results. Provider names retain
+their source identity. These instructions are input-side explanations of existing
+tasks; no completed article is rewritten or score-gated. Other templates keep
+their existing handoff. The approved six Skill source files remain unchanged.
+
+All 46 functional checks pass. Live prose review is recorded separately and is
+not implied by this result.
 
 ## Recommendation Judgment At Planning Time
 
