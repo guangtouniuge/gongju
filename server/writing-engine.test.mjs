@@ -18,7 +18,8 @@ test('all twelve engine routes preserve the whole article with one writing call'
         calls++
         const prompt = messages[1].content
         assert.equal((prompt.match(/^## Template [A-L]:/gm) || []).length, 1)
-        assert.equal((prompt.match(/^- [A-L]:/gm) || []).length, 1)
+        assert.ok(!prompt.includes('article_section_plan'))
+        assert.ok(!prompt.includes('# 服务商推荐稿的编辑工作'))
         assert.ok(!prompt.includes('OLD_INJECTION'))
         return { ok: true, content: JSON.stringify({ title: '测试标题', body }), raw: { model: 'provider-resolved-model' } }
       },

@@ -25,13 +25,11 @@ test('all twelve briefs are independently routed and retain the recommended subj
     assert.ok(prompt.includes('技术团队、自研系统、客户案例原文'))
     assert.ok(!prompt.includes('第1/6'))
     assert.ok(!prompt.includes('## Paragraph Tasking'))
-    assert.ok(prompt.includes('不是标题卖点'))
-    assert.ok(prompt.includes(/[ACDIJ]/.test(template.id) ? '推荐的依据是服务适配性' : 'A recommendation is a reasoned choice'))
+    assert.ok(prompt.includes('A recommendation is a reasoned choice'))
     if (/[ACDIJ]/.test(template.id)) {
       assert.ok(prompt.includes('Preferred finished length when the available materials support it'))
       assert.ok(prompt.includes('A normal paragraph should usually carry 60-130 Chinese characters'))
-      assert.ok(!prompt.includes('# Industry Variables'))
-      assert.ok(!prompt.includes('## Dimension Rule'))
+      assert.ok(prompt.includes('# Industry Variables'))
     }
   }
 })
@@ -41,6 +39,19 @@ test('empty selection rotates all types; explicit selection rotates only chosen 
   assert.equal(selectTemplate('技术解析', 17).id, 'G')
   assert.equal(selectTemplate('榜单推荐、避坑指南', 1).id, 'E')
   assert.equal(selectTemplate('榜单推荐、避坑指南', 2).id, 'A')
+})
+
+test('two hundred topic assignments retain their selected template without legacy outlines', () => {
+  for (let index = 0; index < 200; index++) {
+    const editor = buildIsolatedEditor({
+      project: { brand: '测试公司' },
+      plan: { articleType: '榜单推荐', planIndex: index, editorialBrief: { businessProblem: `客户问题${index}`, sectionTasks: ['OLD_PARAGRAPH_CONTROL'], argumentSpine: 'OLD_ARGUMENT_CONTROL' } },
+    }, '2026年9月')
+    assert.equal(editor.template.id, 'A')
+    assert.equal(editor.input.topic.businessProblem, `客户问题${index}`)
+    assert.ok(!editor.messages[1].content.includes('OLD_PARAGRAPH_CONTROL'))
+    assert.ok(!editor.messages[1].content.includes('OLD_ARGUMENT_CONTROL'))
+  }
 })
 
 test('soft-list templates receive provider facts without switching to ranking', () => {
@@ -63,7 +74,9 @@ test('provider writing direction is isolated from non-provider templates and has
   for (const name of templateNames) {
     const { template, messages } = buildIsolatedEditor({ plan: { articleType: name } }, '2026年9月')
     const text = messages[1].content
-    assert.equal(text.includes('# 服务商推荐稿的编辑工作'), /[ACDIJ]/.test(template.id))
+    assert.equal(text.includes('# 服务商推荐稿的编辑工作'), false)
+    assert.equal(text.includes('article_section_plan'), false)
+    assert.equal(text.includes('provider_section_plan'), false)
     assert.ok(!text.includes('导语直接用'))
     assert.ok(!text.includes('例如“如果一家连锁企业'))
   }
@@ -76,30 +89,26 @@ test('writing uses exact selected source extracts without trusting invented mate
   assert.deepEqual(resolveWritingMaterials(packet, { materialQuotes: [{ source: 'brand', quote: '捏造能力' }] }), { brand: packet.brandAssets, evidence: packet.evidence })
 })
 
-test('provider section headings come from supplied companies for every provider template', () => {
+test('all provider templates receive ordered companies without a second writing outline', () => {
   for (const articleType of ['榜单推荐', '深度测评', '口碑核查', '服务商对比', '资质实力解析']) {
     const result = buildIsolatedEditor({ packet: { coreKeyword: '西安GEO公司', rankingCompanies: [{ name: '主品牌全称', shortName: '主品牌' }, { name: '对照甲' }, { name: '对照乙' }] }, plan: { articleType } }, '2026年9月')
     const text = result.messages[1].content
-    assert.ok(text.includes('provider_section_heading'))
-    assert.ok(text.includes('article_section_plan'))
-    assert.ok(text.includes('逐家分析中首次完整展开'))
-    assert.ok(text.includes('总标题属于全部公司'))
-    for (const heading of ['### 第1名：主品牌', '### 第2名：对照甲', '### 第3名：对照乙']) assert.ok(text.includes(heading))
+    assert.deepEqual(result.input.competitor_or_provider_list.map(row => row.order), [1, 2, 3])
+    assert.deepEqual(result.input.competitor_or_provider_list.map(row => row.company), ['主品牌全称', '对照甲', '对照乙'])
+    assert.ok(!text.includes('article_section_plan'))
     assert.ok(result.messages[0].content.includes('标题以“西安GEO公司”为选择对象'))
     assert.ok(result.messages[0].content.includes('带上2026年9月'))
-    assert.ok(text.includes('已有服务事实、本篇客户怎样使用这项服务'))
+    assert.equal((text.match(/^## Template [A-L]:/gm) || []).length, 1)
   }
 })
 
 test('provider facts travel with their owning entry, not an unlabelled shared pool', () => {
   for (const articleType of ['榜单推荐', '深度测评', '口碑核查', '服务商对比', '资质实力解析']) {
     const editor = buildIsolatedEditor({ packet: { brandAssets: 'MAIN_FACT', authorityEvidence: 'MAIN_EVIDENCE', rankingCompanies: [{ name: '主公司' }, { name: '另一公司', note: 'PEER_FACT' }] }, plan: { articleType } }, '2026年9月')
-    const data = JSON.parse(editor.messages[1].content.split('三、已经准备好的本篇稿单和原始资料\n\n')[1].split('\n\n四、交稿方式')[0])
-    assert.equal(data.brand_assets, undefined)
-    assert.equal(data.competitor_or_provider_list, undefined)
-    assert.deepEqual(data.provider_section_plan[0].owned_materials, { brand_assets: 'MAIN_FACT', authority_evidence: 'MAIN_EVIDENCE' })
-    assert.equal(data.provider_section_plan[1].material_owner, '另一公司')
-    assert.equal(data.provider_section_plan[1].owned_materials.note, 'PEER_FACT')
-    assert.ok(!JSON.stringify(data.provider_section_plan[1]).includes('MAIN_FACT'))
+    const data = editor.input
+    assert.deepEqual(data.competitor_or_provider_list[0].materials, { brand_assets: 'MAIN_FACT', authority_evidence: 'MAIN_EVIDENCE' })
+    assert.equal(data.competitor_or_provider_list[1].company, '另一公司')
+    assert.equal(data.competitor_or_provider_list[1].materials.note, 'PEER_FACT')
+    assert.ok(!JSON.stringify(data.competitor_or_provider_list[1]).includes('MAIN_FACT'))
   }
 })
