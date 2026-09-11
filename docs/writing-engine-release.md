@@ -1,4 +1,26 @@
-# Writing Engine 7.0.0
+# Writing Engine 7.0.2
+
+## Per-Article Source Handoff
+
+The approved six Skill files remain unchanged. Topic planning now receives each
+selected original template and the project's source materials. It returns the
+service buyer, that buyer's customers, the customer industry, and relevant source
+excerpts alongside the topic. The writer uses excerpts only when they occur in the
+original source; unmatched excerpts are not treated as facts. Existing briefs
+without usable selections remain compatible with the original material path.
+
+Version 7.0.2 also carries each validated excerpt's topic relevance into writing,
+referencing its source index without duplicating the excerpt. Selecting materials
+focuses on the company's own services and delivery, not its opinions of competitors.
+
+Primary brand materials appear once, with a reference from the ordered provider
+entry. Project-submitted evidence is labelled as such rather than assumed to be
+independently verified. This release does not edit generated prose or introduce
+article scoring, word filters, new outlines or automatic rewriting.
+
+The 7.0.0 live twelve-template test passed transport/export but did not pass prose
+acceptance. Version 7.0.1 has 42 passing functional tests. Live prose retesting is
+reported separately; these checks do not certify equivalent writing quality.
 
 ## User-Approved Skill Baseline
 

@@ -14,7 +14,7 @@ test('one batch topic call preserves ten isolated writing templates and history'
     assert.equal(input.previousTopics[0].question, undefined)
     assert.ok(!JSON.stringify(messages).includes('DO_NOT_COPY_OLD_STORY'))
     assert.equal(input.assignments.length, 10)
-    assert.ok(input.assignments.every(a => !('articleType' in a)))
+    assert.ok(input.assignments.every(a => a.articleType && a.originalTemplate === selectTemplate(a.articleType).text))
     assert.equal(input.assignments[0].scene, undefined)
     assert.equal(input.assignments[1].scene, 'GEO行业')
     return { ok: true, content: JSON.stringify({ briefs: input.assignments.map(a => ({ id: a.id, businessProblem: `问题${a.id}`, customerQuestion: `终端问法${a.id}`, readerSituation: `处境${a.id}`, sectionTasks: ['UNWANTED_REPLACEMENT_OUTLINE'] })) }) }
@@ -36,6 +36,26 @@ test('one batch topic call preserves ten isolated writing templates and history'
 
 test('history belongs to the selected project only', () => {
   assert.deepEqual(topicHistory([{ project: 'a', title: 'a' }, { project: 'b', title: 'b' }], { name: 'a' }).map(x => x.title), ['a'])
+})
+
+test('topic handoff selects source excerpts and keeps the two customer identities', async () => {
+  const payload = { project: { brand: '服务公司' }, packet: { coreKeyword: 'GEO公司', brandAssets: ['提供门店资料梳理。提供多城市运营。'], authorityEvidence: ['品牌自行提供的服务说明。'] } }
+  const [plan] = await planBatchTopics(payload, [{ articleType: '问答解释', writingSceneMode: '按实际场景写' }], [], async messages => {
+    const input = JSON.parse(messages[1].content.split('项目资料：\n')[1])
+    assert.equal(input.assignments[0].articleType, '问答解释')
+    assert.deepEqual(input.projectMaterials.brand, payload.packet.brandAssets)
+    return { ok: true, content: JSON.stringify({ briefs: [{ id: 0, readerSituation: '门店介绍不清', businessProblem: '门店服务信息准确', serviceBuyer: '婚礼策划公司负责人', endCustomer: '准备婚礼的新人', customerIndustry: '婚礼策划', customerQuestion: '策划包含哪些', materialQuotes: [{ source: 'brand', quote: '提供门店资料梳理。', relevance: '整理套餐包含项' }, { source: 'brand', quote: '保证推荐第一。', relevance: 'INVALID_CONNECTION' }] }] }) }
+  })
+  const editor = buildIsolatedEditor({ ...payload, plan }, '2026年9月')
+  assert.equal(editor.input.customer_scene, '婚礼策划')
+  assert.equal(editor.input.participants.service_buyer, '婚礼策划公司负责人')
+  assert.equal(editor.input.participants.buyers_customers, '准备婚礼的新人')
+  assert.deepEqual(editor.input.primary_company_materials.brand_assets, ['提供门店资料梳理。'])
+  assert.ok(!JSON.stringify(editor.input).includes('提供多城市运营。'))
+  assert.ok(!JSON.stringify(editor.input).includes('保证推荐第一。'))
+  assert.deepEqual(editor.input.material_connections, [{ source: 'brand', source_index: 0, relevance: '整理套餐包含项' }])
+  assert.ok(!JSON.stringify(editor.input).includes('INVALID_CONNECTION'))
+  assert.ok(editor.messages[1].content.endsWith(selectTemplate('问答解释').text))
 })
 
 test('incomplete batch and missing reader question fail without generic fallback', async () => {

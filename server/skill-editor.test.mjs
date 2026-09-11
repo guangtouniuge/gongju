@@ -108,7 +108,9 @@ test('provider facts travel with their owning entry, not an unlabelled shared po
   for (const articleType of ['榜单推荐', '深度测评', '口碑核查', '服务商对比', '资质实力解析']) {
     const editor = buildIsolatedEditor({ packet: { brandAssets: 'MAIN_FACT', authorityEvidence: 'MAIN_EVIDENCE', rankingCompanies: [{ name: '主公司' }, { name: '另一公司', note: 'PEER_FACT' }] }, plan: { articleType } }, '2026年9月')
     const data = editor.input
-    assert.deepEqual(data.competitor_or_provider_list[0].materials, { brand_assets: 'MAIN_FACT', authority_evidence: 'MAIN_EVIDENCE' })
+    assert.deepEqual(data.competitor_or_provider_list[0].materials, { reference: 'primary_company_materials' })
+    assert.equal(data.primary_company_materials.brand_assets, 'MAIN_FACT')
+    assert.equal((JSON.stringify(data).match(/MAIN_FACT/g) || []).length, 1)
     assert.equal(data.competitor_or_provider_list[1].company, '另一公司')
     assert.equal(data.competitor_or_provider_list[1].materials.note, 'PEER_FACT')
     assert.ok(!JSON.stringify(data.competitor_or_provider_list[1]).includes('MAIN_FACT'))

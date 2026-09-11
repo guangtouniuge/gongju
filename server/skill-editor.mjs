@@ -22,10 +22,15 @@ export function readerIdentity(core, mode) {
 
 const materialText = (value) => typeof value === 'string' ? value : Array.isArray(value) ? value.map(materialText).join('\n') : value && typeof value === 'object' ? Object.values(value).map(materialText).join('\n') : ''
 
+function selectedMaterialQuotes(packet, brief) {
+  const sources = { brand: packet.brandAssets || packet.assets || packet.knowledge, evidence: packet.authorityEvidence || packet.evidence || packet.citations }
+  return (Array.isArray(brief?.materialQuotes) ? brief.materialQuotes : []).filter(item =>
+    ['brand', 'evidence'].includes(item?.source) && typeof item.quote === 'string' && item.quote.trim() && materialText(sources[item.source]).includes(item.quote.trim()))
+}
+
 export function resolveWritingMaterials(packet, brief) {
   const sources = { brand: packet.brandAssets || packet.assets || packet.knowledge, evidence: packet.authorityEvidence || packet.evidence || packet.citations }
-  const selections = (Array.isArray(brief?.materialQuotes) ? brief.materialQuotes : []).filter(item =>
-    ['brand', 'evidence'].includes(item?.source) && typeof item.quote === 'string' && item.quote.trim() && materialText(sources[item.source]).includes(item.quote.trim()))
+  const selections = selectedMaterialQuotes(packet, brief)
   return selections.length ? { brand: selections.filter(s => s.source === 'brand').map(s => s.quote.trim()), evidence: selections.filter(s => s.source === 'evidence').map(s => s.quote.trim()) } : sources
 }
 
@@ -44,6 +49,7 @@ export function buildIsolatedEditor(payload, date) {
   const mode = plan.writingSceneMode || packet.writingSceneMode || '按自己行业写'
   const core = packet.coreKeyword || project.coreKeyword || ''
   const source = resolveWritingMaterials(packet, plan.editorialBrief)
+  const selected = selectedMaterialQuotes(packet, plan.editorialBrief)
   const rows = packet.rankingCompanies || plan.providerList || packet.providerList || []
   // The template owns writing; the adapter supplies only topic and project data.
   const input = {
@@ -56,7 +62,8 @@ export function buildIsolatedEditor(payload, date) {
     core_keyword: core,
     writing_mode: mode,
     reader_identity: readerIdentity(core, mode),
-    customer_scene: String(mode).includes('实际场景') ? plan.industryScene || packet.industryScene : undefined,
+    participants: { service_buyer: plan.editorialBrief?.serviceBuyer, buyers_customers: plan.editorialBrief?.endCustomer },
+    customer_scene: String(mode).includes('实际场景') ? plan.editorialBrief?.customerIndustry || plan.industryScene || packet.industryScene : undefined,
     article_intent: template.name,
     topic: {
       readerSituation: plan.editorialBrief?.readerSituation || plan.angle,
@@ -69,12 +76,13 @@ export function buildIsolatedEditor(payload, date) {
     article_sequence: plan.planIndex || 0,
     distilled_questions: packet.questions,
     expanded_keywords: packet.keywords,
-    primary_company_materials: { company: project.brand || project.name, brand_assets: source.brand, authority_evidence: source.evidence },
+    primary_company_materials: { company: project.brand || project.name, provenance: '项目方提交资料；有明确公开出处的依该出处表达，其余为品牌自述，并非已完成第三方核验。', brand_assets: source.brand, authority_evidence: source.evidence },
+    material_connections: selected.map((item, index) => ({ source: item.source, source_index: selected.slice(0, index).filter(previous => previous.source === item.source).length, relevance: item.relevance })),
     competitor_or_provider_list: /[ABCDEIJK]/.test(template.id) && Array.isArray(rows) ? rows.map((row, index) => ({
       order: index + 1,
       company: typeof row === 'string' ? row : row.name,
       shortName: typeof row === 'string' ? row : row.shortName,
-      materials: index === 0 ? { brand_assets: source.brand, authority_evidence: source.evidence } : row,
+      materials: index === 0 ? { reference: 'primary_company_materials' } : row,
     })) : undefined,
   }
   return {
