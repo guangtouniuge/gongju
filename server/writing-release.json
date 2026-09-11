@@ -1,10 +1,10 @@
 {
-  "version": "6.1.0",
+  "version": "6.2.1",
   "files": {
-    "writing-engine.mjs": "a75aa3ac090ff557cc2c97b12252b179827f87935f70afbcd61c5775e6894f5a",
+    "writing-engine.mjs": "effdf41beb07ca65a382275a60b6ab5641e299ef95a287e8f057020a1dd24d92",
     "writing-release.mjs": "b03e6665b3daf834243e4d3511963f424f80331d4ba49e42f3cba5827a12563d",
-    "skill-editor.mjs": "e58d68108c3c2106cdc59a3096f08e508135692f29466e4cb3ff186410c7ae81",
-    "batch-editor.mjs": "f82d24485d61bd25bf15a67b41bfdba96d7a9eb62c3f4f3abb2bed45a0685409",
+    "skill-editor.mjs": "44a40660a055800697a109f2528721bcd8852e98a570a0b0052030d219419695",
+    "batch-editor.mjs": "cb8c446f9a1f6b54ace3a5683c8f362ef172582849d68e83f93e7fd1d817c08a",
     "job-journal.mjs": "5858e4e2678258971b2436ce4767444ba6bc6aa4d3b7181cbcd5049c1a0dd10f",
     "skills/niuge-geo-skill/SKILL.md": "25efd147430e94c8c1c1baa8531aafbd41c5f86a403f43d3dffb61e10413765d",
     "skills/niuge-geo-skill/references/article-templates.md": "34092c971d316e1124cb72eb0b5e4ec5a545e6412c66dfe28733e3c621a188f5",

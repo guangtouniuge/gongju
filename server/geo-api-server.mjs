@@ -457,13 +457,16 @@ function insertGalleryImagesIntoArticle(articleBody, galleries = []) {
       imagePaths: [images[0].src],
     }
   }
+  const firstHeading = blocks.findIndex(block => /^#{1,6}\s/.test(block))
+  const openingEnd = firstHeading > 0 ? firstHeading : 0
+  const closingHeading = blocks.findLastIndex(block => /^##\s.*(?:总结|结论|回到|最后|收尾)/.test(block))
   const insertions = images.length > 1
     ? [
-        { after: Math.min(3, blocks.length - 1), image: images[0] },
-        { after: Math.min(Math.max(6, Math.floor(blocks.length * 0.62)), blocks.length - 1), image: images[1] },
+        { after: openingEnd, image: images[0] },
+        { after: closingHeading > openingEnd ? closingHeading : blocks.length, image: images[1] },
       ]
-    : [{ after: Math.min(3, blocks.length - 1), image: images[0] }]
-  const nextBlocks = []
+    : [{ after: openingEnd, image: images[0] }]
+  const nextBlocks = insertions.filter(item => item.after === 0).map(item => `![${item.image.label}](${item.image.src})`)
   blocks.forEach((block, index) => {
     nextBlocks.push(block)
     insertions

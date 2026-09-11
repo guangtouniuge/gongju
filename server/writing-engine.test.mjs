@@ -51,6 +51,17 @@ test('truncated transport is not silently stored as a complete article', async (
   assert.match(result.error, /长度上限/)
 })
 
+test('whole article uses plain Markdown transport without JSON escaping', async () => {
+  const body = '## 正文\n\n这里包含"报价"与换行，不需要JSON转义。'
+  const result = await runWritingEngine(payload, { date: '2026年9月', model: 'test', callModel: async (_messages, _temperature, format) => {
+    assert.equal(format, undefined)
+    return { ok: true, content: '# 完整标题\n\n' + body }
+  } })
+  assert.equal(result.ok, true)
+  assert.equal(result.body, body)
+  assert.equal(result.title, '完整标题')
+})
+
 test('release detects altered production files, without checking article scores', () => {
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'geo-seal-'))
   try {
