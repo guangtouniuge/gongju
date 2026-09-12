@@ -39,17 +39,16 @@ test('history belongs to the selected project only', () => {
   assert.deepEqual(topicHistory([{ project: 'a', title: 'a' }, { project: 'b', title: 'b' }], { name: 'a' }).map(x => x.title), ['a'])
 })
 
-test('batch plans article progression within the original tasks in the same planning call', async () => {
-  let calls = 0
+test('planner only returns topic and material, not paragraph instructions', async () => {
   const [plan] = await planBatchTopics({}, [{ articleType: '问答解释' }], [], async messages => {
-    calls++
-    assert.ok(messages.at(-1).content.includes('sectionFocus'))
-    return { ok: true, content: JSON.stringify({ briefs: [{ id: 0, businessProblem: '已有内容如何更新', readerSituation: '服务范围刚刚变化', sectionFocus: [{ task: 3, focus: '回答新旧服务范围如何分开表达' }, { task: 12, focus: 'OUTSIDE_TEMPLATE' }] }] }) }
+    assert.equal(messages.length, 2)
+    assert.ok(!JSON.stringify(messages).includes('sectionFocus'))
+    return { ok: true, content: JSON.stringify({ briefs: [{ id: 0, businessProblem: '已有内容如何更新', readerSituation: '服务范围刚刚变化', sectionFocus: [{ task: 3, focus: 'OLD_SECTION' }], openingAnswer: 'OLD_OPENING', reasoningPath: 'OLD_REASONING' }] }) }
   })
-  assert.equal(calls, 1)
-  assert.deepEqual(plan.editorialBrief.sectionFocus, [{ task: 3, focus: '回答新旧服务范围如何分开表达' }])
-  assert.ok(buildIsolatedEditor({ plan }, '2026年9月').messages[1].content.includes('回答新旧服务范围如何分开表达'))
+  assert.equal(plan.editorialBrief.businessProblem, '已有内容如何更新')
+  assert.ok(!/OLD_SECTION|OLD_OPENING|OLD_REASONING/.test(JSON.stringify(plan)))
 })
+
 
 test('fixed topic rebuilds recommendation judgment while preserving the customer problem', async () => {
   const [plan] = await planBatchTopics({}, [{ articleType: '榜单推荐', lockTopic: true, question: '投入进展如何看清', angle: '负责人需要了解执行进展' }], [], async messages => {
@@ -61,15 +60,15 @@ test('fixed topic rebuilds recommendation judgment while preserving the customer
   assert.equal(plan.question, '投入进展如何看清')
   assert.equal(plan.editorialBrief.businessProblem, '投入进展如何看清')
   assert.equal(plan.editorialBrief.readerSituation, '负责人需要了解执行进展')
-  assert.equal(plan.editorialBrief.openingAnswer, '推荐能展示执行进展的服务')
+  assert.equal(plan.editorialBrief.openingAnswer, undefined)
 })
 
 test('same-type batch carries distinct editorial decisions without replacing the template', async () => {
   const assignments = Array.from({ length: 3 }, (_, planIndex) => ({ articleType: '榜单推荐', planIndex, writingSceneMode: '按自己行业写' }))
   const history = [{ title: '旧标题', brief: { centralQuestion: '旧问题', decisionFocus: '旧决策', titleAngle: '旧角度' } }]
   const plans = await planBatchTopics({}, assignments, history, async messages => {
-    assert.ok(messages[2].content.includes('一个简洁的选题切入点'))
-    assert.ok(messages[2].content.includes('不是成品标题'))
+    assert.ok(messages[1].content.includes('一个简洁的选题切入点'))
+    assert.ok(messages[1].content.includes('不是成品标题'))
     const input = JSON.parse(messages[1].content.split('项目资料：\n')[1])
     assert.equal(input.topicExamples, undefined)
     assert.equal(input.previousTopics[0].businessProblem, '旧问题')
@@ -79,8 +78,8 @@ test('same-type batch carries distinct editorial decisions without replacing the
   for (const [id, plan] of plans.entries()) {
     const editor = buildIsolatedEditor({ plan }, '2026年9月')
     assert.equal(editor.input.topic.decisionFocus, `决策${id}`)
-    assert.equal(editor.input.topic.openingAnswer, `直接答案${id}`)
-    assert.equal(editor.input.topic.reasoningPath, `推荐推理${id}`)
+    assert.equal(editor.input.topic.openingAnswer, undefined)
+    assert.equal(editor.input.topic.reasoningPath, undefined)
     assert.equal(editor.input.topic.titleAngle, `标题方向${id}`)
     assert.ok(!editor.messages[1].content.includes('OTHER_OUTLINE'))
     assert.ok(editor.messages[1].content.endsWith(selectTemplate('榜单推荐').text))

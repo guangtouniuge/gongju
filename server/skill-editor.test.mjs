@@ -26,7 +26,7 @@ test('all twelve briefs are independently routed and retain the recommended subj
     assert.ok(prompt.includes('测试咨询'))
     assert.ok(prompt.includes('技术团队、自研系统、客户案例原文'))
     assert.ok(!prompt.includes('第1/6'))
-    assert.ok(prompt.includes('## Paragraph Tasking'))
+    assert.ok(!prompt.includes('## Paragraph Tasking'))
     assert.ok(prompt.includes(fs.readFileSync(new URL('./skills/niuge-geo-skill/SKILL.md', import.meta.url), 'utf8')))
     if (/[ACDIJ]/.test(template.id)) {
       assert.ok(prompt.includes('Preferred finished length when the available materials support it'))
@@ -43,35 +43,28 @@ test('empty selection rotates all types; explicit selection rotates only chosen 
   assert.equal(selectTemplate('榜单推荐、避坑指南', 2).id, 'A')
 })
 
-test('the four reviewed templates receive only their own original-task application', () => {
-  const expected = { 榜单推荐: '先列简约名单', 选型指南: '选择框架解释应该怎样判断', 深度测评: '同一组客户决策维度', 问答解释: '把服务动作及用途放在那个答案里' }
+test('all types use original templates without system-added writing applications', () => {
   for (const articleType of templateNames) {
-    const editor = buildIsolatedEditor({ project: { brand: '项目主体' }, plan: { articleType } }, '2026年9月')
-    const text = editor.messages[1].content
-    for (const [name, instruction] of Object.entries(expected)) assert.equal(text.includes(instruction), articleType === name)
-    assert.ok(text.endsWith(selectTemplate(articleType).text))
-    assert.equal((text.match(/^## Template [A-L]:/gm) || []).length, 1)
-    assert.ok(editor.messages[0].content.includes(`由最后的Template ${selectTemplate(articleType).id}决定`))
-    assert.ok(text.includes('编辑问题不是需要逐字使用的成品标题'))
-    assert.ok(text.includes('资料没有说明某项能力，不代表该公司缺乏能力'))
+    const editor = buildIsolatedEditor({ plan: { articleType } }, '2026年9月')
+    assert.ok(editor.messages[1].content.endsWith(selectTemplate(articleType).text))
+    for (const removed of ['对应原模板第', '原稿单开头的回答任务', '本篇在此推进的新信息', '仅示范叙述']) {
+      assert.ok(!editor.messages[1].content.includes(removed))
+    }
   }
 })
 
-test('all twelve task-focus handoffs bind to the selected original steps, not new outlines', () => {
+
+test('historical paragraph control fields do not reenter any writer', () => {
   for (const articleType of templateNames) {
-    const editor = buildIsolatedEditor({ plan: { articleType, editorialBrief: { sectionFocus: [
-      { task: 2, focus: '先说明本篇第二步的新判断', originalTask: 'UNTRUSTED_REPLACEMENT' },
-      { task: 1, focus: '用本篇客户的问题开始' },
-      { task: 2, focus: 'DUPLICATE_FOCUS' },
-      { task: 999, focus: 'INVENTED_CHAPTER' },
-    ] } } }, '2026年9月')
-    assert.deepEqual(editor.input.section_focus.map(row => row.task), [1, 2])
-    assert.ok(editor.input.section_focus.every(row => editor.template.text.includes(`${row.task}. ${row.originalTask}`)))
-    assert.ok(editor.messages[1].content.includes('本篇在此推进的新信息'))
-    assert.ok(!/UNTRUSTED_REPLACEMENT|DUPLICATE_FOCUS|INVENTED_CHAPTER/.test(editor.messages[1].content))
-    assert.ok(editor.messages[1].content.endsWith(editor.template.text))
+    const editor = buildIsolatedEditor({ plan: { articleType, editorialBrief: {
+      businessProblem: '本篇真实问题', sectionFocus: [{ task: 1, focus: 'OLD_SECTION' }],
+      openingAnswer: 'OLD_OPENING', reasoningPath: 'OLD_REASONING'
+    } } }, '2026年9月')
+    assert.ok(editor.messages[1].content.includes('本篇真实问题'))
+    assert.ok(!/OLD_SECTION|OLD_OPENING|OLD_REASONING/.test(JSON.stringify(editor)))
   }
 })
+
 
 test('two hundred topic assignments retain their selected template without legacy outlines', () => {
   for (let index = 0; index < 200; index++) {
@@ -113,9 +106,9 @@ test('editor handoff connects the opening and sources in readable prose without 
     } },
   }, '2026年9月')
   const text = editor.messages[1].content
-  assert.ok(text.includes('原稿单开头的回答任务：选择能展示交付过程的服务'))
-  assert.ok(text.includes('原稿单各部分的承接与推荐论证：由交付不清'))
-  assert.ok(text.includes('提供独立后台。\n本篇使用思路（编辑判断，事实以原文为依据）：帮助客户查看进度'))
+  assert.ok(!text.includes('原稿单开头的回答任务'))
+  assert.ok(!text.includes('原稿单各部分的承接与推荐论证'))
+  assert.ok(text.includes('提供独立后台。\n与本题的联系：帮助客户查看进度'))
   assert.equal(text.split('提供独立后台。').length - 1, 1)
   assert.ok(!text.includes('"openingAnswer":'))
   assert.ok(text.includes('同行事实'))
@@ -148,9 +141,9 @@ test('all provider templates receive ordered companies without a second writing 
     assert.deepEqual(result.input.competitor_or_provider_list.map(row => row.order), [1, 2, 3])
     assert.deepEqual(result.input.competitor_or_provider_list.map(row => row.company), ['主品牌全称', '对照甲', '对照乙'])
     assert.ok(!text.includes('article_section_plan'))
-    assert.ok(result.messages[0].content.includes('标题以“西安GEO公司”为选择对象'))
-    assert.ok(result.messages[0].content.includes('带上2026年9月'))
-    assert.ok(result.messages[0].content.includes('本次比较对象确定为资料中的3家：主品牌、对照甲、对照乙'))
+    assert.ok(text.includes('服务选择主词：西安GEO公司'))
+    assert.ok(text.includes('日期：2026年9月'))
+    assert.ok(result.messages[0].content.includes('本篇对比资料：3家，主品牌、对照甲、对照乙'))
     assert.equal((text.match(/^## Template [A-L]:/gm) || []).length, 1)
   }
 })
@@ -158,7 +151,8 @@ test('all provider templates receive ordered companies without a second writing 
 test('non-provider articles do not inherit a forced comparison roster', () => {
   for (const articleType of ['实战案例', '技术解析', '趋势白皮书', '问答解释']) {
     const editor = buildIsolatedEditor({ packet: { rankingCompanies: ['主公司', '另一公司'] }, plan: { articleType } }, '2026年9月')
-    assert.ok(!editor.messages[0].content.includes('本次比较对象'))
+    assert.equal(editor.input.competitor_or_provider_list, undefined)
+    assert.ok(!editor.messages[1].content.includes('本篇可用服务商资料'))
     assert.ok(editor.messages[1].content.endsWith(editor.template.text))
   }
 })

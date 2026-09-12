@@ -1,4 +1,43 @@
-# Writing Engine 7.1.3
+# Writing Engine 7.2.3
+
+## Production Simplification
+
+The user's instruction is to remove system-added writing controls, not create
+another improvement layer. Version 7.2.3 removes per-template adapter prose,
+sectionFocus, openingAnswer, reasoningPath, the L prose demonstration and the
+duplicate shared template preamble from the active writer. Historical brief
+fields remain in old records but are not forwarded to new writing calls.
+
+The writer receives the unchanged Skill main file, the selected original A-L
+template, the three original material/industry/keyword references, and project
+data plus its topic. The planner uses two messages to return topic and material
+selection only; it no longer prepares paragraph instructions. The existing
+four-brief request grouping, project ownership and single-article API transport
+are unchanged. No output rewrite or score gate was introduced.
+
+The comparison roster's count and names are passed as project data in the request.
+The 7.2.2 live A sample otherwise expanded four supplied companies into five
+types by following the original generic five-provider example. This is a data
+binding change, not an additional section plan or a post-generation deletion.
+
+Local controlled replays preserved the selected topic and current project
+materials. They did not establish prose parity: L still copies repetitive
+answer/judgment/boundary patterns from the original template. The approved Skill
+was not edited to hide this result. This release removes unwanted system layers;
+it is not a claim that commercial editorial acceptance is complete.
+
+Live verification: version 7.2.3 completed JOB-mtxnigx9-kbi0x on geoskill,
+using the same topic as the preceding A sample. Its four supplied companies
+remained in order, and the Word export contained the article title (507868
+bytes). Two images were inserted by the existing delivery pipeline. Originals
+are in outputs/api-tests/website-1789173173912. The opening still delays the
+recommendation and the conclusion remains tentative; these are unresolved
+editorial observations, not reasons to rewrite the returned article.
+
+Repository tests passed 49/49; the standalone package passed 37/37. Those
+checks establish functional integrity, not commercial prose acceptance.
+
+Everything below is historical where it conflicts with this section.
 
 ## Current Release: 2026-09-12
 
